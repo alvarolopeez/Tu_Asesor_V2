@@ -142,3 +142,44 @@ Interfaces TypeScript que mapean EXACTAMENTE al schema de Supabase:
 | BAJA | Implementar focus trap en modales | Accesibilidad |
 | BAJA | Quitar prop `unoptimized` de SuccessStoriesCarousel | Ya configurado remotePatterns |
 | BAJA | Activar leaked password protection | Dashboard Supabase → Auth Settings |
+
+---
+
+## 🔵 SESIÓN 2: Fixes de Formularios y Deploy (12 May 2026 - 21:00h)
+
+### FIX: Error RLS en formularios de calculadoras
+- **Error:** `new row violates row-level security policy for table 'leads'` (401)
+- **Causa:** Las nuevas políticas RLS de la Sesión 1 validaban correctamente pero faltaba que el frontend enviara `status: 'new'` explícitamente. Además no había SELECT público para buscar leads existentes.
+- **Solución:** Creado `src/lib/leadService.ts` centralizado + RLS de SELECT público en `leads`
+
+### Nuevo archivo: `src/lib/leadService.ts`
+Servicio centralizado de leads con lógica de negocio:
+- **Deduplicación:** Busca lead existente por teléfono antes de insertar
+- **Si ya existe:** Reutiliza su ID, NO duplica
+- **Si no existe:** Crea nuevo lead como `seller` (plusvalía) o `buyer` (rentabilidad)
+- **Guarda cálculo:** Vincula el cálculo al lead (existente o nuevo)
+- **Manejo de errores:** Devuelve `{ success, leadId, isExisting, error }` en vez de throw
+
+### Formularios actualizados (plusvalia + rentabilidad)
+- ✅ **Checkbox de consentimiento** obligatorio: "Acepto recibir llamada/mensaje de Tu Asesor..."
+- ✅ **Botón deshabilitado** hasta aceptar consentimiento (gris → amarillo)
+- ✅ **Loading state**: "Guardando..." mientras procesa
+- ✅ **Errores inline** en vez de `alert()` nativo
+- ✅ **Validación HTML5**: `minLength`, `maxLength`, `pattern` en campos
+- ✅ **Sanitización de teléfono**: Solo permite dígitos (`replace(/[^0-9]/g, '')`)
+
+### FIX: Deploy Netlify — `eslint` config
+- **Error:** `next.config.ts` incluía propiedad `eslint` no soportada en Next.js 16
+- **Solución:** Eliminada la propiedad del config
+
+### FIX: Deploy Netlify — Supabase prerender crash
+- **Error:** `supabaseUrl is required` durante prerender estático de `/comprar`
+- **Causa:** `createClient()` se ejecutaba a nivel de módulo sin env vars disponibles
+- **Solución:** `src/lib/supabase.ts` reescrito con patrón Proxy lazy-init
+- **Requisito:** Variables `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` deben existir en Netlify
+
+### RLS adicional creada
+| Tabla | Política | Tipo |
+|---|---|---|
+| `leads` | `Public can check existing leads by phone` | SELECT (para deduplicación) |
+
