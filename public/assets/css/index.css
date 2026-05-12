@@ -1,0 +1,277 @@
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	font-family: 'Lato', sans-serif;
+	background-color: #E5E7EB;
+	color: #2C3E50;
+	position: relative;
+}
+
+body::before {
+	content: '';
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	z-index: -1;
+	background-image: none;
+	background-size: cover;
+	background-position: center;
+	background-attachment: fixed;
+	filter: grayscale(100%);
+	opacity: 0.15;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-family: 'Montserrat', sans-serif;
+}
+
+.header-floating {
+	margin: 1rem;
+}
+
+@media (min-width: 768px) {
+	.header-floating {
+		margin: 1rem 1.5rem;
+	}
+}
+
+.glass-effect {
+	background-color: rgba(44, 62, 80, 0.85);
+	backdrop-filter: blur(14px);
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+
+.hero-bg {
+	background-image: url('../images/que-ver-en-sevilla-optimizada.webp')	;
+	background-size: cover;
+	background-position: center;
+}
+
+.nav-link {
+	padding: 0.5rem 1rem;
+	border-radius: 8px;
+	transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+	transform: translateY(-2px);
+	background-color: rgba(255, 255, 255, 0.2);
+	backdrop-filter: blur(5px);
+	box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn {
+	padding: 0.75rem 1.5rem;
+	border-radius: 8px;
+	font-weight: bold;
+	transition: all 0.3s ease;
+	text-align: center;
+	cursor: pointer;
+}
+
+.btn-primary {
+	background-color: transparent;
+	color: white;
+	border: 2px solid white;
+}
+
+.btn-primary:hover {
+	transform: translateY(-3px);
+	background-color: rgba(255, 255, 255, 0.2);
+	backdrop-filter: blur(5px);
+	box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn-outline {
+	background-color: transparent;
+	color: #2C3E50;
+	border: 2px solid #587C9A;
+}
+
+.btn-outline:hover {
+	transform: translateY(-3px);
+	background-color: #587C9A;
+	color: white;
+	box-shadow: 0 10px 20px rgba(88, 124, 154, 0.3);
+}
+
+.btn-submit {
+	background-color: #2C3E50;
+	color: white;
+	width: 100%;
+}
+
+.btn-submit:hover {
+	background-color: #3e576c;
+	transform: translateY(-3px);
+	box-shadow: 0 10px 20px rgba(44, 62, 80, 0.3);
+}
+
+.property-card, .service-card {
+	transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.property-card:hover, .service-card:hover {
+	transform: translateY(-5px);
+}
+
+.service-card:hover {
+	box-shadow: 0 15px 30px rgba(44, 62, 80, 0.15);
+}
+
+.expandable-content {
+	max-height: 0;
+	overflow: hidden;
+	transition: max-height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.expandable-content.expanded {
+	max-height: 500px;
+}
+
+.swiper {
+	width: 100%;
+	padding-top: 20px;
+	padding-bottom: 50px;
+}
+
+.swiper-slide {
+	height: auto;
+}
+
+.swiper-pagination-bullet-active {
+	background-color: white;
+}
+
+.swiper-pagination-bullet {
+	background-color: rgba(255, 255, 255, 0.5);
+}
+
+.swiper-button-custom {
+	top: 50%;
+	transform: translateY(-50%);
+	width: 44px;
+	height: 44px;
+	background-color: rgba(88, 124, 154, 0.8);
+	backdrop-filter: blur(5px);
+	border-radius: 9999px;
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.1);
+	transition: all 0.3s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: white;
+	cursor: pointer;
+}
+
+.swiper-button-custom:hover {
+	background-color: rgba(88, 124, 154, 1);
+	transform: translateY(-50%) scale(1.1);
+}
+
+.swiper-button-custom.swiper-button-prev {
+	left: -22px;
+}
+
+.swiper-button-custom.swiper-button-next {
+	right: -22px;
+}
+
+.swiper-button-custom::after {
+	font-size: 1rem;
+	font-weight: bold;
+}
+
+@media (max-width: 768px) {
+	.swiper-button-custom {
+		display: none;
+	}
+}
+
+.form-input {
+	width: 100%;
+	background-color: rgba(255, 255, 255, 0.9);
+	border: 1px solid rgba(44, 62, 80, 0.2);
+	border-radius: 8px;
+	padding: 12px 16px;
+	color: #2C3E50;
+	transition: all 0.3s ease;
+}
+
+.form-input:focus {
+	outline: none;
+	border-color: #587C9A;
+	box-shadow: 0 0 0 3px rgba(88, 124, 154, 0.3);
+}
+
+.popup-overlay {
+	background-color: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(5px);
+}
+
+/* --- NUEVOS ESTILOS PARA RESEÑAS --- */
+.review-card {
+	background-color: rgba(44, 62, 80, 0.90);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	color: white;
+}
+
+.star-rating .star {
+	color: #D1D5DB;
+	/* Gris claro para estrellas vacías */
+	transition: color 0.2s;
+}
+
+.star-rating .star.filled {
+	color: #FBBF24;
+	/* Amarillo para estrellas llenas */
+}
+
+/* Para el formulario de añadir reseña */
+.review-form-stars label {
+	cursor: pointer;
+}
+
+.review-form-stars input:checked~label .star,
+.review-form-stars label:hover~label .star,
+.review-form-stars label:hover .star {
+	color: #FBBF24;
+}
+
+/* --- ESTILOS ADICIONALES PARA CARRUSEL DE RESEÑAS --- */
+.testimonials-swiper-prev {
+	left: -22px;
+}
+
+.testimonials-swiper-next {
+	right: -22px;
+}
+
+.testimonialsSwiper .swiper-pagination-bullet-active {
+	background-color: #587C9A;
+}
+
+.testimonialsSwiper .swiper-pagination-bullet {
+	background-color: #BDC3C7;
+}
+
+/* --- ESTILOS PARA EL BANNER DE COOKIES --- */
+.cookie-banner {
+	/* Estado inicial: oculto abajo */
+	transform: translateY(100%);
+	opacity: 0;
+	transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+}
+
+.cookie-banner.visible {
+	/* Estado final: visible en su posición */
+	transform: translateY(0);
+	opacity: 1;
+}

@@ -1,0 +1,130 @@
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Lato', sans-serif;
+    background-color: #E5E7EB;
+    color: #2C3E50;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background-image: none;
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    filter: grayscale(100%);
+    opacity: 0.15;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
+}
+
+.header-floating {
+    margin: 1rem;
+}
+
+@media (min-width: 768px) {
+    .header-floating {
+        margin: 1rem 1.5rem;
+    }
+}
+
+.glass-effect {
+    background-color: rgba(44, 62, 80, 0.85);
+    backdrop-filter: blur(14px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+
+.nav-link {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    color: white;
+}
+
+.nav-link:hover {
+    transform: translateY(-2px);
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    text-align: center;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: transparent;
+    color: white;
+    border: 2px solid white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilos para el contenido del post inyectado desde el CMS */
+.post-content h1, .post-content h2, .post-content h3 {
+    font-family: 'Montserrat', sans-serif;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+}
+
+.post-content h1 {
+    font-size: 2.25rem;
+}
+
+.post-content h2 {
+    font-size: 1.875rem;
+}
+
+.post-content h3 {
+    font-size: 1.5rem;
+}
+
+.post-content p {
+    line-height: 1.75;
+    margin-bottom: 1.25em;
+}
+
+.post-content a {
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+.post-content ul, .post-content ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1.25em;
+    list-style-position: inside;
+}
+
+.post-content li {
+    margin-bottom: 0.5em;
+}
+
+.post-content blockquote {
+    border-left: 4px solid #d1d5db;
+    padding-left: 1rem;
+    font-style: italic;
+    color: #4b5563;
+    margin: 1.5em 0;
+}

@@ -1,26 +1,130 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-primary: #587C9A;
+  --color-secondary: #2C3E50;
+  --color-accent: #FBBF24;
+  --color-background: #E5E7EB;
+  --font-sans: var(--font-lato), sans-serif;
+  --font-heading: var(--font-montserrat), sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Custom Base Styles */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-secondary);
+  position: relative;
+}
+
+
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+/* UI Components */
+.glass-effect {
+  background-color: rgba(44, 62, 80, 0.85);
+  backdrop-filter: blur(14px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+
+.hero-bg {
+  background-image: url('/assets/images/que-ver-en-sevilla-optimizada.webp');
+  background-size: cover;
+  background-position: center;
+}
+
+.nav-link {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  transform: translateY(-2px);
+  background-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  text-align: center;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-color: transparent;
+  color: white;
+  border: 2px solid white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-3px);
+  background-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--color-secondary);
+  border: 2px solid var(--color-primary);
+}
+
+.btn-outline:hover {
+  transform: translateY(-3px);
+  background-color: var(--color-primary);
+  color: white;
+  box-shadow: 0 10px 20px rgba(88, 124, 154, 0.3);
+}
+
+.btn-submit {
+  background-color: var(--color-secondary);
+  color: white;
+  width: 100%;
+}
+
+.btn-submit:hover {
+  background-color: #3e576c;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px rgba(44, 62, 80, 0.3);
+}
+
+.property-card, .service-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.property-card:hover, .service-card:hover {
+  transform: translateY(-5px);
+}
+
+.service-card:hover {
+  box-shadow: 0 15px 30px rgba(44, 62, 80, 0.15);
+}
+
+.form-input {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(44, 62, 80, 0.2);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--color-secondary);
+  transition: all 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(88, 124, 154, 0.3);
 }

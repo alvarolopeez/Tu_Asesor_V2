@@ -1,0 +1,57 @@
+body {
+	font-family: 'Lato', sans-serif;
+	background-color: #E5E7EB;
+	color: #2C3E50;
+	position: relative;
+}
+body::before {
+	content: '';
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	z-index: -1;
+	background-image: none;
+	background-size: cover;
+	background-position: center;
+	background-attachment: fixed;
+	filter: grayscale(100%);
+	opacity: 0.15;
+}
+.glass-effect {
+	background-color: rgba(44, 62, 80, 0.85);
+	backdrop-filter: blur(14px);
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+}
+.form-input {
+	width: 100%;
+	background-color: rgba(255, 255, 255, 0.9);
+	border: 1px solid rgba(44, 62, 80, 0.2);
+	border-radius: 8px;
+	padding: 12px 16px;
+	color: #2C3E50;
+	transition: all 0.3s ease;
+}
+.form-input:focus {
+	outline: none;
+	border-color: #587C9A;
+	box-shadow: 0 0 0 3px rgba(88, 124, 154, 0.3);
+}
+.btn-submit {
+	background-color: #587C9A;
+	color: white;
+	width: 100%;
+	padding: 0.75rem 1.5rem;
+	border-radius: 8px;
+	font-weight: bold;
+	transition: all 0.3s ease;
+	text-align: center;
+}
+.btn-submit:hover {
+	background-color: #6a8aa6;
+	transform: translateY(-2px);
+	box-shadow: 0 10px 20px rgba(44, 62, 80, 0.2);
+}

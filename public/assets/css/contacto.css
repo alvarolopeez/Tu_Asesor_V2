@@ -1,0 +1,61 @@
+body {
+    font-family: 'Lato', sans-serif;
+    background-color: #E5E7EB;
+    color: #2C3E50;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
+}
+
+.glass-effect {
+    background-color: rgba(44, 62, 80, 0.85);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+.nav-link {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    transform: translateY(-2px);
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.mobile-menu-link {
+    display: block;
+    padding: 1rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mobile-menu-link:last-child {
+    border-bottom: none;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    text-align: center;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: transparent;
+    color: white;
+    border: 2px solid white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}

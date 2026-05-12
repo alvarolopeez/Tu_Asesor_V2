@@ -1,0 +1,76 @@
+import Link from 'next/link'
+import { MessageCircle, Phone, Mail, ArrowRight } from 'lucide-react'
+
+export default function ContactoPage() {
+  return (
+    <main className="min-h-screen flex flex-col items-center pt-32 pb-24 px-4 bg-slate-50 relative overflow-x-hidden">
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 right-0 w-full h-full bg-[url('/assets/images/pattern.svg')] opacity-5"></div>
+      </div>
+
+      <div className="w-full max-w-4xl relative z-10 text-center mb-16">
+        <h1 className="text-4xl md:text-5xl font-bold text-[#2C3E50] mb-4 font-heading">
+          Contacto
+        </h1>
+        <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+          ¿Tienes alguna duda o quieres empezar a vender/comprar tu propiedad? Contáctanos a través de cualquiera de nuestros canales.
+        </p>
+      </div>
+
+      <div className="w-full max-w-5xl relative z-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* WhatsApp Card */}
+        <div className="glass-effect bg-white border border-slate-200 shadow-xl rounded-2xl p-8 flex flex-col items-center text-center hover:-translate-y-2 transition-transform duration-300">
+          <div className="w-16 h-16 bg-[#25D366]/10 rounded-full flex items-center justify-center mb-6">
+            <MessageCircle className="w-8 h-8 text-[#25D366]" />
+          </div>
+          <h2 className="text-2xl font-bold text-[#2C3E50] mb-2 font-heading">WhatsApp 24/7</h2>
+          <p className="text-slate-600 mb-6 flex-grow">
+            Escríbenos en cualquier momento. Nuestro asistente inteligente te responderá de forma instantánea.
+          </p>
+          <a 
+            href="https://wa.me/34697223944?text=Hola%20Álvaro,%20me%20gustaría%20recibir%20más%20información." 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            Chat en WhatsApp <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+
+        {/* Phone Card */}
+        <div className="glass-effect bg-white border border-slate-200 shadow-xl rounded-2xl p-8 flex flex-col items-center text-center hover:-translate-y-2 transition-transform duration-300">
+          <div className="w-16 h-16 bg-[#FBBF24]/10 rounded-full flex items-center justify-center mb-6">
+            <Phone className="w-8 h-8 text-[#FBBF24]" />
+          </div>
+          <h2 className="text-2xl font-bold text-[#2C3E50] mb-2 font-heading">Llamada Telefónica</h2>
+          <p className="text-slate-600 mb-6 flex-grow">
+            ¿Prefieres hablar directamente? Te atenderé yo personalmente para resolver todas tus dudas.
+          </p>
+          <a 
+            href="tel:+34697223944" 
+            className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            Llamar al 697 223 944 <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+
+        {/* Email Card */}
+        <div className="glass-effect bg-[#2C3E50] border border-[#2C3E50]/20 shadow-xl rounded-2xl p-8 flex flex-col items-center text-center hover:-translate-y-2 transition-transform duration-300 text-white">
+          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-6">
+            <Mail className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2 font-heading">Correo Electrónico</h2>
+          <p className="text-slate-300 mb-6 flex-grow">
+            Envíanos un mensaje detallado a través de nuestro formulario y te responderemos en 24 horas.
+          </p>
+          <a 
+            href="mailto:tuasesoralvaro@gmail.com" 
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            Enviar Email <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+      </div>
+    </main>
+  )
+}
