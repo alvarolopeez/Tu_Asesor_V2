@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Edit } from "lucide-react";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import toast from "react-hot-toast";
@@ -22,7 +23,7 @@ export default function PropertiesManager() {
   const [loading, setLoading] = useState(true);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PropertyFormValues>({
-    resolver: zodResolver(propertySchema),
+    resolver: zodResolver(propertySchema) as Resolver<PropertyFormValues, any>,
     defaultValues: {
       status: 'draft',
       price: 0
