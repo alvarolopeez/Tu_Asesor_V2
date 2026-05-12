@@ -19,7 +19,8 @@ export default function ReviewsManager({ reviews, onRefresh }: ReviewsManagerPro
       if (error) throw error;
       toast.success(currentStatus ? "Reseña ocultada de la web" : "Reseña publicada en la web");
       onRefresh();
-    } catch (error) {
+    } catch (err) {
+      console.error(err);
       toast.error("Error al actualizar la reseña");
     }
   };
@@ -31,7 +32,8 @@ export default function ReviewsManager({ reviews, onRefresh }: ReviewsManagerPro
       if (error) throw error;
       toast.success("Reseña borrada correctamente");
       onRefresh();
-    } catch (error) {
+    } catch (err) {
+      console.error(err);
       toast.error("Error al borrar la reseña");
     }
   };
@@ -52,7 +54,7 @@ export default function ReviewsManager({ reviews, onRefresh }: ReviewsManagerPro
                 ))}
               </div>
             </div>
-            <p className="text-slate-400 italic">"{review.comment}"</p>
+            <p className="text-slate-400 italic">&quot;{review.comment}&quot;</p>
             <p className="text-[10px] text-slate-600 mt-4">{new Date(review.created_at).toLocaleString()}</p>
           </div>
           <div className="flex flex-col gap-2 justify-center shrink-0">

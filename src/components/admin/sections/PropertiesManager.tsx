@@ -17,22 +17,28 @@ const propertySchema = z.object({
 
 type PropertyFormValues = z.infer<typeof propertySchema>;
 
+interface Property {
+  id: string;
+  title: string;
+  price: number;
+  status: string;
+  created_at: string;
+}
+
 export default function PropertiesManager() {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [properties, setProperties] = useState<any[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PropertyFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(propertySchema) as Resolver<PropertyFormValues, any>,
     defaultValues: {
       status: 'draft',
       price: 0
     }
   });
-
-  useEffect(() => {
-    fetchProperties();
-  }, []);
 
   const fetchProperties = async () => {
     setLoading(true);
@@ -43,7 +49,7 @@ export default function PropertiesManager() {
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      setProperties(data || []);
+      setProperties(data as Property[] || []);
     } catch (error) {
       console.error(error);
       toast.error("Error al cargar los inmuebles");
@@ -51,6 +57,11 @@ export default function PropertiesManager() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchProperties();
+  }, []);
+
 
   const onSubmit = async (data: PropertyFormValues) => {
     try {

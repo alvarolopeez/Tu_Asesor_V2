@@ -11,18 +11,18 @@ export default function Home() {
     <>
       <BuyerLeadPopup />
       {/* Hero Section */}
-      <section className="relative min-h-[100svh] w-full flex items-center justify-center overflow-hidden bg-[url('/assets/images/que-ver-en-sevilla-optimizada.webp')] bg-cover bg-center pt-32 pb-16">
+      <section className="relative min-h-[100svh] w-full flex items-center justify-center overflow-hidden bg-[url('/assets/images/que-ver-en-sevilla-optimizada.webp')] bg-cover bg-center pt-40 pb-32 md:pt-32 md:pb-16">
         {/* Decorative Background Elements */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#2C3E50]/90 via-[#2C3E50]/70 to-[#1a252f] z-10"></div>
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FBBF24]/20 rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
 
-        <div className="relative z-20 text-center p-4 sm:p-6 md:p-12 mx-4 max-w-5xl">
-          <div className="inline-block bg-[#FBBF24]/10 border border-[#FBBF24]/30 text-[#FBBF24] font-bold px-4 sm:px-6 py-2 rounded-full mb-6 sm:mb-8 backdrop-blur-sm shadow-[0_0_15px_rgba(251,191,36,0.3)] text-sm sm:text-base">
+        <div className="relative z-20 text-center p-4 sm:p-6 md:p-12 mx-4 max-w-5xl mt-8">
+          <div className="inline-block bg-[#FBBF24]/10 border border-[#FBBF24]/30 text-[#FBBF24] font-bold px-4 sm:px-6 py-2 rounded-full mb-6 sm:mb-8 backdrop-blur-sm shadow-[0_0_15px_rgba(251,191,36,0.3)] text-xs sm:text-base">
             ✨ Revolucionamos el sector inmobiliario en Sevilla
           </div>
           
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold font-heading text-white leading-tight mb-6 drop-shadow-lg">
+          <h1 className="text-3xl sm:text-6xl md:text-7xl font-bold font-heading text-white leading-tight mb-6 drop-shadow-lg">
             Vende tu casa por solo un <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FBBF24] to-yellow-200">2%</span>
             <br />
             Compradores pagan <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FBBF24] to-yellow-200">0€</span>
