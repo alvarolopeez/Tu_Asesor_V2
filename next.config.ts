@@ -16,11 +16,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
-  },
+  // NOTA: Next.js 16 ya no soporta "eslint" en next.config.ts
+  // Si necesitas ignorar ESLint en builds, hazlo desde el script de CI/CD
 };
 
 export default nextConfig;
