@@ -51,6 +51,10 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
     setError(null);
 
     try {
+      if (!supabase) {
+        throw new Error('La base de datos no está configurada. Contacta con el administrador.');
+      }
+
       const preferences = {
         location: formData.location,
         propertyType: formData.propertyType,
