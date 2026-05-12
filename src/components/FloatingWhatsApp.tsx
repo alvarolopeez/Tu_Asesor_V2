@@ -1,11 +1,17 @@
 "use client";
 
 import { MessageCircle } from "lucide-react";
+import { BUSINESS } from "@/lib/constants";
 
+/**
+ * FloatingWhatsApp — Botón flotante de contacto WhatsApp.
+ *
+ * FIX APLICADO (Code Review):
+ * - Número de teléfono centralizado desde @/lib/constants
+ *   (antes hardcodeado directamente en el componente).
+ */
 export default function FloatingWhatsApp() {
-  const phoneNumber = "34697223944"; // Número de teléfono proporcionado en el footer
-  const message = "Hola Álvaro, me gustaría recibir más información.";
-  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+  const whatsappUrl = BUSINESS.whatsappUrl(BUSINESS.defaultWhatsappMessage);
 
   return (
     <a

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { BUSINESS, ITP_DATA, IRPF_TRAMOS } from "@/lib/constants";
+import type { RentabilidadResult } from "@/types";
 import { 
   Calculator, 
   ArrowRight, 
@@ -17,17 +18,15 @@ import {
   Wallet
 } from "lucide-react";
 
-const ITP_DATA: Record<string, number> = {
-  'Andalucía': 0.07, 'Aragón': 0.08, 'Asturias': 0.08, 'Baleares': 0.08, 'Canarias': 0.065,
-  'Cantabria': 0.10, 'Castilla - La Mancha': 0.09, 'Castilla y León': 0.08, 'Cataluña': 0.10,
-  'Ceuta': 0.06, 'Comunidad de Madrid': 0.06, 'Comunidad Valenciana': 0.10, 'Extremadura': 0.08,
-  'Galicia': 0.10, 'La Rioja': 0.07, 'Melilla': 0.06, 'Murcia': 0.08, 'Navarra': 0.06, 'País Vasco': 0.04
-};
+/**
+ * FIX APLICADO (Code Review):
+ * - BUG-003: Eliminado <Header /> duplicado (ya lo renderiza LayoutWrapper)
+ * - Número WhatsApp centralizado desde BUSINESS constant
+ * - ITP_DATA e IRPF_TRAMOS importados de constants.ts
+ * - Tipado: RentabilidadResult reemplaza 'any'
+ */
 
-const IRPF_TRAMOS = [
-  { limit: 12450, rate: 0.19 }, { limit: 20200, rate: 0.24 }, { limit: 35200, rate: 0.30 },
-  { limit: 60000, rate: 0.37 }, { limit: Infinity, rate: 0.45 }
-];
+// ITP_DATA e IRPF_TRAMOS ahora importados desde @/lib/constants
 
 export default function RentabilidadPage() {
   const [step, setStep] = useState(1);
@@ -54,7 +53,7 @@ export default function RentabilidadPage() {
     telefono: ""
   });
 
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<RentabilidadResult | null>(null);
 
   const calculateIRPF = (base: number) => {
     let tax = 0;
@@ -169,7 +168,6 @@ export default function RentabilidadPage() {
 
   return (
     <main className="min-h-screen pt-40 pb-20 bg-slate-50">
-      <Header />
       
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="text-center mb-12">
@@ -467,7 +465,7 @@ export default function RentabilidadPage() {
 
               <div className="flex flex-col md:flex-row gap-4 justify-center mt-12">
                 <button 
-                  onClick={() => window.location.href = `https://wa.me/34623956461?text=Hola Álvaro, he analizado una inversión de ${formData.precioCompra}€ y quiero que me asesores.`}
+                  onClick={() => window.location.href = BUSINESS.whatsappUrl(`Hola Álvaro, he analizado una inversión de ${formData.precioCompra}€ y quiero que me asesores.`)}
                   className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-10 flex items-center gap-2 justify-center"
                 >
                   Hablar con Álvaro por WhatsApp

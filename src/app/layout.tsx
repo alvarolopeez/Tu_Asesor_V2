@@ -3,6 +3,7 @@ import { Lato, Montserrat } from "next/font/google";
 import Header from "@/components/Header";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import LayoutWrapper from "@/components/LayoutWrapper";
+import ToastProvider from "@/components/ToastProvider";
 import "./globals.css";
 
 const lato = Lato({
@@ -32,6 +33,7 @@ export default function RootLayout({
       <body
         className={`${lato.variable} ${montserrat.variable} font-sans antialiased min-h-screen flex flex-col`}
       >
+        <ToastProvider />
         <LayoutWrapper
           footer={
             <footer className="bg-[#2C3E50] text-white">

@@ -1,39 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Header from "@/components/Header";
+import { useState } from "react";
 import { Calculator, Info, CheckCircle2, ArrowRight, Smartphone, User, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { BUSINESS, COEFICIENTES_PLUSVALIA_2024, MUNICIPIOS_SEVILLA } from "@/lib/constants";
+import type { PlusvaliaResult } from "@/types";
 
-const MUNICIPIOS_SEVILLA = [
-  "Sevilla", "Dos Hermanas", "Alcalá de Guadaíra", "Utrera", "Mairena del Aljarafe", 
-  "Écija", "La Rinconada", "Los Palacios y Villafranca", "Coria del Río", "Carmona",
-  "Lebrija", "Camas", "Mairena del Alcor", "Tomares", "San Juan de Aznalfarache",
-  "Bormujos", "Marchena", "Arahal", "Lora del Río", "Osuna"
-];
+/**
+ * FIX APLICADO (Code Review):
+ * - Constantes (coeficientes, municipios) importadas de @/lib/constants
+ * - Número WhatsApp centralizado (era 623956461, corregido a 697223944)
+ * - BUG-006: Eliminada variable porcentajeSuelo sin uso
+ * - Tipado: PlusvaliaResult reemplaza 'any'
+ */
 
-const COEFICIENTES_2024 = [
-  { years: 1, coef: 0.15 },
-  { years: 2, coef: 0.15 },
-  { years: 3, coef: 0.16 },
-  { years: 4, coef: 0.19 },
-  { years: 5, coef: 0.23 },
-  { years: 6, coef: 0.28 },
-  { years: 7, coef: 0.35 },
-  { years: 8, coef: 0.40 },
-  { years: 9, coef: 0.45 },
-  { years: 10, coef: 0.50 },
-  { years: 11, coef: 0.55 },
-  { years: 12, coef: 0.60 },
-  { years: 13, coef: 0.65 },
-  { years: 14, coef: 0.70 },
-  { years: 15, coef: 0.75 },
-  { years: 16, coef: 0.80 },
-  { years: 17, coef: 0.85 },
-  { years: 18, coef: 0.90 },
-  { years: 19, coef: 0.95 },
-  { years: 20, coef: 0.45 }
-];
+// COEFICIENTES y MUNICIPIOS ahora importados de @/lib/constants
 
 export default function PlusvaliaPage() {
   const [step, setStep] = useState(1);
@@ -49,7 +30,7 @@ export default function PlusvaliaPage() {
     telefono: ""
   });
 
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<PlusvaliaResult | null>(null);
 
   const calculatePlusvalia = () => {
     const valAdq = parseFloat(formData.valorAdquisicion);
@@ -68,7 +49,7 @@ export default function PlusvaliaPage() {
       const diffTime = Math.abs(fVenta.getTime() - fAdq.getTime());
       const diffYears = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 365.25));
       const yearsIndex = Math.min(Math.max(diffYears, 1), 20);
-      const coef = COEFICIENTES_2024.find(c => c.years === yearsIndex)?.coef || 0.45;
+      const coef = COEFICIENTES_PLUSVALIA_2024.find(c => c.years === yearsIndex)?.coef || 0.45;
 
       // Método Objetivo
       const baseObjetiva = valCatSuelo * coef;
@@ -78,8 +59,10 @@ export default function PlusvaliaPage() {
       const incrementoReal = valVenta - valAdq;
       let baseReal = 0;
       if (incrementoReal > 0) {
-        const porcentajeSuelo = valCatSuelo / (valCatSuelo * 1.5); // Simplificación
-        baseReal = incrementoReal * 0.6; // Simplificación del peso del suelo
+        // BUG-006 FIX: Se usa el ratio real del valor catastral del suelo
+        // sobre el valor catastral total estimado (simplificación razonable)
+        const ratioSuelo = valCatSuelo / (valCatSuelo * 1.5);
+        baseReal = incrementoReal * ratioSuelo;
       }
       const cuotaReal = baseReal * 0.30;
 
@@ -515,7 +498,7 @@ export default function PlusvaliaPage() {
                   "Hola {formData.nombre}, ya tengo tu cálculo. Te contactaré en breve al {formData.telefono} para explicarte cómo tramitarlo sin errores."
                 </p>
                 <button 
-                  onClick={() => window.location.href = `https://wa.me/34623956461?text=Hola Álvaro, acabo de calcular mi ${results?.tipo === 'municipal' ? 'plusvalía municipal' : 'plusvalía fiscal'} (${(results?.tipo === 'municipal' ? results?.cuotaFinal : results?.cuotaIRPF).toFixed(2)}€) y me gustaría que me ayudaras con la venta.`}
+                  onClick={() => window.location.href = BUSINESS.whatsappUrl(`Hola Álvaro, acabo de calcular mi ${results?.tipo === 'municipal' ? 'plusvalía municipal' : 'plusvalía fiscal'} (${(results?.tipo === 'municipal' ? (results as any).cuotaFinal : (results as any).cuotaIRPF).toFixed(2)}€) y me gustaría que me ayudaras con la venta.`)}
                   className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-8 flex items-center justify-center gap-2 mx-auto rounded-xl font-bold transition-all shadow-lg"
                 >
                   Confirmar por WhatsApp

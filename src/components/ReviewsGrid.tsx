@@ -3,24 +3,28 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Star, Quote } from 'lucide-react'
+import type { Review } from '@/types'
 
-interface Review {
-  id: string
-  client_name: string
-  rating: number
-  comment: string
-  status: string
-}
+/**
+ * ReviewsGrid — Muestra las reseñas publicadas desde Supabase.
+ * 
+ * FIX APLICADO (Code Review):
+ * - BUG-001: Se corrigió .eq('status','published') → .eq('is_published', true)
+ *   La tabla reviews usa "is_published" (boolean), no "status" (text).
+ * - BUG-002: Se eliminó el campo "status" de la interfaz local.
+ *   Ahora usa la interfaz centralizada Review de @/types.
+ */
+
+// Fallback reviews for when DB has no published reviews yet
+const fallbackReviews: Review[] = [
+  { id: '1', client_name: "María R.", rating: 5, comment: "Vender con Álvaro fue la mejor decisión. Vendió mi piso en La Macarena en 20 días y me ahorré muchísimo dinero en comisiones frente a otras agencias de la zona.", is_published: true, created_at: '', updated_at: '' },
+  { id: '2', client_name: "José Manuel D.", rating: 5, comment: "Increíble trato y transparencia desde el primer minuto. Todo el proceso de tasación fue muy claro y me sentí acompañado en cada firma.", is_published: true, created_at: '', updated_at: '' },
+  { id: '3', client_name: "Laura G.", rating: 5, comment: "Buscaba comprar en Sevilla sin pagar honorarios abusivos, y con él fue posible. Recomendable 100% por su cercanía y profesionalidad.", is_published: true, created_at: '', updated_at: '' }
+]
 
 export default function ReviewsGrid() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
-
-  const fallbackReviews: Review[] = [
-    { id: '1', client_name: "María R.", rating: 5, comment: "Vender con Álvaro fue la mejor decisión. Vendió mi piso en La Macarena en 20 días y me ahorré muchísimo dinero en comisiones frente a otras agencias de la zona.", status: 'published' },
-    { id: '2', client_name: "José Manuel D.", rating: 5, comment: "Increíble trato y transparencia desde el primer minuto. Todo el proceso de tasación fue muy claro y me sentí acompañado en cada firma.", status: 'published' },
-    { id: '3', client_name: "Laura G.", rating: 5, comment: "Buscaba comprar en Sevilla sin pagar honorarios abusivos, y con él fue posible. Recomendable 100% por su cercanía y profesionalidad.", status: 'published' }
-  ]
 
   useEffect(() => {
     async function fetchReviews() {
@@ -28,7 +32,7 @@ export default function ReviewsGrid() {
         const { data, error } = await supabase
           .from('reviews')
           .select('*')
-          .eq('status', 'published')
+          .eq('is_published', true)  // FIX: era .eq('status', 'published')
           .order('created_at', { ascending: false })
           .limit(3)
 
@@ -41,13 +45,16 @@ export default function ReviewsGrid() {
             client_name: r.client_name,
             rating: r.rating,
             comment: r.comment,
-            status: r.status
+            is_published: r.is_published,  // FIX: era r.status
+            created_at: r.created_at,
+            updated_at: r.updated_at,
           })))
         } else {
           setReviews(fallbackReviews)
         }
-      } catch (err: any) {
-        console.warn("Unexpected error fetching reviews:", err?.message || err)
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn("Unexpected error fetching reviews:", message)
         setReviews(fallbackReviews)
       } finally {
         setLoading(false)

@@ -1,5 +1,11 @@
 import Link from 'next/link'
 import { MessageCircle, Phone, Mail, ArrowRight } from 'lucide-react'
+import { BUSINESS } from '@/lib/constants'
+
+/**
+ * FIX APLICADO (Code Review):
+ * - Teléfono y email centralizados desde BUSINESS constant
+ */
 
 export default function ContactoPage() {
   return (
@@ -28,7 +34,7 @@ export default function ContactoPage() {
             Escríbenos en cualquier momento. Nuestro asistente inteligente te responderá de forma instantánea.
           </p>
           <a 
-            href="https://wa.me/34697223944?text=Hola%20Álvaro,%20me%20gustaría%20recibir%20más%20información." 
+            href={BUSINESS.whatsappUrl('Hola Álvaro, me gustaría recibir más información.')} 
             target="_blank" 
             rel="noopener noreferrer"
             className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -47,10 +53,10 @@ export default function ContactoPage() {
             ¿Prefieres hablar directamente? Te atenderé yo personalmente para resolver todas tus dudas.
           </p>
           <a 
-            href="tel:+34697223944" 
+            href={`tel:+${BUSINESS.phoneIntl}`} 
             className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            Llamar al 697 223 944 <ArrowRight className="w-4 h-4" />
+            Llamar al {BUSINESS.phone.replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3')} <ArrowRight className="w-4 h-4" />
           </a>
         </div>
 
@@ -64,7 +70,7 @@ export default function ContactoPage() {
             Envíanos un mensaje detallado a través de nuestro formulario y te responderemos en 24 horas.
           </p>
           <a 
-            href="mailto:tuasesoralvaro@gmail.com" 
+            href={`mailto:${BUSINESS.email}`} 
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             Enviar Email <ArrowRight className="w-4 h-4" />
