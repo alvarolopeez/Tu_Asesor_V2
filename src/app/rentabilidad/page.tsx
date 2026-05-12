@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { BUSINESS, ITP_DATA, IRPF_TRAMOS } from "@/lib/constants";
+import { submitLeadWithCalculation } from "@/lib/leadService";
 import type { RentabilidadResult } from "@/types";
 import { 
   Calculator, 
@@ -54,6 +54,9 @@ export default function RentabilidadPage() {
   });
 
   const [results, setResults] = useState<RentabilidadResult | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const calculateIRPF = (base: number) => {
     let tax = 0;
@@ -125,44 +128,41 @@ export default function RentabilidadPage() {
 
   const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      // 1. Crear Lead
-      const { data: leadData, error: leadError } = await supabase
-        .from('leads')
-        .insert([{
-          name: formData.nombre,
-          phone: formData.telefono,
-          type: 'buyer',
-          source: 'rentabilidad'
-        }])
-        .select()
-        .single();
+    setSubmitError(null);
 
-      if (leadError) throw leadError;
+    if (!consent) {
+      setSubmitError('Debes aceptar el consentimiento para continuar.');
+      return;
+    }
 
-      // 2. Guardar cálculo
-      const { error: calcError } = await supabase
-        .from('tool_calculations')
-        .insert([{
-          lead_id: leadData.id,
-          tool_type: 'rentabilidad',
-          inputs: {
-            precioCompra: formData.precioCompra,
-            comunidad: formData.comunidad,
-            costeReforma: formData.costeReforma,
-            conHipoteca: formData.conHipoteca,
-            alquilerMensual: formData.alquilerMensual
-          },
-          results: results
-        }]);
+    setSubmitting(true);
 
-      if (calcError) throw calcError;
+    const result = await submitLeadWithCalculation(
+      {
+        name: formData.nombre,
+        phone: formData.telefono,
+        type: 'buyer',
+        source: 'rentabilidad'
+      },
+      {
+        tool_type: 'rentabilidad',
+        inputs: {
+          precioCompra: formData.precioCompra,
+          comunidad: formData.comunidad,
+          costeReforma: formData.costeReforma,
+          conHipoteca: formData.conHipoteca,
+          alquilerMensual: formData.alquilerMensual
+        },
+        results: results as unknown as Record<string, unknown>
+      }
+    );
 
+    setSubmitting(false);
+
+    if (result.success) {
       setStep(3);
-    } catch (error) {
-      console.error("Error saving lead:", error);
-      alert("Hubo un error al guardar tus datos. Por favor, inténtalo de nuevo.");
+    } else {
+      setSubmitError(result.error || 'Hubo un error. Inténtalo de nuevo.');
     }
   };
 
@@ -374,6 +374,8 @@ export default function RentabilidadPage() {
                     <input 
                       type="text" 
                       required
+                      minLength={2}
+                      maxLength={100}
                       placeholder="Tu Nombre"
                       value={formData.nombre}
                       onChange={(e) => setFormData({...formData, nombre: e.target.value})}
@@ -385,14 +387,44 @@ export default function RentabilidadPage() {
                     <input 
                       type="tel" 
                       required
+                      pattern="[0-9]{9,15}"
+                      title="Introduce un teléfono válido (9-15 dígitos)"
                       placeholder="Tu Teléfono"
                       value={formData.telefono}
-                      onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                      onChange={(e) => setFormData({...formData, telefono: e.target.value.replace(/[^0-9]/g, '')})}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] placeholder:text-slate-400"
                     />
                   </div>
-                  <button type="submit" className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] py-4 rounded-xl text-lg font-bold transition-all shadow-lg">
-                    Desbloquear Informe Completo
+
+                  {/* Consentimiento de contacto comercial */}
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={consent}
+                      onChange={(e) => { setConsent(e.target.checked); setSubmitError(null); }}
+                      className="mt-1 w-4 h-4 accent-[#FBBF24] rounded"
+                    />
+                    <span className="text-xs text-slate-300 leading-relaxed group-hover:text-slate-200 transition-colors">
+                      Acepto recibir una llamada o mensaje de <strong>Tu Asesor</strong> para informarme sobre los resultados y servicios relacionados con mi consulta. Puedo retirar mi consentimiento en cualquier momento.
+                    </span>
+                  </label>
+
+                  {submitError && (
+                    <p className="text-red-400 text-sm text-center bg-red-500/10 p-3 rounded-xl border border-red-500/20">
+                      {submitError}
+                    </p>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={submitting || !consent}
+                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg ${
+                      consent 
+                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer' 
+                        : 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {submitting ? 'Guardando...' : 'Desbloquear Informe Completo'}
                   </button>
                   <p className="flex items-center justify-center gap-2 text-xs text-slate-300 mt-4">
                     <Lock size={12} /> Sin spam. Solo tu informe profesional.
