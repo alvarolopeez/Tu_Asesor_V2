@@ -1,36 +1,29 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Middleware principal de Tu Asesor V2.
+ * 
+ * HISTORIAL:
+ * - [2026-05-11] Basic Auth activado con contraseña "Asesor135" para fase de desarrollo.
+ * - [2026-05-14] Basic Auth DESACTIVADO — Web pública.
+ * - [2026-05-14] Añadido bypass para /api/* (webhooks N8N, WhatsApp, Chatwoot).
+ * 
+ * SEGURIDAD API:
+ * Los webhooks en /api/webhooks/* se protegen con API keys dentro de cada route handler,
+ * NO con este middleware. Esto permite que servicios externos (N8N, Meta, Chatwoot)
+ * envíen peticiones sin Basic Auth.
+ */
+
 export function middleware(req: NextRequest) {
-  const basicAuth = req.headers.get('authorization');
-  const url = req.nextUrl;
-
-  // Bypass auth for static assets and API routes if necessary
-  if (
-    url.pathname.startsWith('/_next') ||
-    url.pathname.startsWith('/favicon.ico')
-  ) {
-    return NextResponse.next();
-  }
-
-  if (basicAuth) {
-    const authValue = basicAuth.split(' ')[1];
-    const [user, pwd] = atob(authValue).split(':');
-
-    // Username can be anything, password must be Asesor135
-    if (pwd === 'Asesor135') {
-      return NextResponse.next();
-    }
-  }
-
-  return new NextResponse('Auth required', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': 'Basic realm="Secure Area"',
-    },
-  });
+  // Web pública — todo el tráfico pasa sin restricciones
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: '/:path*',
+  // Solo interceptar rutas que podrían necesitar protección futura
+  // (admin, API). Las rutas estáticas (_next, assets) nunca se interceptan.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|icon.png|assets/).*)',
+  ],
 };

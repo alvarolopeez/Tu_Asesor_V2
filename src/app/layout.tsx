@@ -69,6 +69,11 @@ export default function RootLayout({
                           Nuestros Servicios
                         </a>
                       </li>
+                      <li>
+                        <a href="/blog" className="hover:text-[#FBBF24] transition-colors font-semibold">
+                          Blog
+                        </a>
+                      </li>
                     </ul>
                   </div>
                   <div>

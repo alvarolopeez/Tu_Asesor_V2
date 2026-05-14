@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import Header from "@/components/Header";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+import FloatingChatWidget from "@/components/FloatingChatWidget";
 
 export default function LayoutWrapper({
   children,
@@ -22,6 +23,7 @@ export default function LayoutWrapper({
     <>
       <Header />
       <FloatingWhatsApp />
+      <FloatingChatWidget />
       <main className="flex-grow">{children}</main>
       {footer}
     </>

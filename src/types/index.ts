@@ -90,7 +90,73 @@ export interface AIInteraction {
   lead_id: string;
   summary: string;
   intent: AIIntent | null;
+  channel: string | null;       // [2026-05-14] Añadido por Agente IA
+  raw_message: string | null;   // [2026-05-14] Añadido por Agente IA
+  response_text: string | null; // [2026-05-14] Añadido por Agente IA
+  confidence_score: number | null; // [2026-05-14] Añadido por Agente IA
+  session_id: string | null;    // [2026-05-14] Añadido por Agente IA → FK a chatbot_conversations
   created_at: string;
+}
+
+// ─── CHATBOT (Nuevo - Agente IA 2026-05-14) ──────────
+export type ChatChannel = 'whatsapp' | 'web_widget' | 'chatwoot';
+export type ConversationStatus = 'active' | 'escalated' | 'closed';
+export type MessageRole = 'user' | 'assistant' | 'system';
+
+export interface ChatbotConversation {
+  id: string;
+  lead_id: string | null;
+  channel: ChatChannel;
+  wa_phone_number: string | null;
+  status: ConversationStatus;
+  escalated_to: string | null;
+  started_at: string;
+  ended_at: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface ChatbotMessage {
+  id: string;
+  conversation_id: string;
+  role: MessageRole;
+  content: string;
+  intent_detected: string | null;
+  confidence: number | null;
+  wa_message_id: string | null;
+  created_at: string;
+}
+
+export interface N8nWebhookLog {
+  id: string;
+  webhook_name: string;
+  source: string;
+  payload: Record<string, unknown>;
+  response_status: number | null;
+  error_message: string | null;
+  processed_at: string;
+}
+
+// ─── CHATBOT ENGINE TYPES ────────────────────────────
+export interface ChatbotEngineRequest {
+  conversation_id?: string;
+  message: string;
+  channel: ChatChannel;
+  phone?: string;       // Para WhatsApp
+  lead_name?: string;   // Si se conoce
+}
+
+export interface ChatbotEngineResponse {
+  response: string;
+  intent: AIIntent | 'ESCALATE' | null;
+  confidence: number;
+  data_extracted: {
+    name?: string;
+    phone?: string;
+    preferred_date?: string;
+    property_interest?: string;
+  };
+  conversation_id: string;
+  should_escalate: boolean;
 }
 
 // ─── CALCULATOR RESULTS ──────────────────────────────

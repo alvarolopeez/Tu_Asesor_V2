@@ -1,0 +1,85 @@
+import { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { getPostBySlug } from '@/lib/blogService';
+import ReactMarkdown from 'react-markdown';
+import Link from 'next/link';
+import { Calendar, ArrowLeft } from 'lucide-react';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const resolvedParams = await params;
+  const post = await getPostBySlug(resolvedParams.slug);
+
+  if (!post) {
+    return { title: 'Post no encontrado' };
+  }
+
+  return {
+    title: post.seo_title || `${post.title} | Tu Asesor Álvaro`,
+    description: post.seo_description || post.excerpt,
+    openGraph: {
+      title: post.seo_title || post.title,
+      description: post.seo_description || post.excerpt,
+      images: post.cover_image ? [post.cover_image] : [],
+    },
+  };
+}
+
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
+  const resolvedParams = await params;
+  const post = await getPostBySlug(resolvedParams.slug);
+
+  if (!post) {
+    notFound();
+  }
+
+  return (
+    <div className="min-h-screen bg-[#1a252f] pt-32 pb-24 text-white relative overflow-hidden">
+      {/* Decorative Background */}
+      <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
+      <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-[#FBBF24]/5 rounded-full mix-blend-screen filter blur-[100px] opacity-50 z-0"></div>
+
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="max-w-4xl mx-auto">
+          <Link href="/blog" className="inline-flex items-center text-slate-400 hover:text-[#FBBF24] transition-colors mb-8 font-semibold">
+            <ArrowLeft size={20} className="mr-2" />
+            Volver al blog
+          </Link>
+
+          <article className="glass-effect bg-[#2C3E50]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+            {post.cover_image && (
+              <div className="w-full h-64 md:h-96 relative">
+                <img 
+                  src={post.cover_image} 
+                  alt={post.title} 
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#2C3E50]/90 to-transparent"></div>
+              </div>
+            )}
+            
+            <div className="p-8 md:p-12">
+              <div className="flex items-center text-[#FBBF24] text-sm md:text-base mb-6 font-semibold">
+                <Calendar size={18} className="mr-2" />
+                <time dateTime={post.created_at}>
+                  {new Date(post.created_at).toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </time>
+              </div>
+
+              <h1 className="text-3xl md:text-5xl font-bold font-heading mb-8 leading-tight">
+                {post.title}
+              </h1>
+
+              <div className="prose prose-invert prose-lg max-w-none prose-headings:font-heading prose-headings:text-[#FBBF24] prose-a:text-[#FBBF24] prose-a:no-underline hover:prose-a:underline prose-img:rounded-xl">
+                <ReactMarkdown>{post.content}</ReactMarkdown>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -26,7 +26,8 @@ import {
   Activity,
   Briefcase,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Server
 } from "lucide-react";
 import DashboardOverview from "./sections/DashboardOverview";
 import PropertiesManager from "./sections/PropertiesManager";
@@ -38,8 +39,9 @@ import SellersManager from "./sections/SellersManager";
 import ChatManager from "./sections/ChatManager";
 import BlogManager from "./sections/BlogManager";
 import HeatmapManager from "./sections/HeatmapManager";
+import WebhooksManager from "./sections/WebhooksManager";
 
-type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'sellers' | 'warm_sellers' | 'chat' | 'reviews' | 'blog' | 'heatmap';
+type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'sellers' | 'warm_sellers' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
 
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -177,6 +179,7 @@ export default function AdminDashboard() {
     { id: 'reviews', label: 'Reseñas', icon: Star },
     { id: 'blog', label: 'Blog', icon: PenTool },
     { id: 'heatmap', label: 'Mapa de Calor', icon: Activity },
+    { id: 'webhooks', label: 'Webhook Logs', icon: Server },
   ];
 
   return (
@@ -267,6 +270,9 @@ export default function AdminDashboard() {
 
             {/* 10. MAPA DE CALOR */}
             {activeTab === 'heatmap' && <HeatmapManager />}
+
+            {/* 11. WEBHOOKS */}
+            {activeTab === 'webhooks' && <WebhooksManager />}
 
           </div>
         )}

@@ -17,6 +17,7 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.75.0",
     "react-hot-toast": "^2.6.0",
+    "react-markdown": "^10.1.0",
     "swiper": "^12.1.4",
     "zod": "^4.4.3"
   },
