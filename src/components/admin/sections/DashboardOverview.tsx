@@ -258,8 +258,57 @@ export default function DashboardOverview() {
       setMessages(msgsData || []);
       setWebhookLogs(logsData || []);
       setWebVisits(visitsData || []);
-      setExpenses(expensesData || []);
       setSystemErrors(errorsData || []);
+
+      // Auto-seeding default baseline operating expenses if they are missing
+      let finalExpenses = expensesData || [];
+      const hasAutonomos = finalExpenses.some(e => e.category === "autonomos");
+      const hasIdealista = finalExpenses.some(e => e.category === "idealista" || e.category === "portales");
+      const hasTecnologia = finalExpenses.some(e => e.category === "tecnologia" || e.category === "stack");
+      
+      const seedItems = [];
+      if (!hasAutonomos) {
+        seedItems.push({
+          name: "Cuota de Autónomos (Fija)",
+          category: "autonomos",
+          amount: 294.00,
+          is_automated: true
+        });
+      }
+      if (!hasIdealista) {
+        seedItems.push({
+          name: "Suscripción Idealista (Baseline)",
+          category: "idealista",
+          amount: 120.00,
+          is_automated: true
+        });
+      }
+      if (!hasTecnologia) {
+        seedItems.push({
+          name: "Stack de Infraestructura Cloud",
+          category: "tecnologia",
+          amount: 80.00,
+          is_automated: true
+        });
+      }
+
+      if (seedItems.length > 0) {
+        try {
+          const { data: insertedData, error: seedError } = await supabase
+            .from("operating_expenses")
+            .insert(seedItems)
+            .select();
+          
+          if (!seedError && insertedData) {
+            finalExpenses = [...finalExpenses, ...insertedData].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+          }
+        } catch (seedErr) {
+          console.error("Error auto-seeding baseline expenses:", seedErr);
+        }
+      }
+      setExpenses(finalExpenses);
 
       // Default the selector to the first property if available
       if (propsData && propsData.length > 0 && !selectedPropertyId) {
@@ -1426,9 +1475,9 @@ export default function DashboardOverview() {
 
     // 2. Gastos calculations
     const totalPublicidad = expenses.filter(e => e.category === "publicidad").reduce((acc, e) => acc + Number(e.amount), 0);
-    const totalPortales = expenses.filter(e => e.category === "portales").reduce((acc, e) => acc + Number(e.amount), 0) + 120; // 120€ baseline for Idealista
-    const totalStack = expenses.filter(e => e.category === "stack").reduce((acc, e) => acc + Number(e.amount), 0) + 80; // 80€ baseline for Vercel, Supabase, n8n
-    const totalAutonomos = expenses.filter(e => e.category === "autonomos").reduce((acc, e) => acc + Number(e.amount), 0) + 294; // 294€ standard autonomo fee
+    const totalPortales = expenses.filter(e => e.category === "idealista" || e.category === "portales").reduce((acc, e) => acc + Number(e.amount), 0);
+    const totalStack = expenses.filter(e => e.category === "tecnologia" || e.category === "stack").reduce((acc, e) => acc + Number(e.amount), 0);
+    const totalAutonomos = expenses.filter(e => e.category === "autonomos").reduce((acc, e) => acc + Number(e.amount), 0);
     const totalIrpf = commissionsGenerated * (irpfRate / 100); // dynamic estimated IRPF on generated comissions
     const totalOtros = expenses.filter(e => e.category === "otros").reduce((acc, e) => acc + Number(e.amount), 0);
 
@@ -1496,8 +1545,8 @@ export default function DashboardOverview() {
     // Donut chart percentages logic
     const expenseCategoriesList = [
       { name: "Inversión Publicidad", value: totalPublicidad, color: "#3B82F6", category: "publicidad" },
-      { name: "Idealista & Portales", value: totalPortales, color: "#F43F5E", category: "portales" },
-      { name: "Stack Tecnológico", value: totalStack, color: "#8B5CF6", category: "stack" },
+      { name: "Idealista & Portales", value: totalPortales, color: "#F43F5E", category: "idealista" },
+      { name: "Stack Tecnológico", value: totalStack, color: "#8B5CF6", category: "tecnologia" },
       { name: "Cuota Autónomos", value: totalAutonomos, color: "#10B981", category: "autonomos" },
       { name: "IRPF Previsto (15%)", value: totalIrpf, color: "#FBBF24", category: "irpf" },
       { name: "Otros Gastos", value: totalOtros, color: "#64748B", category: "otros" }
@@ -1908,57 +1957,26 @@ export default function DashboardOverview() {
                 <span className="text-slate-500 lowercase font-normal">Sincronizado con Supabase</span>
               </h4>
               <div className="max-h-[260px] overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-slate-800">
-                {/* Automated/Fixed Baseline items first */}
-                <div className="p-3 bg-slate-900/30 rounded-xl border border-white/5 flex justify-between items-center text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-                    <div>
-                      <p className="font-bold text-white">Cuota de Autónomos (Fija)</p>
-                      <p className="text-[10px] text-slate-500">Categoría: autónomos • Gasto fijo automático</p>
-                    </div>
-                  </div>
-                  <span className="font-extrabold text-white">294€</span>
-                </div>
-
-                <div className="p-3 bg-slate-900/30 rounded-xl border border-white/5 flex justify-between items-center text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-[#F43F5E]" />
-                    <div>
-                      <p className="font-bold text-white">Suscripción Idealista (Baseline)</p>
-                      <p className="text-[10px] text-slate-500">Categoría: portales • Mantenimiento de portal</p>
-                    </div>
-                  </div>
-                  <span className="font-extrabold text-white">120€</span>
-                </div>
-
-                <div className="p-3 bg-slate-900/30 rounded-xl border border-white/5 flex justify-between items-center text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
-                    <div>
-                      <p className="font-bold text-white">Stack de Infraestructura Cloud</p>
-                      <p className="text-[10px] text-slate-500">Categoría: stack • Supabase, Vercel & n8n</p>
-                    </div>
-                  </div>
-                  <span className="font-extrabold text-white">80€</span>
-                </div>
-
+                {/* Dynamic/Calculated IRPF row */}
                 <div className="p-3 bg-slate-900/30 rounded-xl border border-white/5 flex justify-between items-center text-xs">
                   <div className="flex items-center gap-2.5">
                     <span className="w-2 h-2 rounded-full bg-[#FBBF24]" />
                     <div>
-                      <p className="font-bold text-white">IRPF Retención Estimado (15%)</p>
+                      <p className="font-bold text-white">IRPF Retención Estimado ({irpfRate}%)</p>
                       <p className="text-[10px] text-slate-500">Categoría: irpf • Calculado sobre comisiones</p>
                     </div>
                   </div>
                   <span className="font-extrabold text-[#FBBF24]">{Math.round(totalIrpf).toLocaleString()}€</span>
                 </div>
 
-                {/* Custom/Manual Items from state */}
+                {/* Custom & Baseline Items from Supabase database */}
                 {expenses.length > 0 ? (
                   expenses.map((expense) => {
                     const badgeColors: Record<string, string> = {
                       publicidad: "bg-[#3B82F6]",
+                      idealista: "bg-[#F43F5E]",
                       portales: "bg-[#F43F5E]",
+                      tecnologia: "bg-[#8B5CF6]",
                       stack: "bg-[#8B5CF6]",
                       autonomos: "bg-[#10B981]",
                       irpf: "bg-[#FBBF24]",
@@ -1971,7 +1989,16 @@ export default function DashboardOverview() {
                           <div>
                             <p className="font-bold text-white">{expense.name}</p>
                             <p className="text-[10px] text-slate-500">
-                              Categoría: {expense.category} • Registrado el {new Date(expense.created_at).toLocaleDateString()}
+                              Categoría: {
+                                expense.category === "publicidad" ? "Publicidad Ads" :
+                                expense.category === "idealista" ? "Idealista & Portales" :
+                                expense.category === "portales" ? "Idealista & Portales" :
+                                expense.category === "tecnologia" ? "Stack Tecnológico" :
+                                expense.category === "stack" ? "Stack Tecnológico" :
+                                expense.category === "autonomos" ? "Autónomos" :
+                                expense.category === "irpf" ? "IRPF" :
+                                "Otros"
+                              } • {expense.is_automated ? "Gasto automático" : "Gasto manual"}
                             </p>
                           </div>
                         </div>
@@ -2038,8 +2065,8 @@ export default function DashboardOverview() {
                       className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-[#FBBF24] transition-all"
                     >
                       <option value="publicidad">Publicidad Ads</option>
-                      <option value="portales">Portales Inmobiliarios</option>
-                      <option value="stack">Stack Tecnológico</option>
+                      <option value="idealista">Portales Inmobiliarios (Idealista)</option>
+                      <option value="tecnologia">Stack Tecnológico</option>
                       <option value="autonomos">Autónomos</option>
                       <option value="otros">Otros Gastos</option>
                     </select>
