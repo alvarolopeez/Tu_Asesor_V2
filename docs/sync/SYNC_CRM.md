@@ -10,6 +10,26 @@ Si otro agente añade funcionalidades que requieren gestión desde el panel (por
 
 ## ✅ Peticiones Completadas
 
+### 🟢 [2026-05-20] Petición del Usuario — Refinamiento Premium de Dashboard de Operaciones (Sevilla) y Consola Financiera Completa
+
+**Estado:** Completado
+**Resumen de cambios:**
+1. **Interactive Sevilla Zonas de Demanda:**
+   - Incorporamos un listado base de 18 zonas y barrios de Sevilla (Triana, Nervión, Los Remedios, Centro, Sevilla Este, etc.) cruzados en tiempo real con la base de datos de Supabase.
+   - Implementamos un buscador reactivo integrado en el gráfico de barras horizontales doradas (`#FBBF24`) para filtrar por cualquier zona o barrio.
+   - Añadimos visualizaciones dinámicas de compradores activos, porcentaje representativo y presupuesto promedio.
+2. **Crecimiento de Compradores Activos:**
+   - Añadimos un gráfico de área SVG temporal interactivo con un degradado premium que expone el crecimiento mensual acumulado de la base de datos de compradores.
+3. **Desglose de Capacidad Financiera y Propósitos:**
+   - Diseñamos una interfaz analítica con porcentajes (`%`) e indicadores absolutos que desglosa a los compradores activos por Capacidad Financiera (Hipoteca y sin estudio, Hipoteca con estudio, Preconcedida, Al contado) y por Propósito (Vivienda Habitual vs Inversión).
+   - Añadimos una caja de *Insight Operativo* que calcula de forma automática el porcentaje de clientes con liquidez inmediata.
+4. **Consola de Configuración Financiera y Sobreescrituras:**
+   - Añadimos una consola de simulación con controles deslizantes interactivos para ajustar la comisión de honorarios (del 2% al 10%) e IRPF.
+   - Permitimos la sobreescritura (override) en caliente de los KPIs principales (Facturado, Previsiones, CAC) que se inyectan reactivamente en el flujo de renderizado del panel.
+5. **CRUD de Gastos Operativos Completo e In-Place:**
+   - Implementamos la edición *in-place* sobre la tabla `operating_expenses` en caliente, con estados visuales activos (bordes dorados e iconos de guardado) y cálculos automáticos de IRPF y beneficio neto.
+
+
 ### 🟢 [2026-05-20] Petición del Agente Web — Integración de Mapas de Captación y Coincidencias de Inmuebles
 
 **Estado:** Completado
