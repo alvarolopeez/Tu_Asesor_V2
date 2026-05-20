@@ -162,6 +162,19 @@ export default function AdminDashboard() {
             >
               {authLoading ? 'Verificando...' : 'Entrar al Dashboard'}
             </button>
+            
+            {process.env.NODE_ENV === "development" && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsAuthenticated(true);
+                  fetchData();
+                }}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-[#FBBF24] font-bold py-2.5 rounded-xl border border-white/5 transition-all mt-2 text-xs"
+              >
+                🛠️ Auto-Bypass (Desarrollo)
+              </button>
+            )}
           </form>
         </div>
       </div>

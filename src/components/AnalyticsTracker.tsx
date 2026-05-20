@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 export default function AnalyticsTracker() {
   const pathname = usePathname();
@@ -21,11 +20,18 @@ export default function AnalyticsTracker() {
           localStorage.setItem("analytics_session_id", sessionId);
         }
 
-        await supabase.from("web_visits").insert({
-          session_id: sessionId,
-          page_path: pathname || "/",
-          referrer: document.referrer || null,
-          user_agent: navigator.userAgent || null,
+        await fetch("/api/analytics/track", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            page_path: pathname || "/",
+            referrer: document.referrer || null,
+            user_agent: navigator.userAgent || null,
+            full_url: window.location.href,
+          }),
         });
       } catch (err) {
         console.error("Failed to track page view:", err);

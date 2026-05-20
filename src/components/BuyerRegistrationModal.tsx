@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { X, ChevronRight, ChevronLeft, Check, Home, MapPin, Calculator, CreditCard } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import dynamic from "next/dynamic";
+
+const BuyerMap = dynamic(() => import("./BuyerMap"), { ssr: false });
 
 type BuyerRegistrationModalProps = {
   isOpen: boolean;
@@ -14,6 +17,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [area, setArea] = useState<[number, number][]>([]);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -52,7 +56,8 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
 
     try {
       const preferences = {
-        location: formData.location,
+        area,
+        location: area.length > 0 ? "Área delimitada en mapa" : formData.location,
         propertyType: formData.propertyType,
         maxPrice: formData.maxPrice,
         minRooms: formData.minRooms,
@@ -209,20 +214,16 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                   <div className="bg-[#FBBF24]/20 p-3 rounded-lg text-[#FBBF24]">
                     <MapPin size={24} />
                   </div>
-                  <h3 className="text-xl font-bold text-[#2C3E50]">2. ¿Qué buscas?</h3>
+                  <h3 className="text-xl font-bold text-[#2C3E50]">2. ¿Qué zonas buscas?</h3>
                 </div>
 
                 <div className="space-y-5">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700">¿En qué zonas buscas? *</label>
-                    <textarea 
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      rows={3}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all resize-none"
-                      placeholder="Ej: Sevilla Este, Triana, Nervión, o pueblos cercanos..."
-                    />
+                    <label className="text-sm font-semibold text-slate-700 block mb-1">Delimita las zonas sobre el mapa *</label>
+                    <p className="text-xs text-slate-500 mb-2 leading-relaxed">
+                      Haz clic sobre el mapa para delimitar las zonas de Sevilla donde buscas tu vivienda (mínimo 3 puntos). Haz clic sobre los puntos creados si necesitas borrarlos uno a uno.
+                    </p>
+                    <BuyerMap area={area} onChange={setArea} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Tipo de Inmueble</label>
@@ -403,7 +404,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                 onClick={handleNext}
                 disabled={
                   (step === 1 && (!formData.firstName || !formData.phone)) ||
-                  (step === 2 && !formData.location) ||
+                  (step === 2 && area.length < 3) ||
                   (step === 3 && !formData.maxPrice)
                 }
                 className="flex items-center bg-[#2C3E50] text-white px-8 py-2 rounded-lg font-bold hover:bg-[#1a252f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"

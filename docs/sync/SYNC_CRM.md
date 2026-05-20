@@ -10,6 +10,14 @@ Si otro agente añade funcionalidades que requieren gestión desde el panel (por
 
 ## ✅ Peticiones Completadas
 
+### 🟢 [2026-05-20] Petición del Agente Web — Integración de Mapas de Captación y Coincidencias de Inmuebles
+
+**Estado:** Completado
+**Resumen de cambios:**
+1. **Coordenadas de Compradores (Polígonos):** El formulario de registro de compradores ahora incluye un mapa interactivo (Leaflet con CartoDB Dark Matter) que permite delimitar áreas poligonales de búsqueda. Estos vértices se guardan en la tabla `leads` como `preferences.area` (formato `[number, number][]`).
+2. **Campos de Inmuebles y Matchmaker:** Al subir un inmueble en `PropertiesManager.tsx`, se solicitan `propertyType`, `rooms`, `baths`, `latitude` y `longitude` (se guardan en la columna JSONB `features`).
+3. **Algoritmo de Coincidencia (Ray-Casting Point-in-Polygon):** Tras guardar el inmueble, se evalúan al instante todos los compradores activos. Si su polígono de búsqueda `preferences.area` contiene la ubicación `[lat, lng]` del inmueble y coincide con sus otras preferencias (precio máximo, tipo de inmueble, mínimo de habitaciones/baños), se notifica de inmediato al administrador con un modal premium con accesos rápidos a WhatsApp y Email para contactarlos directamente.
+
 ### 🟢 [2026-05-20] Petición del Usuario — Desarrollo del 100% de Dashboard CRM (Marketing, Operaciones, Finanzas, Ecosistema)
 
 **Estado:** Completado
