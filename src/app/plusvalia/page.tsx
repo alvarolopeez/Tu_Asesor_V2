@@ -97,19 +97,19 @@ export default function PlusvaliaPage() {
       const limitDate1 = new Date('1994-12-31');
       const limitDate2 = new Date('1996-12-31');
       const changeDate = new Date('2006-01-20');
-      
+
       if (fAdq <= limitDate1) {
         // Days from acquisition to 31/12/1996
         const diffDays1 = Math.floor((limitDate2.getTime() - fAdq.getTime()) / (1000 * 60 * 60 * 24));
         const years = Math.ceil(diffDays1 / 365.25);
-        
+
         if (years > 2) {
           let reductionPercent = (years - 2) * 0.1111;
           if (reductionPercent > 1) reductionPercent = 1;
-          
+
           const totalDays = Math.floor((fVenta.getTime() - fAdq.getTime()) / (1000 * 60 * 60 * 24));
           const daysTo2006 = Math.floor((changeDate.getTime() - fAdq.getTime()) / (1000 * 60 * 60 * 24));
-          
+
           if (totalDays > 0 && daysTo2006 > 0) {
             const gananciaTo2006 = ganancia * (daysTo2006 / totalDays);
             const gananciaReduced = gananciaTo2006 * reductionPercent;
@@ -123,7 +123,7 @@ export default function PlusvaliaPage() {
       // Apply IRPF tiers 2024
       let cuotaIRPF = 0;
       let remaining = gananciaSujeta;
-      
+
       if (remaining > 0) {
         const b1 = Math.min(remaining, 6000);
         cuotaIRPF += b1 * 0.19;
@@ -208,7 +208,7 @@ export default function PlusvaliaPage() {
       </div>
 
 
-      
+
       <div className="container mx-auto px-4 max-w-4xl relative z-10">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-[#2C3E50] mb-4">
@@ -220,18 +220,18 @@ export default function PlusvaliaPage() {
         </div>
 
         <div className="glass-effect p-8 md:p-12 rounded-3xl border border-[#2C3E50]/20 shadow-2xl relative z-10">
-          
+
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in duration-500">
-              
+
               <div className="flex flex-col sm:flex-row justify-center mb-8 bg-slate-800 p-1 rounded-xl w-fit mx-auto border border-white/10 gap-1">
-                <button 
+                <button
                   onClick={() => setTaxType('municipal')}
                   className={`px-6 py-2 rounded-lg font-bold transition-all ${taxType === 'municipal' ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-white hover:bg-white/10'}`}
                 >
                   Plusvalía Municipal
                 </button>
-                <button 
+                <button
                   onClick={() => setTaxType('fiscal')}
                   className={`px-6 py-2 rounded-lg font-bold transition-all ${taxType === 'fiscal' ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-white hover:bg-white/10'}`}
                 >
@@ -244,10 +244,10 @@ export default function PlusvaliaPage() {
                   <label className="text-slate-300 text-sm font-medium">Precio de Compra (Original)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={formData.valorAdquisicion}
-                      onChange={(e) => setFormData({...formData, valorAdquisicion: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, valorAdquisicion: e.target.value })}
                       placeholder="Ej: 150000"
                       className="w-full bg-white border border-transparent rounded-xl py-3 pl-10 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                     />
@@ -256,10 +256,10 @@ export default function PlusvaliaPage() {
 
                 <div className="space-y-2">
                   <label className="text-slate-300 text-sm font-medium">Fecha de Compra</label>
-                  <input 
-                    type="date" 
+                  <input
+                    type="date"
                     value={formData.fechaAdquisicion}
-                    onChange={(e) => setFormData({...formData, fechaAdquisicion: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, fechaAdquisicion: e.target.value })}
                     className="w-full bg-white border border-transparent rounded-xl py-3 px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                   />
                 </div>
@@ -268,10 +268,10 @@ export default function PlusvaliaPage() {
                   <label className="text-slate-300 text-sm font-medium">Precio de Venta (Estimado)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       value={formData.valorVenta}
-                      onChange={(e) => setFormData({...formData, valorVenta: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, valorVenta: e.target.value })}
                       placeholder="Ej: 210000"
                       className="w-full bg-white border border-transparent rounded-xl py-3 pl-10 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                     />
@@ -280,10 +280,10 @@ export default function PlusvaliaPage() {
 
                 <div className="space-y-2">
                   <label className="text-slate-300 text-sm font-medium">Fecha de Venta</label>
-                  <input 
-                    type="date" 
+                  <input
+                    type="date"
                     value={formData.fechaVenta}
-                    onChange={(e) => setFormData({...formData, fechaVenta: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, fechaVenta: e.target.value })}
                     className="w-full bg-white border border-transparent rounded-xl py-3 px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                   />
                 </div>
@@ -294,10 +294,10 @@ export default function PlusvaliaPage() {
                       <label className="text-slate-300 text-sm font-medium">Valor Catastral del Suelo</label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
-                        <input 
-                          type="number" 
+                        <input
+                          type="number"
                           value={formData.valorCatastralSuelo}
-                          onChange={(e) => setFormData({...formData, valorCatastralSuelo: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, valorCatastralSuelo: e.target.value })}
                           placeholder="Consultar en el IBI"
                           className="w-full bg-white border border-transparent rounded-xl py-3 pl-10 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                         />
@@ -306,9 +306,9 @@ export default function PlusvaliaPage() {
 
                     <div className="space-y-2">
                       <label className="text-slate-300 text-sm font-medium">Municipio</label>
-                      <select 
+                      <select
                         value={formData.municipio}
-                        onChange={(e) => setFormData({...formData, municipio: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, municipio: e.target.value })}
                         className="w-full bg-white border border-transparent rounded-xl py-3 px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all appearance-none"
                       >
                         {MUNICIPIOS_SEVILLA.map(m => (
@@ -323,13 +323,13 @@ export default function PlusvaliaPage() {
               <div className="flex items-center gap-3 p-4 bg-blue-900/30 border border-blue-500/20 rounded-xl">
                 <Info className="text-[#FBBF24] shrink-0" size={20} />
                 <p className="text-sm text-blue-100">
-                  {taxType === 'municipal' 
+                  {taxType === 'municipal'
                     ? "Calculamos automáticamente el método más favorable (Real vs Objetivo) según la normativa de 2024."
                     : "Aplicamos los coeficientes de abatimiento si tu inmueble fue adquirido antes del 31 de diciembre de 1994."}
                 </p>
               </div>
 
-              <button 
+              <button
                 onClick={calculatePlusvalia}
                 className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold py-4 text-xl rounded-xl flex items-center justify-center gap-3 group transition-all shadow-lg"
               >
@@ -345,7 +345,7 @@ export default function PlusvaliaPage() {
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/20 border border-green-500/30 mb-4">
                 <CheckCircle2 className="text-green-400" size={40} />
               </div>
-              
+
               <h2 className="text-3xl font-bold text-white">¡Cálculo Listo!</h2>
               {results?.tipo === 'municipal' ? (
                 <p className="text-slate-300">
@@ -380,31 +380,31 @@ export default function PlusvaliaPage() {
                 <p className="text-slate-300 mb-8 text-sm">
                   Introduce tus datos para desbloquear el desglose completo y recibir una consulta gratuita sobre cómo reducir este impuesto legalmente.
                 </p>
-                
+
                 <form onSubmit={handleLeadSubmit} className="space-y-4">
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
                       minLength={2}
                       maxLength={100}
                       placeholder="Tu Nombre"
                       value={formData.nombre}
-                      onChange={(e) => setFormData({...formData, nombre: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
                       className="w-full bg-white border border-transparent rounded-xl py-4 pl-12 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]"
                     />
                   </div>
                   <div className="relative">
                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                      type="tel" 
+                    <input
+                      type="tel"
                       required
                       pattern="[0-9]{9,15}"
                       title="Introduce un teléfono válido (9-15 dígitos)"
                       placeholder="Tu Teléfono"
                       value={formData.telefono}
-                      onChange={(e) => setFormData({...formData, telefono: e.target.value.replace(/[^0-9]/g, '')})}
+                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value.replace(/[^0-9]/g, '') })}
                       className="w-full bg-white border border-transparent rounded-xl py-4 pl-12 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]"
                     />
                   </div>
@@ -428,14 +428,13 @@ export default function PlusvaliaPage() {
                     </p>
                   )}
 
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={submitting || !consent}
-                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg ${
-                      consent 
-                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer' 
+                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg ${consent
+                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer'
                         : 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                    }`}
+                      }`}
                   >
                     {submitting ? 'Guardando...' : 'Ver Informe Completo Gratis'}
                   </button>
@@ -531,7 +530,7 @@ export default function PlusvaliaPage() {
                 <p className="text-slate-300 italic">
                   "Hola {formData.nombre}, ya tengo tu cálculo. Te contactaré en breve al {formData.telefono} para explicarte cómo tramitarlo sin errores."
                 </p>
-                <button 
+                <button
                   onClick={() => window.location.href = BUSINESS.whatsappUrl(`Hola Álvaro, acabo de calcular mi ${results?.tipo === 'municipal' ? 'plusvalía municipal' : 'plusvalía fiscal'} (${(results?.tipo === 'municipal' ? (results as any).cuotaFinal : (results as any).cuotaIRPF).toFixed(2)}€) y me gustaría que me ayudaras con la venta.`)}
                   className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-8 flex items-center justify-center gap-2 mx-auto rounded-xl font-bold transition-all shadow-lg"
                 >
