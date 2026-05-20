@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import LayoutWrapper from "@/components/LayoutWrapper";
 import ToastProvider from "@/components/ToastProvider";
+import AnalyticsTracker from "@/components/AnalyticsTracker";
 import "./globals.css";
 
 const lato = Lato({
@@ -34,6 +35,7 @@ export default function RootLayout({
         className={`${lato.variable} ${montserrat.variable} font-sans antialiased min-h-screen flex flex-col`}
       >
         <ToastProvider />
+        <AnalyticsTracker />
         <LayoutWrapper
           footer={
             <footer className="bg-[#2C3E50] text-white">

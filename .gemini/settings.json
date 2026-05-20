@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "type": "http",
+      "url": "https://alvaroolopez.app.n8n.cloud/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYjI0ZTA5Ni00YTA1LTQyYjItYTViZi1kYjdjNDhjMGEwYmIiLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6ImQwOWNhMjM3LTE0MTYtNDUxYS05MDY3LTAxNmI4ZjJmNTgwMSIsImlhdCI6MTc3OTIyNDcxNn0.rDOdwRNKqwYUbkfQKkBPesV06vltPI0FloQU_7_YcsU"
+      }
+    }
+  }
+}
