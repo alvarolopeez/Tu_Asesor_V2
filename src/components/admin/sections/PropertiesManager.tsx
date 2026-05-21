@@ -123,12 +123,25 @@ export default function PropertiesManager() {
 
       const matches = (buyers || []).filter((buyer: any) => {
         const prefs = buyer.preferences || {};
+        const polygons = prefs.polygons;
         const area = prefs.area;
 
         // 1. Spatial filter (polygon containment)
-        if (!area || !Array.isArray(area) || area.length < 3) return false;
-        const isInside = isPointInPolygon([propLat, propLng], area as [number, number][]);
-        if (!isInside) return false;
+        let hasLocationPreference = false;
+        let isInside = false;
+
+        if (polygons && Array.isArray(polygons) && polygons.length > 0) {
+          hasLocationPreference = true;
+          isInside = polygons.some((poly: any) => {
+            if (!Array.isArray(poly) || poly.length < 3) return false;
+            return isPointInPolygon([propLat, propLng], poly as [number, number][]);
+          });
+        } else if (area && Array.isArray(area) && area.length >= 3) {
+          hasLocationPreference = true;
+          isInside = isPointInPolygon([propLat, propLng], area as [number, number][]);
+        }
+
+        if (hasLocationPreference && !isInside) return false;
 
         // 2. Price filter
         if (prefs.maxPrice && propPrice > Number(prefs.maxPrice)) return false;

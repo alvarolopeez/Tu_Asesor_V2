@@ -17,7 +17,9 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [area, setArea] = useState<[number, number][]>([]);
+  const [polygons, setPolygons] = useState<[number, number][][]>([]);
+  const [inputMode, setInputMode] = useState<'draw' | 'type'>('draw');
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -56,8 +58,9 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
 
     try {
       const preferences = {
-        area,
-        location: area.length > 0 ? "Área delimitada en mapa" : formData.location,
+        area: polygons.length > 0 ? polygons[0] : [],
+        polygons: polygons,
+        location: inputMode === "draw" && polygons.length > 0 ? `Delimitado en mapa (${polygons.length} zonas)` : formData.location,
         propertyType: formData.propertyType,
         maxPrice: formData.maxPrice,
         minRooms: formData.minRooms,
@@ -210,21 +213,110 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
 
               {/* Step 2: Ubicación y Tipo */}
               <div className={`${step === 2 ? 'block' : 'hidden'} animate-fadeIn`}>
-                <div className="flex items-center gap-3 mb-6">
+                <div className="flex items-center gap-3 mb-5">
                   <div className="bg-[#FBBF24]/20 p-3 rounded-lg text-[#FBBF24]">
                     <MapPin size={24} />
                   </div>
-                  <h3 className="text-xl font-bold text-[#2C3E50]">2. ¿Qué zonas buscas?</h3>
+                  <h3 className="text-xl font-bold text-[#2C3E50]">2. ¿En qué zonas deseas comprar?</h3>
                 </div>
 
                 <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-slate-700 block mb-1">Delimita las zonas sobre el mapa *</label>
-                    <p className="text-xs text-slate-500 mb-2 leading-relaxed">
-                      Haz clic sobre el mapa para delimitar las zonas de Sevilla donde buscas tu vivienda (mínimo 3 puntos). Haz clic sobre los puntos creados si necesitas borrarlos uno a uno.
-                    </p>
-                    <BuyerMap area={area} onChange={setArea} />
+                  {/* Option Cards Choice */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setInputMode('draw')}
+                      className={`p-4 border-2 rounded-xl text-left transition-all active:scale-95 duration-200 ${
+                        inputMode === 'draw'
+                          ? 'border-[#FBBF24] bg-[#FBBF24]/5 shadow-md shadow-[#FBBF24]/5'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-[#FBBF24]/10 text-[#FBBF24] flex items-center justify-center mb-3">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </div>
+                      <p className="font-bold text-sm text-slate-800">Dibujar zona</p>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-normal">Selecciona con precisión libre dibujando con tu dedo o ratón.</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setInputMode('type')}
+                      className={`p-4 border-2 rounded-xl text-left transition-all active:scale-95 duration-200 ${
+                        inputMode === 'type'
+                          ? 'border-[#FBBF24] bg-[#FBBF24]/5 shadow-md shadow-[#FBBF24]/5'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center mb-3">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <p className="font-bold text-sm text-slate-800">Escribe la ubicación</p>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-normal">Introduce nombres de calles o barrios de forma clásica.</p>
+                    </button>
                   </div>
+
+                  {/* Mode Renderers */}
+                  {inputMode === 'draw' ? (
+                    <div className="bg-slate-50 border border-slate-200/80 p-5 rounded-2xl text-center space-y-4 shadow-sm animate-fadeIn">
+                      <div className="max-w-md mx-auto space-y-1.5">
+                         <p className="font-bold text-[#2C3E50] text-sm">Dibuja tus zonas sobre el mapa</p>
+                         <p className="text-xs text-slate-500 leading-normal">
+                           Abre el mapa interactivo y delimita con total precisión las zonas de Sevilla en las que quieres buscar tu vivienda.
+                         </p>
+                      </div>
+
+                      {polygons.length > 0 ? (
+                        <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/25 px-4 py-2 rounded-full text-xs font-bold text-green-700">
+                          <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+                          <span>¡Listo! Has delimitado {polygons.length} {polygons.length === 1 ? "zona" : "zonas"} en Sevilla</span>
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 bg-yellow-500/10 border border-yellow-500/20 px-4 py-2 rounded-full text-xs font-semibold text-[#B28711]">
+                          <span>Falta por definir tu zona de búsqueda</span>
+                        </div>
+                      )}
+
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setIsMapOpen(true)}
+                          className="bg-[#2C3E50] hover:bg-[#1a252f] text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 mx-auto shadow-md"
+                        >
+                          <svg className="w-4 h-4 text-[#FBBF24]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                          </svg>
+                          {polygons.length > 0 ? "Modificar zonas en mapa" : "Abrir mapa y dibujar"}
+                        </button>
+                      </div>
+
+                      {/* Fullscreen Map Portal */}
+                      <BuyerMap 
+                        polygons={polygons} 
+                        onChange={setPolygons} 
+                        isOpen={isMapOpen} 
+                        onClose={() => setIsMapOpen(false)} 
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 animate-fadeIn">
+                      <label className="text-sm font-semibold text-slate-700">Introduce la calle, zona o barrio *</label>
+                      <textarea 
+                        name="location"
+                        value={formData.location}
+                        onChange={handleChange}
+                        rows={3}
+                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all resize-none text-sm placeholder:text-slate-400"
+                        placeholder="Ej: Triana, Los Remedios, Nervión..."
+                      />
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Tipo de Inmueble</label>
                     <select 
@@ -404,7 +496,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                 onClick={handleNext}
                 disabled={
                   (step === 1 && (!formData.firstName || !formData.phone)) ||
-                  (step === 2 && area.length < 3) ||
+                  (step === 2 && (inputMode === 'draw' ? polygons.length === 0 : !formData.location.trim())) ||
                   (step === 3 && !formData.maxPrice)
                 }
                 className="flex items-center bg-[#2C3E50] text-white px-8 py-2 rounded-lg font-bold hover:bg-[#1a252f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
