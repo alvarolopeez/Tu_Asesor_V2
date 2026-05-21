@@ -85,3 +85,23 @@ export const VALIDATION = {
     message: 'El nombre debe tener entre 2 y 100 caracteres',
   },
 } as const;
+
+/**
+ * Constantes de calendario y horarios.
+ * Usadas por CalendarManager, PropertiesManager y /comprar.
+ */
+export const AVAILABLE_DAYS = [
+  'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+] as const;
+
+export const AVAILABLE_HOURS = [
+  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '12:00', '12:30', '13:00', '13:30',
+  '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
+  '19:00', '19:30', '20:00'
+] as const;
+
+export const DEFAULT_WORK_SLOTS = [
+  '10:00', '11:00', '12:00', '16:00', '17:00', '18:00'
+] as const;
+

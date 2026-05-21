@@ -21,7 +21,7 @@ import { supabase } from '@/lib/supabase';
  * @created 2026-05-14
  */
 
-const N8N_API_KEY = process.env.N8N_API_KEY || 'tuasesor_n8n_key_2026';
+const N8N_API_KEY = process.env.N8N_API_KEY || '';
 
 function validateApiKey(request: NextRequest): boolean {
   const apiKey = request.headers.get('x-api-key');

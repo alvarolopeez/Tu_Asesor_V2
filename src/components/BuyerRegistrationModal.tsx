@@ -57,6 +57,10 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
     setError(null);
 
     try {
+      const cleanPhone = formData.phone.trim().replace(/\s+/g, '');
+      const cleanName = `${formData.firstName} ${formData.lastName}`.trim();
+      const cleanEmail = formData.email?.trim().toLowerCase() || null;
+
       const preferences = {
         area: polygons.length > 0 ? polygons[0] : [],
         polygons: polygons,
@@ -71,20 +75,42 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         mortgageStatus: formData.paymentMethod === "Hipoteca" ? formData.mortgageStatus : null,
       };
 
-      const { error: insertError } = await supabase.from("leads").insert([
-        {
-          id: crypto.randomUUID(),
-          name: `${formData.firstName} ${formData.lastName}`.trim(),
-          phone: formData.phone,
-          email: formData.email,
-          type: "buyer",
-          status: "new",
-          source: "buyer_registration",
-          preferences,
-        },
-      ]);
+      // Check for existing lead by phone to prevent duplicates
+      const { data: existingLeads } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("phone", cleanPhone)
+        .limit(1);
 
-      if (insertError) throw insertError;
+      if (existingLeads && existingLeads.length > 0) {
+        // Lead already exists — update preferences instead of creating duplicate
+        const { error: updateError } = await supabase
+          .from("leads")
+          .update({
+            name: cleanName,
+            email: cleanEmail,
+            preferences,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingLeads[0].id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create new lead — let Supabase generate the UUID
+        const { error: insertError } = await supabase.from("leads").insert([
+          {
+            name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail,
+            type: "buyer",
+            status: "new",
+            source: "buyer_registration",
+            preferences,
+          },
+        ]);
+
+        if (insertError) throw insertError;
+      }
 
       setSuccess(true);
     } catch (err: any) {

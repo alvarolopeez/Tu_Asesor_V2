@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import toast from "react-hot-toast";
 import { 
   Calendar as CalendarIcon,
   Clock,
@@ -298,14 +299,14 @@ export default function CalendarManager() {
       fetchCalendarData();
     } catch (err) {
       console.error("Error saving appointment:", err);
-      alert("Hubo un error al guardar la cita.");
+      toast.error("Hubo un error al guardar la cita.");
     }
   };
 
   // Eliminar cita
   const handleDeleteAppointment = async () => {
     if (!editingAppointment) return;
-    if (!confirm("¿Seguro que deseas eliminar/cancelar esta cita o bloqueo?")) return;
+    if (!window.confirm("¿Seguro que deseas eliminar/cancelar esta cita o bloqueo?")) return;
 
     try {
       const { error } = await supabase
@@ -319,14 +320,14 @@ export default function CalendarManager() {
       fetchCalendarData();
     } catch (err) {
       console.error("Error deleting appointment:", err);
-      alert("Hubo un error al eliminar la cita.");
+      toast.error("Hubo un error al eliminar la cita.");
     }
   };
 
   // Bloquear día completo rápido
   const handleBlockFullDay = async (date: Date) => {
     const dayStr = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-    if (!confirm(`¿Deseas bloquear completamente la agenda para el ${dayStr}?`)) return;
+    if (!window.confirm(`¿Deseas bloquear completamente la agenda para el ${dayStr}?`)) return;
 
     try {
       // Creamos un único bloqueo de 10:00 a 20:00 (600 minutos)
@@ -353,7 +354,7 @@ export default function CalendarManager() {
       fetchCalendarData();
     } catch (err) {
       console.error("Error blocking day:", err);
-      alert("Hubo un error al bloquear el día.");
+      toast.error("Hubo un error al bloquear el día.");
     }
   };
 

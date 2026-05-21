@@ -51,6 +51,7 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState("");
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
   const [calculations, setCalculations] = useState<any[]>([]);
@@ -196,9 +197,50 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-slate-200 flex">
+    <div className="min-h-screen bg-[#0F172A] text-slate-200 flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <header className="md:hidden flex items-center justify-between px-5 py-4 bg-[#1E293B] border-b border-white/5 sticky top-0 z-30 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-[#FBBF24] rounded-lg flex items-center justify-center font-bold text-[#2C3E50] text-sm">
+            AA
+          </div>
+          <div>
+            <p className="font-bold text-white text-xs">Álvaro | CRM</p>
+            <p className="text-[8px] text-slate-400 uppercase tracking-widest">Administrador</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="p-2 hover:bg-white/5 rounded-lg text-slate-300 focus:outline-none transition-colors"
+          aria-label="Toggle Menu"
+        >
+          {isSidebarOpen ? (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
+      </header>
+
+      {/* Mobile Sidebar Overlay Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-[#1E293B] border-r border-white/5 flex flex-col shrink-0">
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-[#1E293B] border-r border-white/5 flex flex-col shrink-0
+        transform transition-transform duration-300 ease-in-out
+        md:static md:translate-x-0
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
         <div className="p-6 border-b border-white/5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#FBBF24] rounded-lg flex items-center justify-center font-bold text-[#2C3E50]">
@@ -215,7 +257,10 @@ export default function AdminDashboard() {
           {TABS.map((tab) => (
             <button 
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setIsSidebarOpen(false);
+              }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === tab.id ? 'bg-[#FBBF24] text-[#2C3E50] font-bold shadow-lg shadow-[#FBBF24]/20' : 'hover:bg-white/5 text-slate-400'}`}
             >
               <tab.icon size={20} /> {tab.label}
@@ -225,7 +270,10 @@ export default function AdminDashboard() {
 
         <div className="p-4 border-t border-white/5">
           <button 
-            onClick={handleLogout}
+            onClick={() => {
+              handleLogout();
+              setIsSidebarOpen(false);
+            }}
             className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
           >
             <LogOut size={20} /> Cerrar Sesión
@@ -234,15 +282,15 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-grow p-8 overflow-y-auto">
-        <header className="flex justify-between items-center mb-10">
+      <main className="flex-grow p-4 md:p-8 overflow-y-auto w-full">
+        <header className="flex justify-between items-center mb-6 md:mb-10">
           <div>
-            <h1 className="text-3xl font-bold text-white capitalize">{TABS.find(t => t.id === activeTab)?.label}</h1>
-            <p className="text-slate-400">Panel de gestión y administración.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-white capitalize">{TABS.find(t => t.id === activeTab)?.label}</h1>
+            <p className="text-slate-400 text-xs md:text-sm">Panel de gestión y administración.</p>
           </div>
           <div className="flex gap-4">
             <button onClick={fetchData} className="p-2 hover:bg-white/5 rounded-lg text-slate-400 transition-colors">
-              <Clock size={24} />
+              <Clock size={20} className="md:w-6 md:h-6" />
             </button>
           </div>
         </header>
