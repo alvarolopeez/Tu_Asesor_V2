@@ -47,12 +47,17 @@ export interface LeadRow {
 
 export interface AppointmentRow {
   id: string
-  lead_id: string
+  lead_id: string | null
   property_id: string | null
   scheduled_at: string
   status: string | null
   cal_event_id: string | null
   created_at: string
+  type?: 'captacion' | 'visita' | 'cierre' | 'admin' | 'blocked'
+  title?: string | null
+  location?: string | null
+  notes?: string | null
+  duration_minutes?: number
 }
 
 export interface ConversationRow {
