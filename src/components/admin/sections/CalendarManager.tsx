@@ -72,6 +72,12 @@ export default function CalendarManager() {
     duration_minutes: 30
   });
 
+  // Búsqueda interactiva de Leads e Inmuebles en Modal
+  const [leadSearch, setLeadSearch] = useState("");
+  const [propSearch, setPropSearch] = useState("");
+  const [isLeadDropdownOpen, setIsLeadDropdownOpen] = useState(false);
+  const [isPropDropdownOpen, setIsPropDropdownOpen] = useState(false);
+
   // Configuración de disponibilidad
   const TIME_SLOTS = [
     "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", 
@@ -206,6 +212,8 @@ export default function CalendarManager() {
       notes: "",
       duration_minutes: 30
     });
+    setLeadSearch("");
+    setPropSearch("");
     setIsModalOpen(true);
   };
 
@@ -234,6 +242,11 @@ export default function CalendarManager() {
       notes: appt.notes || "",
       duration_minutes: appt.duration_minutes || 30
     });
+
+    const matchedLead = leads.find(l => l.id === appt.lead_id);
+    const matchedProp = properties.find(p => p.id === appt.property_id);
+    setLeadSearch(matchedLead ? matchedLead.name : "");
+    setPropSearch(matchedProp ? matchedProp.title : "");
     setIsModalOpen(true);
   };
 
@@ -400,6 +413,24 @@ export default function CalendarManager() {
         };
     }
   };
+
+  // Filtrar leads por búsqueda (nombre o teléfono)
+  const filteredLeads = leads.filter(lead => {
+    if (!leadSearch) return true;
+    const searchLower = leadSearch.toLowerCase();
+    const nameMatch = lead.name.toLowerCase().includes(searchLower);
+    const phoneMatch = lead.phone ? lead.phone.toLowerCase().includes(searchLower) : false;
+    return nameMatch || phoneMatch;
+  });
+
+  // Filtrar propiedades por búsqueda (título o descripción/dirección)
+  const filteredProperties = properties.filter(prop => {
+    if (!propSearch) return true;
+    const searchLower = propSearch.toLowerCase();
+    const titleMatch = prop.title.toLowerCase().includes(searchLower);
+    const descMatch = prop.description ? prop.description.toLowerCase().includes(searchLower) : false;
+    return titleMatch || descMatch;
+  });
 
   // Lista ordenada cronológicamente de citas para la vista de Ruta
   const sortedAppointments = [...appointments].sort((a, b) => 
@@ -855,37 +886,138 @@ export default function CalendarManager() {
               {/* Link a Lead (Comprador o Vendedor) */}
               {formData.type !== "blocked" && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  {/* Lead Asociado */}
+                  <div className="relative">
                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Lead Asociado</label>
-                    <select
-                      value={formData.lead_id}
-                      onChange={(e) => setFormData({ ...formData, lead_id: e.target.value })}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
-                    >
-                      <option value="">-- Sin lead asignado --</option>
-                      {leads.map((lead) => (
-                        <option key={lead.id} value={lead.id}>
-                          {lead.name} ({lead.type === 'buyer' ? 'Pedido/Comprador' : 'Vendedor'})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 Buscar lead por nombre o tel..."
+                        value={leadSearch}
+                        onChange={(e) => {
+                          setLeadSearch(e.target.value);
+                          setIsLeadDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsLeadDropdownOpen(true)}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setIsLeadDropdownOpen(false);
+                            const selected = leads.find(l => l.id === formData.lead_id);
+                            if (selected) {
+                              setLeadSearch(selected.name);
+                            } else {
+                              setLeadSearch("");
+                            }
+                          }, 250);
+                        }}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl py-2.5 pl-4 pr-10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                      />
+                      {formData.lead_id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, lead_id: "" });
+                            setLeadSearch("");
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-lg font-bold"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                    {isLeadDropdownOpen && (
+                      <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin scrollbar-thumb-slate-700">
+                        {filteredLeads.length === 0 ? (
+                          <div className="p-3 text-xs text-slate-400 italic">No se encontraron leads</div>
+                        ) : (
+                          filteredLeads.map((lead) => (
+                            <button
+                              key={lead.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, lead_id: lead.id });
+                                setLeadSearch(lead.name);
+                                setIsLeadDropdownOpen(false);
+                              }}
+                              className="w-full text-left p-3 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition-colors block"
+                            >
+                              <div className="text-sm font-semibold text-white">{lead.name}</div>
+                              <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+                                <span>{lead.type === 'buyer' ? '🟢 Pedido/Comprador' : '🔵 Vendedor'}</span>
+                                {lead.phone && <span>📞 {lead.phone}</span>}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Link a Propiedad */}
-                  <div>
+                  <div className="relative">
                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">Inmueble de Interés</label>
-                    <select
-                      value={formData.property_id}
-                      onChange={(e) => setFormData({ ...formData, property_id: e.target.value })}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
-                    >
-                      <option value="">-- Sin propiedad asociada --</option>
-                      {properties.map((prop) => (
-                        <option key={prop.id} value={prop.id}>
-                          {prop.title}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="🔍 Buscar dirección o título..."
+                        value={propSearch}
+                        onChange={(e) => {
+                          setPropSearch(e.target.value);
+                          setIsPropDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsPropDropdownOpen(true)}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setIsPropDropdownOpen(false);
+                            const selected = properties.find(p => p.id === formData.property_id);
+                            if (selected) {
+                              setPropSearch(selected.title);
+                            } else {
+                              setPropSearch("");
+                            }
+                          }, 250);
+                        }}
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl py-2.5 pl-4 pr-10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                      />
+                      {formData.property_id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, property_id: "" });
+                            setPropSearch("");
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-lg font-bold"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                    {isPropDropdownOpen && (
+                      <div className="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 divide-y divide-white/5 scrollbar-thin scrollbar-thumb-slate-700">
+                        {filteredProperties.length === 0 ? (
+                          <div className="p-3 text-xs text-slate-400 italic">No se encontraron propiedades</div>
+                        ) : (
+                          filteredProperties.map((prop) => (
+                            <button
+                              key={prop.id}
+                              type="button"
+                              onClick={() => {
+                                setFormData({ ...formData, property_id: prop.id });
+                                setPropSearch(prop.title);
+                                setIsPropDropdownOpen(false);
+                              }}
+                              className="w-full text-left p-3 hover:bg-slate-800 focus:bg-slate-800 focus:outline-none transition-colors block"
+                            >
+                              <div className="text-sm font-semibold text-white">{prop.title}</div>
+                              <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+                                <span className="line-clamp-1 max-w-[180px]">{prop.description || 'Sin dirección'}</span>
+                                {prop.price && <span className="text-[#FBBF24] font-bold">{new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(prop.price)}</span>}
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
