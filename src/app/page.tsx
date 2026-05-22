@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CheckCircle2, TrendingUp, Handshake, BadgeEuro, Search, Calculator, Smartphone, Star, Quote } from "lucide-react";
-import BuyerLeadPopup from "@/components/BuyerLeadPopup";
+import HomeBuyerPopup from "@/components/HomeBuyerPopup";
 import ReviewsGrid from "@/components/ReviewsGrid";
 import SubscribeSection from "@/components/SubscribeSection";
 import SuccessStoriesCarousel from "@/components/SuccessStoriesCarousel";
@@ -9,7 +9,7 @@ import SuccessStoriesCarousel from "@/components/SuccessStoriesCarousel";
 export default function Home() {
   return (
     <>
-      <BuyerLeadPopup />
+      <HomeBuyerPopup />
       {/* Hero Section */}
       <section className="relative min-h-[100svh] w-full flex items-center justify-center overflow-hidden bg-[url('/assets/images/que-ver-en-sevilla-optimizada.webp')] bg-cover bg-center pt-24 pb-12 md:pt-32 md:pb-16">
         {/* Decorative Background Elements */}
