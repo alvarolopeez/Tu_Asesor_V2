@@ -16,7 +16,7 @@ export default function SubscribeSection() {
       <div className="container mx-auto px-4 relative z-10 text-center">
         <div className="max-w-3xl mx-auto">
           <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner backdrop-blur-sm">
-            <Bell size={40} className="text-[#2C3E50]" />
+            <Bell size={40} className="text-[#2C3E50] animate-bounce" />
           </div>
           
           <h2 className="text-3xl sm:text-5xl font-bold text-[#2C3E50] font-heading mb-6 leading-tight">
@@ -29,7 +29,7 @@ export default function SubscribeSection() {
           
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="group relative overflow-hidden rounded-xl bg-[#2C3E50] px-10 py-5 font-bold text-white transition-all hover:scale-105 hover:shadow-2xl text-xl w-full sm:w-auto"
+            className="group relative overflow-hidden rounded-xl bg-[#2C3E50] px-10 py-5 font-bold text-white transition-all hover:scale-105 shadow-[0_0_20px_rgba(44,62,80,0.2)] hover:shadow-[0_0_30px_rgba(44,62,80,0.4)] text-xl w-full sm:w-auto"
           >
             <span className="relative z-10 flex items-center justify-center">
               Registrarme como Comprador

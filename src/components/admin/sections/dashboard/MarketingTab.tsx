@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   Eye,
   FileCheck2,
@@ -10,21 +12,55 @@ import {
 } from "lucide-react";
 import type { PropertyRow, LeadRow, AppointmentRow, ConversationRow, WebVisitRow } from "./types";
 
-interface MarketingTabProps {
-  properties: PropertyRow[];
-  leads: LeadRow[];
-  appointments: AppointmentRow[];
-  conversations: ConversationRow[];
-  webVisits: WebVisitRow[];
-}
+export default function MarketingTab() {
+  const [loading, setLoading] = useState(true);
+  const [properties, setProperties] = useState<PropertyRow[]>([]);
+  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
+  const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [webVisits, setWebVisits] = useState<WebVisitRow[]>([]);
 
-export default function MarketingTab({
-  properties,
-  leads,
-  appointments,
-  conversations,
-  webVisits,
-}: MarketingTabProps) {
+  useEffect(() => {
+    fetchMarketingData();
+  }, []);
+
+  const fetchMarketingData = async () => {
+    setLoading(true);
+    try {
+      const [
+        { data: propsData },
+        { data: leadsData },
+        { data: apptsData },
+        { data: convsData },
+        { data: visitsData }
+      ] = await Promise.all([
+        supabase.from("properties").select("id, status, price, created_at, updated_at, features"),
+        supabase.from("leads").select("id, status, source, type, preferences"),
+        supabase.from("appointments").select("id, status, property_id, type"),
+        supabase.from("chatbot_conversations").select("id, started_at, metadata"),
+        supabase.from("web_visits").select("id, session_id")
+      ]);
+
+      setProperties((propsData || []) as any[]);
+      setLeads((leadsData || []) as any[]);
+      setAppointments((apptsData || []) as any[]);
+      setConversations((convsData || []) as any[]);
+      setWebVisits((visitsData || []) as any[]);
+    } catch (error) {
+      console.error("Error loading marketing tab metrics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FBBF24]"></div>
+        <p className="text-slate-400 text-sm font-medium">Analizando tráfico y conversiones de marketing...</p>
+      </div>
+    );
+  }
   // 1. Funnel data values
   const uniqueWebVisitors = new Set(webVisits.map((v) => v.session_id)).size;
   const webVisitors = Math.max(leads.length + 5, uniqueWebVisitors);

@@ -124,7 +124,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div 
-        className="absolute inset-0 bg-[#2C3E50]/80 backdrop-blur-sm" 
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm" 
         onClick={() => !isSubmitting && !success && onClose()}
       />
       
@@ -167,7 +167,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
               </p>
               <button 
                 onClick={onClose}
-                className="bg-[#2C3E50] text-white px-8 py-3 rounded-xl font-bold hover:bg-[#1a252f] transition-colors"
+                className="bg-[#0f172a] text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-900 transition-colors"
               >
                 Cerrar
               </button>
@@ -312,7 +312,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                         <button
                           type="button"
                           onClick={() => setIsMapOpen(true)}
-                          className="bg-[#2C3E50] hover:bg-[#1a252f] text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 mx-auto shadow-md"
+                          className="bg-[#0f172a] hover:bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-2 mx-auto shadow-md"
                         >
                           <svg className="w-4 h-4 text-[#FBBF24]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -525,7 +525,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                   (step === 2 && (inputMode === 'draw' ? polygons.length === 0 : !formData.location.trim())) ||
                   (step === 3 && !formData.maxPrice)
                 }
-                className="flex items-center bg-[#2C3E50] text-white px-8 py-2 rounded-lg font-bold hover:bg-[#1a252f] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center bg-[#0f172a] text-white px-8 py-2 rounded-lg font-bold hover:bg-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Siguiente
                 <ChevronRight size={20} className="ml-1" />

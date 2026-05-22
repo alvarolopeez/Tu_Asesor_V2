@@ -11,7 +11,7 @@ export default async function BlogIndexPage() {
   const posts = await getPublishedPosts();
 
   return (
-    <div className="min-h-screen bg-[#1a252f] pt-32 pb-24 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] pt-32 pb-24 text-white relative overflow-hidden">
       {/* Decorative Background */}
       <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FBBF24]/10 rounded-full mix-blend-screen filter blur-3xl opacity-30 z-0"></div>
@@ -46,7 +46,7 @@ export default async function BlogIndexPage() {
                         alt={post.title} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a252f] to-transparent"></div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] to-transparent"></div>
                     </div>
                   )}
                   <div className="p-6 flex flex-col flex-grow">

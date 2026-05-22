@@ -32,8 +32,8 @@ export default function SuccessStoriesCarousel() {
       {/* Botón Izquierda (solo visible en pantallas md en adelante) */}
       <button 
         onClick={() => scroll("left")}
-        className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 bg-white/90 text-[#2C3E50] p-3 rounded-full shadow-lg hover:bg-[#FBBF24] hover:text-white transition-colors"
-        aria-label="Ver anteriores"
+        className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 bg-[#0f172a]/80 text-[#FBBF24] border border-white/10 p-3 rounded-full shadow-lg hover:bg-[#FBBF24] hover:text-[#0f172a] transition-all duration-300 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f172a]"
+        aria-label="Ver testimonios anteriores"
       >
         <ChevronLeft size={24} />
       </button>
@@ -45,10 +45,13 @@ export default function SuccessStoriesCarousel() {
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {properties.map((prop, idx) => (
-          <div key={idx} className="snap-center shrink-0 w-80 sm:w-96 glass-effect bg-[#2C3E50]/80 p-4 rounded-2xl shadow-lg border border-white/10">
+          <div 
+            key={idx} 
+            className="snap-center shrink-0 w-80 sm:w-96 glass-effect bg-[#1E293B]/70 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/5 hover:border-[#FBBF24]/30 hover:scale-[1.02] transition-all duration-300"
+          >
             <div className="relative h-56 w-full rounded-xl overflow-hidden mb-4">
               <Image src={prop.img} alt={prop.title} fill className="object-cover" unoptimized />
-              <div className="absolute top-4 left-4 bg-[#FBBF24] text-[#2C3E50] text-xs font-bold px-3 py-1 rounded shadow-md">
+              <div className="absolute top-4 left-4 bg-[#FBBF24] text-[#0f172a] text-xs font-extrabold px-3 py-1 rounded shadow-md shadow-black/30">
                 {prop.badge}
               </div>
             </div>
@@ -61,8 +64,8 @@ export default function SuccessStoriesCarousel() {
       {/* Botón Derecha (solo visible en pantallas md en adelante) */}
       <button 
         onClick={() => scroll("right")}
-        className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 bg-white/90 text-[#2C3E50] p-3 rounded-full shadow-lg hover:bg-[#FBBF24] hover:text-white transition-colors"
-        aria-label="Ver siguientes"
+        className="hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 bg-[#0f172a]/80 text-[#FBBF24] border border-white/10 p-3 rounded-full shadow-lg hover:bg-[#FBBF24] hover:text-[#0f172a] transition-all duration-300 backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f172a]"
+        aria-label="Ver siguientes testimonios"
       >
         <ChevronRight size={24} />
       </button>

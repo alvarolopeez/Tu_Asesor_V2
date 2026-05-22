@@ -167,20 +167,24 @@ export default function RentabilidadPage() {
   };
 
   return (
-    <main className="min-h-screen pt-40 pb-20 bg-slate-50">
+    <main className="min-h-screen pt-40 pb-20 bg-[#0F172A] text-white relative overflow-hidden">
+      {/* Elementos decorativos */}
+      <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FBBF24]/10 rounded-full mix-blend-screen filter blur-3xl opacity-30 z-0"></div>
+      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full mix-blend-screen filter blur-3xl opacity-20 z-0"></div>
       
-      <div className="container mx-auto px-4 max-w-5xl">
+      <div className="container mx-auto px-4 max-w-5xl relative z-10">
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#2C3E50] mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Calculadora de Rentabilidad Inmobiliaria
           </h1>
-          <p className="text-xl text-slate-600">
+          <p className="text-xl text-slate-300 font-light">
             Analiza tu inversión como un profesional. 
             Cálculo detallado de gastos, impuestos (ITP, IRPF) y Cashflow.
           </p>
         </div>
 
-        <div className="bg-[#2C3E50]/95 backdrop-blur-md p-8 md:p-12 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
+        <div className="bg-[#1E293B]/70 border border-white/5 backdrop-blur-md p-8 md:p-12 rounded-3xl shadow-2xl relative overflow-hidden">
           
           {step === 1 && (
             <div className="space-y-12 animate-in fade-in duration-500">
@@ -191,32 +195,35 @@ export default function RentabilidadPage() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">Precio de Compra</label>
+                    <label htmlFor="precioCompra" className="text-slate-200 text-sm font-medium">Precio de Compra</label>
                     <input 
                       type="number" 
+                      id="precioCompra"
                       value={formData.precioCompra}
                       onChange={(e) => setFormData({...formData, precioCompra: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 placeholder:text-slate-400"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 placeholder:text-slate-400 transition-all focus:outline-none"
                       placeholder="0 €"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">Comunidad Autónoma</label>
+                    <label htmlFor="comunidad" className="text-slate-200 text-sm font-medium">Comunidad Autónoma</label>
                     <select 
+                      id="comunidad"
                       value={formData.comunidad}
                       onChange={(e) => setFormData({...formData, comunidad: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 transition-all focus:outline-none"
                     >
-                      {Object.keys(ITP_DATA).map(c => <option key={c} value={c} className="bg-[#2C3E50] text-white">{c}</option>)}
+                      {Object.keys(ITP_DATA).map(c => <option key={c} value={c} className="bg-[#0F172A] text-white">{c}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">Coste Reforma</label>
+                    <label htmlFor="costeReforma" className="text-slate-200 text-sm font-medium">Coste Reforma</label>
                     <input 
                       type="number" 
+                      id="costeReforma"
                       value={formData.costeReforma}
                       onChange={(e) => setFormData({...formData, costeReforma: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 placeholder:text-slate-400"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 placeholder:text-slate-400 transition-all focus:outline-none"
                       placeholder="0 €"
                     />
                   </div>
@@ -235,6 +242,7 @@ export default function RentabilidadPage() {
                       checked={formData.conHipoteca}
                       onChange={(e) => setFormData({...formData, conHipoteca: e.target.checked})}
                       className="sr-only peer"
+                      aria-label="¿Con Hipoteca?"
                     />
                     <div className="w-11 h-6 bg-white/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#FBBF24]"></div>
                     <span className="ml-3 text-sm font-medium text-white">¿Con Hipoteca?</span>
@@ -244,31 +252,34 @@ export default function RentabilidadPage() {
                 {formData.conHipoteca && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top duration-300">
                     <div className="space-y-2">
-                      <label className="text-slate-200 text-sm font-medium">% Financiado</label>
+                      <label htmlFor="porcentajeFinanciado" className="text-slate-200 text-sm font-medium">% Financiado</label>
                       <input 
                         type="number" 
+                        id="porcentajeFinanciado"
                         value={formData.porcentajeFinanciado}
                         onChange={(e) => setFormData({...formData, porcentajeFinanciado: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 focus:outline-none"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-slate-200 text-sm font-medium">Tipo Interés (%)</label>
+                      <label htmlFor="tipoInteres" className="text-slate-200 text-sm font-medium">Tipo Interés (%)</label>
                       <input 
                         type="number" 
+                        id="tipoInteres"
                         step="0.1"
                         value={formData.tipoInteres}
                         onChange={(e) => setFormData({...formData, tipoInteres: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 focus:outline-none"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-slate-200 text-sm font-medium">Plazo (Años)</label>
+                      <label htmlFor="plazoAnios" className="text-slate-200 text-sm font-medium">Plazo (Años)</label>
                       <input 
                         type="number" 
+                        id="plazoAnios"
                         value={formData.plazoAnios}
                         onChange={(e) => setFormData({...formData, plazoAnios: e.target.value})}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -282,40 +293,44 @@ export default function RentabilidadPage() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">Alquiler Mensual</label>
+                    <label htmlFor="alquilerMensual" className="text-slate-200 text-sm font-medium">Alquiler Mensual</label>
                     <input 
                       type="number" 
+                      id="alquilerMensual"
                       value={formData.alquilerMensual}
                       onChange={(e) => setFormData({...formData, alquilerMensual: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white font-bold focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 placeholder:text-slate-400"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white font-bold focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 placeholder:text-slate-400 focus:outline-none"
                       placeholder="0 €"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">Comunidad (mes)</label>
+                    <label htmlFor="gastosComunidad" className="text-slate-200 text-sm font-medium">Comunidad (mes)</label>
                     <input 
                       type="number" 
+                      id="gastosComunidad"
                       value={formData.gastosComunidad}
                       onChange={(e) => setFormData({...formData, gastosComunidad: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 focus:outline-none"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">IBI (mes)</label>
+                    <label htmlFor="gastosIbi" className="text-slate-200 text-sm font-medium">IBI (mes)</label>
                     <input 
                       type="number" 
+                      id="gastosIbi"
                       value={formData.gastosIbi}
                       onChange={(e) => setFormData({...formData, gastosIbi: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 focus:outline-none"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-slate-200 text-sm font-medium">Seguros (mes)</label>
+                    <label htmlFor="gastosSeguroHogar" className="text-slate-200 text-sm font-medium">Seguros (mes)</label>
                     <input 
                       type="number" 
+                      id="gastosSeguroHogar"
                       value={formData.gastosSeguroHogar}
                       onChange={(e) => setFormData({...formData, gastosSeguroHogar: e.target.value})}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:ring-2 focus:ring-[#FBBF24]/50 focus:outline-none"
                     />
                   </div>
                 </div>
@@ -323,7 +338,7 @@ export default function RentabilidadPage() {
 
               <button 
                 onClick={calculateRentabilidad}
-                className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold py-5 text-xl rounded-xl flex items-center justify-center gap-3 group transition-all shadow-lg"
+                className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-extrabold py-5 text-xl rounded-xl flex items-center justify-center gap-3 group transition-all shadow-lg active:scale-95 duration-200"
               >
                 <Calculator size={24} />
                 Analizar Inversión
@@ -362,7 +377,7 @@ export default function RentabilidadPage() {
                 </div>
               </div>
 
-              <div className="bg-white/5 p-8 rounded-2xl border border-white/10 max-w-2xl mx-auto text-left">
+              <div className="bg-[#0F172A]/50 p-8 rounded-2xl border border-white/5 max-w-2xl mx-auto text-left backdrop-blur-sm">
                 <h3 className="text-xl font-bold text-white mb-6">Ver Informe de Rentabilidad</h3>
                 <p className="text-slate-300 mb-8 text-sm">
                   Introduce tus datos para acceder al desglose de gastos deducibles, amortización y proyecciones a 10 años.
@@ -373,6 +388,7 @@ export default function RentabilidadPage() {
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input 
                       type="text" 
+                      id="nombre"
                       required
                       minLength={2}
                       maxLength={100}
@@ -381,11 +397,13 @@ export default function RentabilidadPage() {
                       onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] placeholder:text-slate-400"
                     />
+                    <label htmlFor="nombre" className="sr-only">Tu Nombre</label>
                   </div>
                   <div className="relative">
                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input 
                       type="tel" 
+                      id="telefono"
                       required
                       pattern="[0-9]{9,15}"
                       title="Introduce un teléfono válido (9-15 dígitos)"
@@ -394,12 +412,14 @@ export default function RentabilidadPage() {
                       onChange={(e) => setFormData({...formData, telefono: e.target.value.replace(/[^0-9]/g, '')})}
                       className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] placeholder:text-slate-400"
                     />
+                    <label htmlFor="telefono" className="sr-only">Tu Teléfono</label>
                   </div>
 
                   {/* Consentimiento de contacto comercial */}
-                  <label className="flex items-start gap-3 cursor-pointer group">
+                  <label htmlFor="consent" className="flex items-start gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
+                      id="consent"
                       checked={consent}
                       onChange={(e) => { setConsent(e.target.checked); setSubmitError(null); }}
                       className="mt-1 w-4 h-4 accent-[#FBBF24] rounded"
@@ -418,9 +438,9 @@ export default function RentabilidadPage() {
                   <button 
                     type="submit" 
                     disabled={submitting || !consent}
-                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg ${
+                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg active:scale-95 ${
                       consent 
-                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer' 
+                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer font-extrabold' 
                         : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                     }`}
                   >
@@ -489,7 +509,7 @@ export default function RentabilidadPage() {
                   <div className="mt-12 p-6 bg-white/5 rounded-2xl border border-white/10">
                     <p className="text-slate-200 text-sm italic text-center">
                       "Hola {formData.nombre}, los números de esta operación son muy interesantes. 
-                      Acabo de enviarte una copia a tu WhatsApp {formData.telefono}. ¿Hablamos para ver si es la mejor opción en Sevilla?"
+                      Acabo de enviarte una copia a tu WhatsApp {formData.telefono}. ¿Hablamos para ver si es la mejor opción?"
                     </p>
                   </div>
                 </div>
@@ -498,13 +518,13 @@ export default function RentabilidadPage() {
               <div className="flex flex-col md:flex-row gap-4 justify-center mt-12">
                 <button 
                   onClick={() => window.location.href = BUSINESS.whatsappUrl(`Hola Álvaro, he analizado una inversión de ${formData.precioCompra}€ y quiero que me asesores.`)}
-                  className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-10 flex items-center gap-2 justify-center"
+                  className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-10 flex items-center gap-2 justify-center rounded-xl font-extrabold shadow-lg shadow-green-500/10 active:scale-95 duration-200"
                 >
                   Hablar con Álvaro por WhatsApp
                 </button>
                 <button 
                   onClick={() => setStep(1)}
-                  className="btn btn-outline border-white text-white hover:bg-white/10 py-4 px-10"
+                  className="btn btn-outline border-white text-white hover:bg-white/10 py-4 px-10 rounded-xl transition-all"
                 >
                   Nuevo Análisis
                 </button>

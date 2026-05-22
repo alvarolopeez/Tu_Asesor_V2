@@ -68,7 +68,7 @@ export default function ReviewsGrid() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse bg-slate-100 h-64 rounded-2xl border border-slate-200"></div>
+          <div key={i} className="animate-pulse bg-[#1E293B]/50 h-64 rounded-2xl border border-white/5"></div>
         ))}
       </div>
     )
@@ -77,14 +77,14 @@ export default function ReviewsGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-12">
       {reviews.map((review) => (
-        <div key={review.id} className="glass-effect bg-[#2C3E50]/80 p-8 rounded-2xl text-left shadow-lg relative border border-white/10 flex flex-col h-full">
+        <div key={review.id} className="glass-effect bg-[#1E293B]/70 p-8 rounded-2xl text-left shadow-lg relative border border-white/5 backdrop-blur-md flex flex-col h-full hover:border-[#FBBF24]/30 hover:scale-[1.02] transition-all duration-300">
           <Quote size={40} className="text-white/10 absolute top-4 right-4" />
           <div className="flex items-center mb-4">
             {[...Array(review.rating)].map((_, i) => (
               <Star key={i} size={20} className="text-[#FBBF24] fill-[#FBBF24]" />
             ))}
           </div>
-          <p className="text-slate-200 italic mb-6 flex-grow leading-relaxed">"{review.comment}"</p>
+          <p className="text-slate-200 italic mb-6 flex-grow leading-relaxed">&ldquo;{review.comment}&rdquo;</p>
           <p className="font-bold text-white mt-auto">- {review.client_name}</p>
         </div>
       ))}

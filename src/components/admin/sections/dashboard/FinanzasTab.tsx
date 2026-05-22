@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { 
   Settings, 
   DollarSign, 
@@ -15,64 +16,177 @@ import {
 } from "lucide-react";
 import type { PropertyRow, ExpenseRow } from "./types";
 
-interface FinanzasTabProps {
-  properties: PropertyRow[];
-  expenses: ExpenseRow[];
-  commissionRate: number;
-  irpfRate: number;
-  overrideFacturado: string;
-  overridePrevision: string;
-  overrideCac: string;
-  showFinanceConfig: boolean;
-  newExpenseName: string;
-  newExpenseCategory: string;
-  newExpenseAmount: string;
-  isSavingExpense: boolean;
-  editingExpenseId: string | null;
+export default function FinanzasTab() {
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [properties, setProperties] = useState<PropertyRow[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
+  
+  // Interactive individual property selector state
+  const [commissionRate, setCommissionRate] = useState<number>(2.0);
+  const [irpfRate, setIrpfRate] = useState<number>(15.0);
+  const [overrideFacturado, setOverrideFacturado] = useState<string>("");
+  const [overridePrevision, setOverridePrevision] = useState<string>("");
+  const [overrideCac, setOverrideCac] = useState<string>("");
+  const [showFinanceConfig, setShowFinanceConfig] = useState<boolean>(false);
 
-  setCommissionRate: (val: number) => void;
-  setIrpfRate: (val: number) => void;
-  setOverrideFacturado: (val: string) => void;
-  setOverridePrevision: (val: string) => void;
-  setOverrideCac: (val: string) => void;
-  setShowFinanceConfig: (val: boolean) => void;
-  setNewExpenseName: (val: string) => void;
-  setNewExpenseCategory: (val: string) => void;
-  setNewExpenseAmount: (val: string) => void;
-  handleAddExpense: (e: React.FormEvent) => Promise<void>;
-  startEditExpense: (expense: ExpenseRow) => void;
-  cancelEditExpense: () => void;
-  handleDeleteExpense: (id: string) => Promise<void>;
-}
+  // Gastos interactivos form states
+  const [newExpenseName, setNewExpenseName] = useState("");
+  const [newExpenseCategory, setNewExpenseCategory] = useState("publicidad");
+  const [newExpenseAmount, setNewExpenseAmount] = useState("");
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
-export default function FinanzasTab({
-  properties,
-  expenses,
-  commissionRate,
-  irpfRate,
-  overrideFacturado,
-  overridePrevision,
-  overrideCac,
-  showFinanceConfig,
-  newExpenseName,
-  newExpenseCategory,
-  newExpenseAmount,
-  isSavingExpense,
-  editingExpenseId,
-  setCommissionRate,
-  setIrpfRate,
-  setOverrideFacturado,
-  setOverridePrevision,
-  setOverrideCac,
-  setShowFinanceConfig,
-  setNewExpenseName,
-  setNewExpenseCategory,
-  setNewExpenseAmount,
-  handleAddExpense,
-  startEditExpense,
-  cancelEditExpense,
-  handleDeleteExpense,
-}: FinanzasTabProps) {
+  useEffect(() => {
+    fetchFinanceData();
+  }, []);
+
+  const fetchFinanceData = async () => {
+    setLoading(true);
+    try {
+      const [
+        { data: propsData },
+        { data: expensesData }
+      ] = await Promise.all([
+        supabase.from("properties").select("*"),
+        supabase.from("operating_expenses").select("*").order("created_at", { ascending: false })
+      ]);
+
+      setProperties((propsData || []) as any[]);
+      
+      // Auto-seeding default baseline operating expenses if they are missing
+      let finalExpenses = (expensesData || []) as ExpenseRow[];
+      const hasAutonomos = finalExpenses.some(e => e.category === "autonomos");
+      const hasIdealista = finalExpenses.some(e => e.category === "idealista" || e.category === "portales");
+      const hasTecnologia = finalExpenses.some(e => e.category === "tecnologia" || e.category === "stack");
+      
+      const seedItems = [];
+      if (!hasAutonomos) {
+        seedItems.push({
+          name: "Cuota de Autónomos (Fija)",
+          category: "autonomos",
+          amount: 294.00,
+          is_automated: true
+        });
+      }
+      if (!hasIdealista) {
+        seedItems.push({
+          name: "Suscripción Idealista (Baseline)",
+          category: "idealista",
+          amount: 120.00,
+          is_automated: true
+        });
+      }
+      if (!hasTecnologia) {
+        seedItems.push({
+          name: "Stack de Infraestructura Cloud",
+          category: "tecnologia",
+          amount: 80.00,
+          is_automated: true
+        });
+      }
+
+      if (seedItems.length > 0) {
+        try {
+          const { data: insertedData, error: seedError } = await supabase
+            .from("operating_expenses")
+            .insert(seedItems)
+            .select();
+          
+          if (!seedError && insertedData) {
+            finalExpenses = [...finalExpenses, ...(insertedData as any[])].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            );
+          }
+        } catch (seedErr) {
+          console.error("Error auto-seeding baseline expenses:", seedErr);
+        }
+      }
+      setExpenses(finalExpenses);
+    } catch (error) {
+      console.error("Error loading financial metrics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newExpenseName || !newExpenseAmount) return;
+    setIsSavingExpense(true);
+    try {
+      if (editingExpenseId) {
+        // Modo Edición
+        const { error } = await supabase
+          .from("operating_expenses")
+          .update({
+            name: newExpenseName,
+            category: newExpenseCategory,
+            amount: parseFloat(newExpenseAmount),
+          })
+          .eq("id", editingExpenseId);
+        
+        if (!error) {
+          setEditingExpenseId(null);
+          setNewExpenseName("");
+          setNewExpenseAmount("");
+          await fetchFinanceData();
+        }
+      } else {
+        // Modo Creación
+        const { error } = await supabase.from("operating_expenses").insert({
+          name: newExpenseName,
+          category: newExpenseCategory,
+          amount: parseFloat(newExpenseAmount),
+          is_automated: false
+        });
+        if (!error) {
+          setNewExpenseName("");
+          setNewExpenseAmount("");
+          await fetchFinanceData();
+        }
+      }
+    } catch (err) {
+      console.error("Error saving expense:", err);
+    } finally {
+      setIsSavingExpense(false);
+    }
+  };
+
+  const startEditExpense = (expense: ExpenseRow) => {
+    setEditingExpenseId(expense.id);
+    setNewExpenseName(expense.name);
+    setNewExpenseCategory(expense.category);
+    setNewExpenseAmount(expense.amount.toString());
+  };
+
+  const cancelEditExpense = () => {
+    setEditingExpenseId(null);
+    setNewExpenseName("");
+    setNewExpenseCategory("publicidad");
+    setNewExpenseAmount("");
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("¿Seguro que quieres eliminar este gasto?")) return;
+    try {
+      const { error } = await supabase.from("operating_expenses").delete().eq("id", id);
+      if (!error) {
+        await fetchFinanceData();
+      }
+    } catch (err) {
+      console.error("Error deleting expense:", err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FBBF24]"></div>
+        <p className="text-slate-400 text-sm font-medium">Analizando balances contables...</p>
+      </div>
+    );
+  }
   // 1. Calculations
   const soldProperties = properties.filter(p => p.status === "sold");
   const salesVolume = soldProperties.reduce((acc, p) => acc + Number(p.price || 0), 0);

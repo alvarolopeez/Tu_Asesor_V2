@@ -13,7 +13,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative min-h-[100svh] w-full flex items-center justify-center overflow-hidden bg-[url('/assets/images/que-ver-en-sevilla-optimizada.webp')] bg-cover bg-center pt-24 pb-12 md:pt-32 md:pb-16">
         {/* Decorative Background Elements */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#2C3E50]/90 via-[#2C3E50]/70 to-[#1a252f] z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#2C3E50]/90 via-[#2C3E50]/70 to-[#0f172a] z-10"></div>
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FBBF24]/20 rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full mix-blend-screen filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
 
@@ -47,7 +47,7 @@ export default function Home() {
       </section>
 
       {/* About the Model */}
-      <section className="py-16 sm:py-24">
+      <section className="py-16 sm:py-24 bg-[#0f172a]">
         <div className="container mx-auto px-4">
           <div className="glass-effect p-8 md:p-12 max-w-5xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -92,12 +92,12 @@ export default function Home() {
       </section>
 
       {/* Services Section */}
-      <section id="servicios" className="py-16 sm:py-24 bg-white/50">
+      <section id="servicios" className="py-16 sm:py-24 bg-[#0f172a] border-t border-white/5">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-[#2C3E50] font-heading">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white font-heading">
             Un Servicio Integral, Optimizado
           </h2>
-          <p className="max-w-2xl mx-auto text-lg mb-12 text-gray-700">
+          <p className="max-w-2xl mx-auto text-lg mb-12 text-slate-300">
             A pesar de cobrar menos, el servicio es Premium. Uso tecnología para hacer lo que otros hacen lento y caro.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -109,7 +109,7 @@ export default function Home() {
               { icon: Calculator, title: "Estudios de Rentabilidad", desc: "Para inversores: te entregamos números claros antes de que tomes decisiones." },
               { icon: Smartphone, title: "Base de Datos Automática", desc: "Más de 3000 compradores cualificados recibirán un aviso por WhatsApp de tu piso." },
             ].map((service, idx) => (
-              <div key={idx} className="glass-effect p-8 service-card bg-[#2C3E50] text-white text-left">
+              <div key={idx} className="glass-effect p-8 service-card bg-[#1E293B]/70 border border-white/5 backdrop-blur-md text-white text-left hover:border-[#FBBF24]/30 hover:scale-[1.02] transition-all duration-300">
                 <div className="bg-white/10 w-16 h-16 rounded-lg flex items-center justify-center mb-6">
                   <service.icon size={32} className="text-[#FBBF24]" />
                 </div>
@@ -122,13 +122,13 @@ export default function Home() {
       </section>
 
       {/* Propiedades Vendidas (Casos de Éxito) */}
-      <section className="py-16 sm:py-24 bg-white">
+      <section className="py-16 sm:py-24 bg-[#0f172a] border-t border-white/5">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-[#2C3E50] font-heading">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white font-heading">
               Casos de Éxito: Propiedades Vendidas
             </h2>
-            <p className="max-w-2xl mx-auto text-lg text-slate-600">
+            <p className="max-w-2xl mx-auto text-lg text-slate-300">
               Estos son algunos de los hogares que he tenido el placer de vender en una media menor a 30 días. Cada uno, una historia de éxito y satisfacción.
             </p>
           </div>
@@ -141,25 +141,25 @@ export default function Home() {
       <SubscribeSection />
 
       {/* Valoraciones (Reviews) */}
-      <section className="py-16 sm:py-24 bg-white border-t border-slate-100">
+      <section className="py-16 sm:py-24 bg-[#0f172a] border-t border-white/5">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-[#2C3E50] font-heading">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white font-heading">
             Lo que dicen nuestros clientes
           </h2>
-          <p className="max-w-2xl mx-auto text-lg mb-12 text-slate-600">
+          <p className="max-w-2xl mx-auto text-lg mb-12 text-slate-300">
             La confianza y la satisfacción de nuestros clientes es nuestra mayor recompensa.
           </p>
           
           <ReviewsGrid />
           
-          <Link href="/dejar-resena" className="btn btn-outline border-[#2C3E50] text-[#2C3E50] hover:bg-[#2C3E50] hover:text-white px-8 py-3 rounded-full font-bold transition-all inline-block mt-8">
+          <Link href="/dejar-resena" className="btn btn-outline border-[#FBBF24] text-[#FBBF24] hover:bg-[#FBBF24] hover:text-[#0f172a] px-8 py-3 rounded-full font-bold transition-all inline-block mt-8">
             Escribe tu propia reseña
           </Link>
         </div>
       </section>
 
       {/* Valuation / Lead Capture Section */}
-      <section id="vender" className="py-24 sm:py-32 relative overflow-hidden bg-[#1a252f]">
+      <section id="vender" className="py-24 sm:py-32 relative overflow-hidden bg-[#0f172a]">
         <div className="absolute top-0 left-0 w-full h-full bg-[url('/assets/images/pattern.svg')] opacity-5"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center">

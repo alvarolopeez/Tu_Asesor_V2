@@ -153,20 +153,20 @@ export default function ValoracionPage() {
   const progressPercentage = ((step - 1) / (totalSteps - 1)) * 100
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center pt-48 pb-24 px-4 bg-slate-50 relative overflow-x-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-0 w-full h-full bg-[url('/assets/images/pattern.svg')] opacity-5"></div>
-      </div>
+    <main className="min-h-screen flex flex-col items-center pt-48 pb-24 px-4 bg-[#0F172A] text-white relative overflow-x-hidden">
+      {/* Elementos decorativos */}
+      <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FBBF24]/10 rounded-full mix-blend-screen filter blur-3xl opacity-30 z-0"></div>
+      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full mix-blend-screen filter blur-3xl opacity-20 z-0"></div>
 
-      <div className="w-full max-w-3xl relative z-10 glass-effect min-h-[550px] flex flex-col shadow-2xl rounded-2xl overflow-hidden border border-[#2C3E50]/20">
+      <div className="w-full max-w-3xl relative z-10 glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md min-h-[550px] flex flex-col shadow-2xl rounded-2xl overflow-hidden">
         
         {/* Progress Bar */}
         <div className="w-full bg-slate-800 h-2 absolute top-0 left-0 z-10">
-          <div className="h-full bg-blue-500 transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }}></div>
+          <div className="h-full bg-gradient-to-r from-yellow-500 to-[#FBBF24] shadow-[0_0_10px_rgba(251,191,36,0.5)] transition-all duration-500 ease-out" style={{ width: `${progressPercentage}%` }}></div>
         </div>
 
-        <Link href="/" className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors z-20">
+        <Link href="/" aria-label="Cerrar tasación" className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors z-20">
           <X className="w-8 h-8" />
         </Link>
 
@@ -176,11 +176,11 @@ export default function ValoracionPage() {
               <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white font-heading">Tasar Vivienda en Sevilla</h1>
               <p className="text-lg text-slate-300 mb-10">Seleccione el tipo de inmueble para iniciar la valoración gratuita en La Macarena y alrededores.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <button onClick={() => handleSelectType('Piso')} className="flex flex-col items-center justify-center bg-[#1a252f]/50 border border-white/10 p-8 rounded-xl cursor-pointer hover:bg-white/10 hover:border-white/30 transition-all group">
+                <button onClick={() => handleSelectType('Piso')} className="flex flex-col items-center justify-center bg-[#0F172A]/50 border border-white/10 p-8 rounded-xl cursor-pointer hover:bg-white/10 hover:border-[#FBBF24]/30 transition-all group">
                   <Building2 className="w-16 h-16 text-[#FBBF24] mb-4 group-hover:scale-110 transition-transform" />
                   <h3 className="text-xl font-bold text-white">Piso / Ático</h3>
                 </button>
-                <button onClick={() => handleSelectType('Casa')} className="flex flex-col items-center justify-center bg-[#1a252f]/50 border border-white/10 p-8 rounded-xl cursor-pointer hover:bg-white/10 hover:border-white/30 transition-all group">
+                <button onClick={() => handleSelectType('Casa')} className="flex flex-col items-center justify-center bg-[#0F172A]/50 border border-white/10 p-8 rounded-xl cursor-pointer hover:bg-white/10 hover:border-[#FBBF24]/30 transition-all group">
                   <Home className="w-16 h-16 text-[#FBBF24] mb-4 group-hover:scale-110 transition-transform" />
                   <h3 className="text-xl font-bold text-white">Casa / Chalet</h3>
                 </button>
@@ -196,30 +196,30 @@ export default function ValoracionPage() {
               <div className="max-w-md mx-auto space-y-4 text-left">
                 <div className="flex gap-4">
                   <div className="w-3/4">
-                    <label className="block text-sm font-bold mb-2 text-slate-300">Calle / Avenida</label>
-                    <input type="text" name="street" value={formData.street} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: Calle Aguamarina" />
+                    <label htmlFor="street" className="block text-sm font-bold mb-2 text-slate-300">Calle / Avenida</label>
+                    <input type="text" id="street" name="street" value={formData.street} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: Calle Aguamarina" />
                   </div>
                   <div className="w-1/4">
-                    <label className="block text-sm font-bold mb-2 text-slate-300">Nº</label>
-                    <input type="text" name="number" value={formData.number} onChange={handleChange} className="w-full bg-white text-slate-800 text-center font-bold rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="12" />
+                    <label htmlFor="number" className="block text-sm font-bold mb-2 text-slate-300">Nº</label>
+                    <input type="text" id="number" name="number" value={formData.number} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white text-center font-bold rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="12" />
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="w-1/3">
-                    <label className="block text-sm font-bold mb-2 text-slate-300">C.P.</label>
-                    <input type="text" name="zipcode" value={formData.zipcode} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="41009" />
+                    <label htmlFor="zipcode" className="block text-sm font-bold mb-2 text-slate-300">C.P.</label>
+                    <input type="text" id="zipcode" name="zipcode" value={formData.zipcode} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="41009" />
                   </div>
                   <div className="w-2/3">
-                    <label className="block text-sm font-bold mb-2 text-slate-300">Ciudad</label>
-                    <input type="text" name="city" value={formData.city} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: Sevilla" />
+                    <label htmlFor="city" className="block text-sm font-bold mb-2 text-slate-300">Ciudad</label>
+                    <input type="text" id="city" name="city" value={formData.city} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: Sevilla" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-slate-300">¿En qué planta se encuentra?</label>
+                  <label htmlFor="floor" className="block text-sm font-bold mb-2 text-slate-300">¿En qué planta se encuentra?</label>
                   <div className="flex items-center gap-3">
-                    <input type="number" name="floor" value={formData.floor} onChange={handleChange} className="w-24 bg-white text-slate-800 text-center text-lg font-bold rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: 2" min="0" />
+                    <input type="number" id="floor" name="floor" value={formData.floor} onChange={handleChange} className="w-24 bg-[#0F172A] border border-white/10 text-white text-center text-lg font-bold rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: 2" min="0" />
                     <span className="text-xs text-slate-400 leading-tight">
                       *Ponga "0" si es un Bajo.<br />El ascensor se indica en el siguiente paso.
                     </span>
@@ -228,8 +228,8 @@ export default function ValoracionPage() {
               </div>
 
               <div className="mt-10 flex justify-center gap-4">
-                <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white hover:text-[#2C3E50] px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
-                <button onClick={nextStep} disabled={!formData.street || !formData.number} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-bold transition-all disabled:opacity-50">Siguiente</button>
+                <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
+                <button onClick={nextStep} disabled={!formData.street || !formData.number} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-extrabold transition-all disabled:opacity-50 active:scale-95 duration-200">Siguiente</button>
               </div>
             </div>
           )}
@@ -239,32 +239,32 @@ export default function ValoracionPage() {
               <h2 className="text-3xl font-bold mb-8 text-white font-heading">Datos Básicos</h2>
               
               <div className="max-w-sm mx-auto mb-8 text-left">
-                <label className="block text-sm font-bold mb-2 text-slate-300 text-center">Superficie Construida (m²)</label>
-                <input type="number" name="sqm" value={formData.sqm} onChange={handleChange} className="w-full bg-white text-center text-2xl font-bold text-[#2C3E50] rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="0" />
+                <label htmlFor="sqm" className="block text-sm font-bold mb-2 text-slate-300 text-center">Superficie Construida (m²)</label>
+                <input type="number" id="sqm" name="sqm" value={formData.sqm} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-center text-2xl font-bold text-white rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="0" />
               </div>
 
               <div className="grid grid-cols-2 gap-8 max-w-sm mx-auto mb-8">
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-slate-300">Habitaciones</label>
-                  <div className="flex items-center justify-between bg-white/10 rounded-lg p-2 border border-white/20">
-                    <button onClick={() => adjustValue('rooms', -1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-md font-bold text-xl">-</button>
+                  <label className="block text-sm font-bold mb-2 text-slate-300 text-center">Habitaciones</label>
+                  <div className="flex items-center justify-between bg-[#0F172A]/50 rounded-lg p-2 border border-white/10">
+                    <button onClick={() => adjustValue('rooms', -1)} aria-label="Restar una habitación" className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-md font-bold text-xl focus:outline-none focus:ring-1 focus:ring-[#FBBF24] transition-all">-</button>
                     <span className="text-xl font-bold text-white">{formData.rooms}</span>
-                    <button onClick={() => adjustValue('rooms', 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-md font-bold text-xl">+</button>
+                    <button onClick={() => adjustValue('rooms', 1)} aria-label="Sumar una habitación" className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-md font-bold text-xl focus:outline-none focus:ring-1 focus:ring-[#FBBF24] transition-all">+</button>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-slate-300">Baños</label>
-                  <div className="flex items-center justify-between bg-white/10 rounded-lg p-2 border border-white/20">
-                    <button onClick={() => adjustValue('baths', -1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-md font-bold text-xl">-</button>
+                  <label className="block text-sm font-bold mb-2 text-slate-300 text-center">Baños</label>
+                  <div className="flex items-center justify-between bg-[#0F172A]/50 rounded-lg p-2 border border-white/10">
+                    <button onClick={() => adjustValue('baths', -1)} aria-label="Restar un baño" className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-md font-bold text-xl focus:outline-none focus:ring-1 focus:ring-[#FBBF24] transition-all">-</button>
                     <span className="text-xl font-bold text-white">{formData.baths}</span>
-                    <button onClick={() => adjustValue('baths', 1)} className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 rounded-md font-bold text-xl">+</button>
+                    <button onClick={() => adjustValue('baths', 1)} aria-label="Sumar un baño" className="w-8 h-8 flex items-center justify-center text-white hover:bg-white/10 rounded-md font-bold text-xl focus:outline-none focus:ring-1 focus:ring-[#FBBF24] transition-all">+</button>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 flex justify-center gap-4">
-                <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white hover:text-[#2C3E50] px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
-                <button onClick={nextStep} disabled={!formData.sqm} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-bold transition-all disabled:opacity-50">Siguiente</button>
+                <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
+                <button onClick={nextStep} disabled={!formData.sqm} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-extrabold transition-all disabled:opacity-50 active:scale-95 duration-200">Siguiente</button>
               </div>
             </div>
           )}
@@ -274,34 +274,34 @@ export default function ValoracionPage() {
               <h2 className="text-3xl font-bold mb-6 text-white font-heading">Características y Estado</h2>
               
               <div className="max-w-md mx-auto space-y-4 text-left mb-8">
-                <label className="flex items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg cursor-pointer transition-colors border border-white/10 hover:border-white/30">
-                  <input type="checkbox" name="hasElevator" checked={formData.hasElevator} onChange={handleChange} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <label htmlFor="hasElevator" className="flex items-center p-4 bg-[#0F172A]/50 hover:bg-[#0F172A]/80 rounded-lg cursor-pointer transition-colors border border-white/10 hover:border-[#FBBF24]/30">
+                  <input type="checkbox" id="hasElevator" name="hasElevator" checked={formData.hasElevator} onChange={handleChange} className="w-5 h-5 rounded border-gray-300 text-[#FBBF24] focus:ring-[#FBBF24]/50 accent-[#FBBF24]" />
                   <span className="ml-3 text-lg text-white">Tiene Ascensor</span>
                 </label>
 
-                <label className="flex items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg cursor-pointer transition-colors border border-white/10 hover:border-white/30">
-                  <input type="checkbox" name="hasTerrace" checked={formData.hasTerrace} onChange={handleChange} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <label htmlFor="hasTerrace" className="flex items-center p-4 bg-[#0F172A]/50 hover:bg-[#0F172A]/80 rounded-lg cursor-pointer transition-colors border border-white/10 hover:border-[#FBBF24]/30">
+                  <input type="checkbox" id="hasTerrace" name="hasTerrace" checked={formData.hasTerrace} onChange={handleChange} className="w-5 h-5 rounded border-gray-300 text-[#FBBF24] focus:ring-[#FBBF24]/50 accent-[#FBBF24]" />
                   <span className="ml-3 text-lg text-white">Terraza / Balcón</span>
                 </label>
 
-                <label className="flex items-center p-4 bg-white/10 hover:bg-white/20 rounded-lg cursor-pointer transition-colors border border-white/10 hover:border-white/30">
-                  <input type="checkbox" name="hasGarage" checked={formData.hasGarage} onChange={handleChange} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <label htmlFor="hasGarage" className="flex items-center p-4 bg-[#0F172A]/50 hover:bg-[#0F172A]/80 rounded-lg cursor-pointer transition-colors border border-white/10 hover:border-[#FBBF24]/30">
+                  <input type="checkbox" id="hasGarage" name="hasGarage" checked={formData.hasGarage} onChange={handleChange} className="w-5 h-5 rounded border-gray-300 text-[#FBBF24] focus:ring-[#FBBF24]/50 accent-[#FBBF24]" />
                   <span className="ml-3 text-lg text-white">Plaza de Garaje</span>
                 </label>
               </div>
 
               <div className="max-w-md mx-auto text-left mb-8">
-                <label className="block text-sm font-bold mb-2 text-slate-300">Estado de conservación</label>
-                <select name="condition" value={formData.condition} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FBBF24]">
-                  <option value="reformar">A reformar (Origen)</option>
-                  <option value="bueno">Buen estado (Habitable)</option>
-                  <option value="reformado">Reformado recientemente</option>
+                <label htmlFor="condition" className="block text-sm font-bold mb-2 text-slate-300">Estado de conservación</label>
+                <select id="condition" name="condition" value={formData.condition} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white rounded-lg px-4 py-3 cursor-pointer focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] appearance-none">
+                  <option value="reformar" className="bg-[#0F172A] text-white">A reformar (Origen)</option>
+                  <option value="bueno" className="bg-[#0F172A] text-white">Buen estado (Habitable)</option>
+                  <option value="reformado" className="bg-[#0F172A] text-white">Reformado recientemente</option>
                 </select>
               </div>
 
               <div className="mt-8 flex justify-center gap-4">
-                <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white hover:text-[#2C3E50] px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
-                <button onClick={nextStep} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-bold transition-all">Siguiente</button>
+                <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
+                <button onClick={nextStep} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-extrabold transition-all active:scale-95 duration-200">Siguiente</button>
               </div>
             </div>
           )}
@@ -313,21 +313,31 @@ export default function ValoracionPage() {
 
               <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-4 text-left">
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Nombre" required />
-                  <input type="text" name="surname" value={formData.surname} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Apellidos" />
+                  <div className="space-y-1">
+                    <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Nombre" required />
+                    <label htmlFor="name" className="sr-only">Nombre</label>
+                  </div>
+                  <div className="space-y-1">
+                    <input type="text" id="surname" name="surname" value={formData.surname} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Apellidos" />
+                    <label htmlFor="surname" className="sr-only">Apellidos</label>
+                  </div>
                 </div>
-                <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Correo electrónico" required />
+                <div className="space-y-1">
+                  <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Correo electrónico" required />
+                  <label htmlFor="email" className="sr-only">Correo electrónico</label>
+                </div>
                 
                 <div className="flex">
-                  <span className="inline-flex items-center px-4 bg-slate-200 border border-r-0 border-slate-300 rounded-l-lg font-bold text-slate-600">
+                  <span className="inline-flex items-center px-4 bg-white/10 border border-white/10 border-r-0 rounded-l-lg font-bold text-slate-300">
                     🇪🇸 +34
                   </span>
-                  <input type="tel" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-white text-slate-800 rounded-r-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="600 000 000" required />
+                  <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-r-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="600 000 000" required />
+                  <label htmlFor="phone" className="sr-only">Teléfono</label>
                 </div>
 
                 <div className="space-y-2 mt-4 pt-4 border-t border-white/10">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" name="privacyCheck" checked={formData.privacyCheck} onChange={handleChange} className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600" />
+                  <label htmlFor="privacyCheck" className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" id="privacyCheck" name="privacyCheck" checked={formData.privacyCheck} onChange={handleChange} className="mt-1 w-4 h-4 rounded border-gray-300 text-[#FBBF24] focus:ring-[#FBBF24]/50 accent-[#FBBF24]" />
                     <span className="text-xs text-slate-300 leading-tight">
                       He leído y acepto la <Link href="/politica-privacidad" className="underline hover:text-white">Política de Privacidad</Link>.
                     </span>
@@ -335,7 +345,7 @@ export default function ValoracionPage() {
                 </div>
 
                 <div className="mt-8 flex flex-col gap-4">
-                  <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-4 rounded-xl transition-colors shadow-lg flex items-center justify-center">
+                  <button type="submit" disabled={isSubmitting} className="w-full bg-[#FBBF24] hover:bg-yellow-500 disabled:bg-slate-600 disabled:text-slate-400 text-[#2C3E50] font-extrabold py-4 rounded-xl transition-all shadow-lg flex items-center justify-center cursor-pointer disabled:cursor-not-allowed active:scale-95 duration-200">
                     {isSubmitting ? 'Procesando...' : 'Obtener Valoración Gratuita'}
                   </button>
                   <button type="button" onClick={prevStep} className="btn btn-outline text-white border-none hover:bg-white/10 px-6 py-2 rounded-lg font-bold transition-all text-sm">
@@ -358,7 +368,7 @@ export default function ValoracionPage() {
               </div>
               <p className="text-slate-400 mb-10">Le contactaré en breve con la valoración detallada a su correo o teléfono.</p>
               
-              <Link href="/" className="inline-flex items-center gap-2 btn btn-outline text-white border-white hover:bg-white hover:text-[#2C3E50] px-8 py-3 rounded-full font-bold transition-all">
+              <Link href="/" className="inline-flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-3 rounded-full font-extrabold transition-all shadow-lg active:scale-95 duration-200">
                 Volver al inicio <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -368,7 +378,7 @@ export default function ValoracionPage() {
       </div>
 
       {/* FAQ Section */}
-      <div className="w-full max-w-4xl relative z-10 mt-16 text-slate-300 glass-effect bg-[#2C3E50] border border-[#2C3E50]/20 rounded-2xl p-8 md:p-12 shadow-2xl">
+      <div className="w-full max-w-4xl relative z-10 mt-16 text-slate-300 glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md rounded-2xl p-8 md:p-12 shadow-2xl">
         <h2 className="text-2xl sm:text-3xl font-bold text-white mb-8 text-center font-heading">
           Preguntas Frecuentes sobre la Valoración Inteligente
         </h2>
@@ -400,6 +410,6 @@ export default function ValoracionPage() {
         </div>
       </div>
     </main>
-  )
+  );
 }
 

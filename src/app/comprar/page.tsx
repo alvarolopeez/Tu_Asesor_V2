@@ -287,7 +287,7 @@ export default function ComprarPage() {
   const fallbackImage = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80";
 
   return (
-    <div className="min-h-screen bg-[#1a252f] pt-32 pb-24 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] pt-32 pb-24 text-white relative overflow-hidden">
       {/* Elementos decorativos */}
       <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FBBF24]/10 rounded-full mix-blend-screen filter blur-3xl opacity-30 z-0"></div>
@@ -310,7 +310,7 @@ export default function ComprarPage() {
         </div>
 
         {/* Barra de Filtros Glassmorphic */}
-        <div className="glass-effect bg-[#2C3E50]/75 p-6 rounded-2xl mb-12 shadow-2xl border border-white/10 max-w-6xl mx-auto">
+        <div className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md p-6 rounded-2xl mb-12 shadow-2xl max-w-6xl mx-auto">
           <h2 className="text-lg font-semibold text-[#FBBF24] mb-4 flex items-center gap-2">
             <Search size={18} /> Filtrar Propiedades
           </h2>
@@ -333,7 +333,7 @@ export default function ComprarPage() {
               <select 
                 value={propertyType}
                 onChange={(e) => setPropertyType(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-[#2C3E50] text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-sm cursor-pointer"
+                className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-[#0f172a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-sm cursor-pointer"
               >
                 <option value="">Cualquier tipo</option>
                 <option value="piso">Piso</option>
@@ -369,7 +369,7 @@ export default function ComprarPage() {
               <select 
                 value={minRooms}
                 onChange={(e) => setMinRooms(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-[#2C3E50] text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-sm cursor-pointer"
+                className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-[#0f172a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-sm cursor-pointer"
               >
                 <option value="">Habitaciones</option>
                 <option value="1">1+ hab</option>
@@ -384,7 +384,7 @@ export default function ComprarPage() {
               <select 
                 value={minBaths}
                 onChange={(e) => setMinBaths(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-[#2C3E50] text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-sm cursor-pointer"
+                className="w-full px-3 py-2.5 rounded-xl border border-white/10 bg-[#0f172a]/80 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-sm cursor-pointer"
               >
                 <option value="">Baños</option>
                 <option value="1">1+ baños</option>
@@ -400,7 +400,7 @@ export default function ComprarPage() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {[1, 2, 3].map((n) => (
-              <div key={n} className="animate-pulse bg-[#2C3E50]/40 rounded-2xl h-[450px] border border-white/5"></div>
+              <div key={n} className="animate-pulse bg-[#1E293B]/40 rounded-2xl h-[450px] border border-white/5"></div>
             ))}
           </div>
         ) : error ? (
@@ -438,7 +438,7 @@ export default function ComprarPage() {
               return (
                 <div 
                   key={p.id}
-                  className="glass-effect bg-[#2C3E50]/70 border border-white/10 rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] flex flex-col group"
+                  className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] flex flex-col group"
                 >
                   {/* Foto con Hover */}
                   <div className="relative h-60 w-full overflow-hidden bg-slate-800">
@@ -511,11 +511,12 @@ export default function ComprarPage() {
       {/* Modal Premium de Detalle */}
       {selectedProperty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-5xl my-8 bg-[#2C3E50] border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-5xl my-8 bg-[#1E293B]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 backdrop-blur-xl">
             
             {/* Botón Cerrar */}
             <button 
               onClick={() => setSelectedProperty(null)}
+              aria-label="Cerrar ficha"
               className="absolute top-4 right-4 z-10 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors border border-white/10"
             >
               <X size={20} />
@@ -539,12 +540,14 @@ export default function ComprarPage() {
                       <>
                         <button 
                           onClick={() => setActiveImageIdx(prev => prev === 0 ? selectedProperty.images.length - 1 : prev - 1)}
+                          aria-label="Imagen anterior"
                           className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 p-1.5 rounded-full text-white transition-colors"
                         >
                           <ChevronLeft size={20} />
                         </button>
                         <button 
                           onClick={() => setActiveImageIdx(prev => prev === selectedProperty.images.length - 1 ? 0 : prev + 1)}
+                          aria-label="Siguiente imagen"
                           className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 p-1.5 rounded-full text-white transition-colors"
                         >
                           <ChevronRight size={20} />

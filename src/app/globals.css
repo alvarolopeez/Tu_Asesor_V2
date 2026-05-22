@@ -4,7 +4,7 @@
   --color-primary: #587C9A;
   --color-secondary: #2C3E50;
   --color-accent: #FBBF24;
-  --color-background: #E5E7EB;
+  --color-background: #0f172a;
   --font-sans: var(--font-lato), sans-serif;
   --font-heading: var(--font-montserrat), sans-serif;
 }
@@ -16,7 +16,7 @@ html {
 
 body {
   background-color: var(--color-background);
-  color: var(--color-secondary);
+  color: #f8fafc;
   position: relative;
 }
 
@@ -78,15 +78,13 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-outline {
   background-color: transparent;
-  color: var(--color-secondary);
-  border: 2px solid var(--color-primary);
+  color: inherit;
+  border: 2px solid currentColor;
 }
 
 .btn-outline:hover {
   transform: translateY(-3px);
-  background-color: var(--color-primary);
-  color: white;
-  box-shadow: 0 10px 20px rgba(88, 124, 154, 0.3);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
 }
 
 .btn-submit {

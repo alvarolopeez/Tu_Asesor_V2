@@ -1,10 +1,13 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { 
   HardDrive, 
   Cpu, 
   Wifi, 
   CheckCircle, 
   AlertTriangle, 
-  Trash2 
+  Trash2,
+  RefreshCw
 } from "lucide-react";
 import type { 
   PropertyRow, 
@@ -16,42 +19,130 @@ import type {
   SystemErrorRow 
 } from "./types";
 
-interface EcosistemaTabProps {
-  properties: PropertyRow[];
-  leads: LeadRow[];
-  appointments: AppointmentRow[];
-  conversations: ConversationRow[];
-  messages: MessageRow[];
-  systemErrors: SystemErrorRow[];
-  webhookLogs: WebhookLogRow[];
-  dbLatency: number | null;
-  apiLatency: number | null;
-  measuringLatency: boolean;
-  selectedErrorId: string | null;
+export default function EcosistemaTab() {
+  const [loading, setLoading] = useState(true);
+  
+  // Datasets loaded internally for ecosystem metrics
+  const [properties, setProperties] = useState<PropertyRow[]>([]);
+  const [leads, setLeads] = useState<LeadRow[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
+  const [conversations, setConversations] = useState<ConversationRow[]>([]);
+  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [webhookLogs, setWebhookLogs] = useState<WebhookLogRow[]>([]);
+  const [systemErrors, setSystemErrors] = useState<SystemErrorRow[]>([]);
+  
+  const [dbLatency, setDbLatency] = useState<number | null>(14);
+  const [apiLatency, setApiLatency] = useState<number | null>(null);
+  const [measuringLatency, setMeasuringLatency] = useState<boolean>(false);
+  const [selectedErrorId, setSelectedErrorId] = useState<string | null>(null);
 
-  setSelectedErrorId: (val: string | null) => void;
-  measureLatency: () => Promise<void>;
-  handleSimulateError: () => Promise<void>;
-  handleClearErrors: () => Promise<void>;
-}
+  useEffect(() => {
+    fetchEcosystemData();
+    measureLatency();
+  }, []);
 
-export default function EcosistemaTab({
-  properties,
-  leads,
-  appointments,
-  conversations,
-  messages,
-  systemErrors,
-  webhookLogs,
-  dbLatency,
-  apiLatency,
-  measuringLatency,
-  selectedErrorId,
-  setSelectedErrorId,
-  measureLatency,
-  handleSimulateError,
-  handleClearErrors,
-}: EcosistemaTabProps) {
+  const fetchEcosystemData = async () => {
+    setLoading(true);
+    try {
+      const [
+        { data: propsData },
+        { data: leadsData },
+        { data: apptsData },
+        { data: convsData },
+        { data: msgsData },
+        { data: logsData },
+        { data: errorsData }
+      ] = await Promise.all([
+        supabase.from("properties").select("id"),
+        supabase.from("leads").select("id"),
+        supabase.from("appointments").select("id"),
+        supabase.from("chatbot_conversations").select("id"),
+        supabase.from("chatbot_messages").select("id"),
+        supabase.from("n8n_webhook_logs").select("id, response_status, error_message"),
+        supabase.from("system_errors").select("*").order("created_at", { ascending: false })
+      ]);
+
+      setProperties((propsData || []) as any[]);
+      setLeads((leadsData || []) as any[]);
+      setAppointments((apptsData || []) as any[]);
+      setConversations((convsData || []) as any[]);
+      setMessages((msgsData || []) as any[]);
+      setWebhookLogs((logsData || []) as any[]);
+      setSystemErrors((errorsData || []) as any[]);
+    } catch (error) {
+      console.error("Error fetching ecosystem statistics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const measureLatency = async () => {
+    setMeasuringLatency(true);
+    try {
+      const t0 = performance.now();
+      await supabase.from("properties").select("id").limit(1);
+      const t1 = performance.now();
+      setDbLatency(Math.round(t1 - t0));
+
+      const t2 = performance.now();
+      await fetch("/api/health").catch(() => null);
+      const t3 = performance.now();
+      setApiLatency(Math.round(t3 - t2));
+    } catch (err) {
+      console.error("Error measuring system latency:", err);
+    } finally {
+      setMeasuringLatency(false);
+    }
+  };
+
+  const handleSimulateError = async () => {
+    const errorTypes = ["database", "webhook", "api"];
+    const randomType = errorTypes[Math.floor(Math.random() * errorTypes.length)];
+    
+    let message = "";
+    let severity = "error";
+    let details = {};
+
+    if (randomType === "database") {
+      message = "PostgreSQL deadlock detected on simultaneous transactions on public.appointments";
+      severity = "error";
+      details = { query: "UPDATE public.appointments SET status = 'confirmed'", duration: "5124ms", pid: 820 };
+    } else if (randomType === "webhook") {
+      message = "WhatsApp Webhook failed: Signature verification mismatch on incoming event payload";
+      severity = "critical";
+      details = { x_hub_signature: "sha256=invalid", length_bytes: 4096 };
+    } else {
+      message = "Idealista API Rate Limit Exceeded: 429 Too Many Requests";
+      severity = "warning";
+      details = { window_remaining_sec: 120, rate_limit: "500/hr" };
+    }
+
+    try {
+      const { error } = await supabase.from("system_errors").insert({
+        error_type: randomType,
+        message,
+        severity,
+        details
+      });
+      if (!error) {
+        await fetchEcosystemData();
+      }
+    } catch (err) {
+      console.error("Error simulating system error:", err);
+    }
+  };
+
+  const handleClearErrors = async () => {
+    try {
+      const { error } = await supabase.from("system_errors").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (!error) {
+        await fetchEcosystemData();
+      }
+    } catch (err) {
+      console.error("Error clearing system errors:", err);
+    }
+  };
+
   // 1. Calculations & statistics
   const totalLogsCount = webhookLogs.length;
   const errorLogsCount = webhookLogs.filter(l => Number(l.response_status) >= 400 || l.error_message).length;
@@ -62,8 +153,17 @@ export default function EcosistemaTab({
   // Selected system error detail object helper
   const selectedSystemError = systemErrors.find(e => e.id === selectedErrorId);
 
-  // Schema rows count
+  // Schema rows count (using fast metadata lengths)
   const totalDBCells = properties.length + leads.length + appointments.length + conversations.length + messages.length + webhookLogs.length;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FBBF24]"></div>
+        <p className="text-slate-400 text-sm font-medium">Diagnosticando ecosistema en tiempo real...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

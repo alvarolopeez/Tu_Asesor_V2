@@ -33,7 +33,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
   }
 
   return (
-    <div className="min-h-screen bg-[#1a252f] pt-32 pb-24 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] pt-32 pb-24 text-white relative overflow-hidden">
       {/* Decorative Background */}
       <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
       <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-[#FBBF24]/5 rounded-full mix-blend-screen filter blur-[100px] opacity-50 z-0"></div>
@@ -45,7 +45,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             Volver al blog
           </Link>
 
-          <article className="glass-effect bg-[#2C3E50]/80 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+          <article className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-xl rounded-3xl overflow-hidden shadow-2xl">
             {post.cover_image && (
               <div className="w-full h-64 md:h-96 relative">
                 <img 
@@ -53,7 +53,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
                   alt={post.title} 
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#2C3E50]/90 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a]/95 to-transparent"></div>
               </div>
             )}
             

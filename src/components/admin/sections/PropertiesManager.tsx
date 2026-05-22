@@ -74,6 +74,7 @@ export default function PropertiesManager() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingLeads, setLoadingLeads] = useState(false);
   
   // Modals / Editors state
   const [showFormModal, setShowFormModal] = useState(false);
@@ -145,65 +146,34 @@ export default function PropertiesManager() {
     }
   };
 
-  const fetchLeads = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('type', 'buyer')
-        .not('status', 'in', '("lost","closed")');
-      if (error) throw error;
-      setLeads(data || []);
-    } catch (err) {
-      console.error("Error fetching leads for matchmaker:", err);
-    }
-  };
-
   useEffect(() => {
     fetchProperties();
-    fetchLeads();
   }, []);
 
-  // Haversine Distance helper in kilometers
-  const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Earth radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  // Polygon centroid helper
-  const getPolygonCentroid = (polygon: [number, number][]): [number, number] => {
-    let latSum = 0;
-    let lngSum = 0;
-    polygon.forEach(([lat, lng]) => {
-      latSum += lat;
-      lngSum += lng;
-    });
-    return [latSum / polygon.length, lngSum / polygon.length];
-  };
-
-  const isPointInPolygon = (point: [number, number], polygon: [number, number][]): boolean => {
-    const [lat, lng] = point;
-    let isInside = false;
-
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const [latI, lngI] = polygon[i];
-      const [latJ, lngJ] = polygon[j];
-
-      const intersect = ((lngI > lng) !== (lngJ > lng))
-          && (lat < (latJ - latI) * (lng - lngI) / (lngJ - lngI) + latI);
-          
-      if (intersect) isInside = !isInside;
+  useEffect(() => {
+    if (showMatchModal && matchingProperty) {
+      const loadMatchmakerLeads = async () => {
+        setLoadingLeads(true);
+        try {
+          const { data, error } = await supabase.rpc("get_matching_leads_for_property", {
+            p_property_id: matchingProperty.id,
+            p_price_margin: priceMargin,
+            p_geo_radius: geoRadius
+          });
+          if (error) throw error;
+          setLeads((data || []) as LeadRow[]);
+        } catch (err) {
+          console.error("Error loading matching leads via RPC:", err);
+          toast.error("Error al cruzar compradores con el inmueble");
+        } finally {
+          setLoadingLeads(false);
+        }
+      };
+      loadMatchmakerLeads();
+    } else {
+      setLeads([]);
     }
-
-    return isInside;
-  };
+  }, [showMatchModal, matchingProperty, priceMargin, geoRadius]);
 
   // Open Edit Form prefilled
   const handleEditClick = (property: Property) => {
@@ -470,68 +440,10 @@ export default function PropertiesManager() {
   const matchmakingResult = useMemo(() => {
     if (!matchingProperty) return { matches: [], metrics: { under: 0, target: 0, over: 0 } };
 
-    const propLat = matchingProperty.features?.latitude;
-    const propLng = matchingProperty.features?.longitude;
     const propPrice = Number(matchingProperty.price);
-    const propType = matchingProperty.features?.propertyType;
-    const propRooms = Number(matchingProperty.features?.rooms || 0);
-    const propBaths = Number(matchingProperty.features?.baths || 0);
+    const matches = leads;
 
-    const matches = leads.filter((buyer: any) => {
-      const prefs = buyer.preferences || {};
-      const polygons = prefs.polygons;
-      const area = prefs.area;
-
-      // 1. Spatial filter using Customizable Radius Slider
-      if (propLat !== undefined && propLng !== undefined) {
-        let locationMatch = false;
-        let hasLocationPreferences = false;
-
-        if (polygons && Array.isArray(polygons) && polygons.length > 0) {
-          hasLocationPreferences = true;
-          // check if inside polygon OR within radius from polygon centroid
-          locationMatch = polygons.some((poly: any) => {
-            if (!Array.isArray(poly) || poly.length < 3) return false;
-            if (isPointInPolygon([propLat, propLng], poly as [number, number][])) return true;
-            // check distance to centroid
-            const [cLat, cLng] = getPolygonCentroid(poly);
-            return getDistance(propLat, propLng, cLat, cLng) <= geoRadius;
-          });
-        } else if (area && Array.isArray(area) && area.length >= 3) {
-          hasLocationPreferences = true;
-          if (isPointInPolygon([propLat, propLng], area as [number, number][])) {
-            locationMatch = true;
-          } else {
-            const [cLat, cLng] = getPolygonCentroid(area);
-            locationMatch = getDistance(propLat, propLng, cLat, cLng) <= geoRadius;
-          }
-        } else if (prefs.latitude && prefs.longitude) {
-          hasLocationPreferences = true;
-          locationMatch = getDistance(propLat, propLng, prefs.latitude, prefs.longitude) <= geoRadius;
-        }
-
-        if (hasLocationPreferences && !locationMatch) return false;
-      }
-
-      // 2. Customizable Price Margin Slider (negotiable up to ±PriceMargin%)
-      if (prefs.maxPrice) {
-        const minAcceptableBuyerBudget = propPrice * (1 - priceMargin / 100);
-        if (Number(prefs.maxPrice) < minAcceptableBuyerBudget) return false;
-      }
-
-      // 3. Property Type filter
-      if (prefs.propertyType && prefs.propertyType !== "Indiferente" && propType && propType !== "Indiferente" && prefs.propertyType !== propType) {
-        return false;
-      }
-
-      // 4. Rooms and Baths
-      if (prefs.minRooms && propRooms < Number(prefs.minRooms)) return false;
-      if (prefs.minBaths && propBaths < Number(prefs.minBaths)) return false;
-
-      return true;
-    });
-
-    // Compute metrics
+    // Compute metrics based on budget vs. property price
     let under = 0;   // Buyer has plenty of budget (maxPrice >= price + 10%)
     let target = 0;  // Perfect fit (within +-10% of price)
     let over = 0;    // Buyer has slightly lower budget but within the margin (negotiable)
@@ -548,7 +460,7 @@ export default function PropertiesManager() {
     });
 
     return { matches, metrics: { under, target, over } };
-  }, [matchingProperty, leads, priceMargin, geoRadius]);
+  }, [matchingProperty, leads]);
 
   // Launches campaign triggers POST Webhook to n8n & records log in database
   const launchWhatsAppCampaign = async () => {
@@ -558,52 +470,31 @@ export default function PropertiesManager() {
     const loadingToast = toast.loading("Enviando webhook y programando campaña en n8n...");
     const payload = {
       event: "real_estate_ai_diffusion",
-      property: {
-        id: matchingProperty.id,
-        title: matchingProperty.title,
-        price: matchingProperty.price,
-        address: matchingProperty.features?.address,
-        rooms: matchingProperty.features?.rooms,
-        baths: matchingProperty.features?.baths,
-        sqm: matchingProperty.features?.sqm
-      },
-      filters: {
-        priceMargin,
-        geoRadius
-      },
-      recipients: matchmakingResult.matches.map(m => ({
-        lead_id: m.id,
-        name: m.name,
-        phone: m.phone,
-        email: m.email,
-        maxPricePreference: m.preferences?.maxPrice
-      }))
+      property_id: matchingProperty.id,
+      price_margin: priceMargin,
+      geo_radius: geoRadius
     };
 
     try {
-      // 1. Post via server-side proxy (API key never exposed to client)
+      // 1. Post via server-side proxy (API key and lead list are calculated securely on server)
       const proxyResponse = await fetch("/api/n8n/diffusion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ webhookUrl: n8nWebhookUrl, payload })
       }).catch(err => {
-        console.warn("N8N proxy call failed, log is created in database local channel. Details:", err);
+        console.warn("N8N proxy call failed, details:", err);
         return { ok: false, status: 500, statusText: "Offline/Simulated" } as Response;
       });
       const response = proxyResponse.ok ? await proxyResponse.json() : { ok: false, status: 500, statusText: "Proxy error" };
 
-      // 2. Insert log record in database n8n_webhook_logs to ensure full CRM auditing!
-      await supabase.from('n8n_webhook_logs').insert({
-        webhook_name: "smart_ai_diffusion",
-        source: "web",
-        payload: payload,
-        response_status: response.status || 200,
-        error_message: response.ok ? null : `Fallo al invocar webhook externo: ${response.statusText}`
-      });
-
       toast.dismiss(loadingToast);
-      toast.success("¡Campaña de Difusión IA lanzada correctamente!");
-      setShowMatchModal(false);
+      
+      if (proxyResponse.ok) {
+        toast.success(`¡Campaña lanzada con éxito para ${response.match_count || 0} leads!`);
+        setShowMatchModal(false);
+      } else {
+        toast.error("Error al lanzar la campaña en el servidor.");
+      }
     } catch (err: any) {
       console.error(err);
       toast.dismiss(loadingToast);
@@ -1329,7 +1220,25 @@ export default function PropertiesManager() {
 
             {/* List of matched buyers */}
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar mb-6">
-              {matchmakingResult.matches.length > 0 ? (
+              {loadingLeads ? (
+                <div className="p-6 bg-[#1E293B]/40 backdrop-blur-md rounded-xl border border-white/5 space-y-4 animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-slate-700 rounded w-1/3"></div>
+                    <div className="h-6 bg-slate-700 rounded w-16"></div>
+                  </div>
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((n) => (
+                      <div key={n} className="bg-[#0F172A]/50 p-4 rounded-xl border border-white/5 flex justify-between items-center">
+                        <div className="space-y-2 flex-1">
+                          <div className="h-4 bg-slate-800 rounded w-1/4"></div>
+                          <div className="h-3 bg-slate-800 rounded w-1/2"></div>
+                        </div>
+                        <div className="h-5 bg-slate-800 rounded w-20"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : matchmakingResult.matches.length > 0 ? (
                 matchmakingResult.matches.map((buyer) => (
                   <div key={buyer.id} className="bg-[#0F172A] p-4 rounded-xl border border-white/5 flex justify-between items-center hover:border-purple-500/20 transition-all">
                     <div>

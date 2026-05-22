@@ -38,14 +38,14 @@ export default function Header() {
                 </button>
                 
                 <div className="absolute top-full left-0 mt-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50">
-                  <div className="bg-[#2C3E50]/95 backdrop-blur-md border border-white/10 rounded-xl shadow-2xl overflow-hidden">
-                    <Link href="/#servicios" className="block px-6 py-4 hover:bg-white/10 transition-colors border-b border-white/5">
+                  <div className="bg-[#0f172a]/95 backdrop-blur-md border border-white/5 rounded-xl shadow-2xl overflow-hidden">
+                    <Link href="/#servicios" className="block px-6 py-4 hover:bg-white/5 hover:text-[#FBBF24] transition-colors border-b border-white/5">
                       Nuestros Servicios
                     </Link>
-                    <Link href="/plusvalia" className="block px-6 py-4 hover:bg-white/10 transition-colors border-b border-white/5">
+                    <Link href="/plusvalia" className="block px-6 py-4 hover:bg-white/5 hover:text-[#FBBF24] transition-colors border-b border-white/5">
                       Calculadora de Plusvalía
                     </Link>
-                    <Link href="/rentabilidad" className="block px-6 py-4 hover:bg-white/10 transition-colors">
+                    <Link href="/rentabilidad" className="block px-6 py-4 hover:bg-white/5 hover:text-[#FBBF24] transition-colors">
                       Calculadora de Rentabilidad
                     </Link>
                   </div>
@@ -78,7 +78,7 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-[#2C3E50]/95 backdrop-blur-md flex flex-col pt-24 px-6 overflow-y-auto pb-10">
+        <div className="fixed inset-0 z-[60] bg-[#0f172a]/95 backdrop-blur-md flex flex-col pt-24 px-6 overflow-y-auto pb-10">
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="absolute top-6 right-6 text-white hover:text-[#FBBF24] transition-colors"
@@ -109,7 +109,7 @@ export default function Header() {
             <Link href="/contacto" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
               Contacto
             </Link>
-            <Link href="/valoracion" onClick={() => setIsMobileMenuOpen(false)} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] mt-4 text-xl px-8 py-4 rounded-xl text-center w-full shadow-lg">
+            <Link href="/valoracion" onClick={() => setIsMobileMenuOpen(false)} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#0f172a] mt-4 text-xl px-8 py-4 rounded-xl text-center w-full shadow-lg">
               Valora tu piso GRATIS
             </Link>
           </div>

@@ -39,12 +39,12 @@ export default function DejarResenaPage() {
 
   if (submitted) {
     return (
-      <main className="min-h-screen pt-32 pb-20 bg-[#2C3E50] flex flex-col items-center justify-center px-4">
+      <main className="min-h-screen pt-32 pb-20 bg-[#0f172a] flex flex-col items-center justify-center px-4">
         <Header />
-        <div className="glass-effect p-12 rounded-3xl border border-white/10 text-center max-w-md animate-in zoom-in duration-500">
+        <div className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md p-12 rounded-3xl text-center max-w-md animate-in zoom-in duration-500 shadow-2xl">
           <CheckCircle2 className="text-green-400 w-20 h-20 mx-auto mb-6" />
           <h1 className="text-3xl font-bold text-white mb-4">¡Gracias por tu reseña!</h1>
-          <p className="text-blue-100 mb-8">
+          <p className="text-slate-300 mb-8">
             Tu opinión es muy importante para mí. La reseña será revisada y publicada en la web próximamente.
           </p>
           <button 
@@ -59,21 +59,21 @@ export default function DejarResenaPage() {
   }
 
   return (
-    <main className="min-h-screen pt-32 pb-20 bg-[#2C3E50]">
+    <main className="min-h-screen pt-32 pb-20 bg-[#0f172a]">
       <Header />
       <div className="container mx-auto px-4 max-w-2xl">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-white mb-4 font-heading">Tu Opinión Cuenta</h1>
-          <p className="text-xl text-blue-100/80">
+          <p className="text-xl text-slate-300">
             ¿Cómo ha sido tu experiencia con mi servicio? Ayúdame a mejorar y ayuda a otros clientes a decidirse.
           </p>
         </div>
 
-        <div className="glass-effect p-8 md:p-12 rounded-3xl border border-white/10 shadow-2xl">
+        <div className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md p-8 md:p-12 rounded-3xl shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Rating Stars */}
             <div className="flex flex-col items-center gap-4">
-              <label className="text-blue-100 font-semibold text-lg">Calificación</label>
+              <label className="text-slate-300 font-semibold text-lg">Calificación</label>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button

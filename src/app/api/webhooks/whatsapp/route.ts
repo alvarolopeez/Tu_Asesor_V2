@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { processMessage } from '@/lib/chatbot/engine';
 
 /**
  * Webhook receptor de WhatsApp Cloud API (Meta Business).
@@ -81,23 +82,57 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Generar respuesta del chatbot (keywords hasta que se active LLM)
-    const chatbotResponse = generateChatbotResponse(parsed.messageText);
+    // 4. Generar respuesta del chatbot (usando el motor oficial de IA)
+    let chatbotResponseText = '';
+    let chatbotIntent: string | null = null;
+    let chatbotConfidence = 0.5;
+    let shouldEscalate = false;
+
+    if (conversationId) {
+      const chatbotResult = await processMessage({
+        message: parsed.messageText,
+        conversationId: conversationId,
+        channel: 'whatsapp',
+        leadContext: {
+          name: parsed.contactName,
+          phone: parsed.phoneNumber,
+        },
+      });
+
+      chatbotResponseText = chatbotResult.response;
+      chatbotIntent = chatbotResult.intent;
+      chatbotConfidence = chatbotResult.confidence;
+      shouldEscalate = chatbotResult.should_escalate;
+    } else {
+      // Fallback por keywords
+      const chatbotResponse = generateChatbotResponse(parsed.messageText);
+      chatbotResponseText = chatbotResponse.response;
+      chatbotIntent = chatbotResponse.intent;
+      chatbotConfidence = chatbotResponse.confidence;
+    }
 
     // 5. Guardar respuesta del asistente en BD
     if (conversationId) {
       await supabase.from('chatbot_messages').insert({
         conversation_id: conversationId,
         role: 'assistant',
-        content: chatbotResponse.response,
-        intent_detected: chatbotResponse.intent,
-        confidence: chatbotResponse.confidence,
+        content: chatbotResponseText,
+        intent_detected: chatbotIntent,
+        confidence: chatbotConfidence,
       });
+
+      // Si hay escalación, actualizar conversación
+      if (shouldEscalate) {
+        await supabase
+          .from('chatbot_conversations')
+          .update({ status: 'escalated', escalated_to: 'alvaro' })
+          .eq('id', conversationId);
+      }
     }
 
     // 6. Enviar respuesta por WhatsApp Cloud API
-    if (ACCESS_TOKEN && PHONE_NUMBER_ID) {
-      await sendWhatsAppMessage(parsed.phoneNumber, chatbotResponse.response);
+    if (ACCESS_TOKEN && PHONE_NUMBER_ID && chatbotResponseText) {
+      await sendWhatsAppMessage(parsed.phoneNumber, chatbotResponseText);
     }
 
     return NextResponse.json({
@@ -105,9 +140,9 @@ export async function POST(request: NextRequest) {
       lead_id: leadId,
       conversation_id: conversationId,
       message_received: parsed.messageText,
-      reply: chatbotResponse.response,
-      intent: chatbotResponse.intent,
-      confidence: chatbotResponse.confidence,
+      reply: chatbotResponseText,
+      intent: chatbotIntent,
+      confidence: chatbotConfidence,
     });
   } catch (error) {
     console.error('[WhatsApp Webhook] Error:', error);

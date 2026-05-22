@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Lato, Montserrat } from "next/font/google";
+import Link from "next/link";
 import Header from "@/components/Header";
 import FloatingWhatsApp from "@/components/FloatingWhatsApp";
 import LayoutWrapper from "@/components/LayoutWrapper";
@@ -42,66 +43,66 @@ export default function RootLayout({
               <div className="container mx-auto px-4 py-16">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
                   <div>
-                    <h3 className="font-bold text-2xl font-heading">Tu asesor | Álvaro</h3>
-                    <p className="mt-4 text-gray-400">
+                    <h3 className="font-bold text-2xl font-heading text-white">Tu asesor <span className="text-[#FBBF24]">|</span> Álvaro</h3>
+                    <p className="mt-4 text-slate-400 leading-relaxed">
                       La forma más inteligente de vender o comprar tu hogar en Sevilla. 
                       Pagando lo justo: 2% vendedor, 0€ comprador.
                     </p>
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg mb-4 font-heading">Navegación</h4>
-                    <ul className="space-y-2 text-gray-400">
+                    <h4 className="font-bold text-lg mb-4 font-heading text-white">Navegación</h4>
+                    <ul className="space-y-2 text-slate-400">
                       <li>
-                        <a href="/comprar" className="hover:text-white">
+                        <Link href="/comprar" className="hover:text-[#FBBF24] transition-colors duration-200">
                           Comprar Propiedades
-                        </a>
+                        </Link>
                       </li>
                       <li>
-                        <a href="/#vender" className="hover:text-white">
+                        <Link href="/#vender" className="hover:text-[#FBBF24] transition-colors duration-200">
                           Vender Propiedad
-                        </a>
+                        </Link>
                       </li>
                       <li>
-                        <a href="/plusvalia" className="hover:text-white">
+                        <Link href="/plusvalia" className="hover:text-[#FBBF24] transition-colors duration-200">
                           Calculadora Plusvalía
-                        </a>
+                        </Link>
                       </li>
                       <li>
-                        <a href="/#servicios" className="hover:text-white">
+                        <Link href="/#servicios" className="hover:text-[#FBBF24] transition-colors duration-200">
                           Nuestros Servicios
-                        </a>
+                        </Link>
                       </li>
                       <li>
-                        <a href="/blog" className="hover:text-[#FBBF24] transition-colors font-semibold">
+                        <Link href="/blog" className="hover:text-[#FBBF24] transition-colors duration-200 font-semibold text-[#FBBF24]">
                           Blog
-                        </a>
+                        </Link>
                       </li>
                     </ul>
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg mb-4 font-heading">Contacto</h4>
-                    <ul className="space-y-2 text-gray-400">
+                    <h4 className="font-bold text-lg mb-4 font-heading text-white">Contacto</h4>
+                    <ul className="space-y-2 text-slate-400">
                       <li>
-                        <a href="tel:+34697223944" className="hover:text-white">
+                        <Link href="tel:+34697223944" className="hover:text-[#FBBF24] transition-colors duration-200">
                           +34 697 223 944
-                        </a>
+                        </Link>
                       </li>
                       <li>
-                        <a href="mailto:tuasesoralvaro@gmail.com" className="hover:text-white">
+                        <Link href="mailto:tuasesoralvaro@gmail.com" className="hover:text-[#FBBF24] transition-colors duration-200">
                           tuasesoralvaro@gmail.com
-                        </a>
+                        </Link>
                       </li>
                     </ul>
                   </div>
                 </div>
-                <div className="mt-12 pt-8 border-t border-gray-700 text-center text-gray-500 text-sm">
+                <div className="mt-12 pt-8 border-t border-white/10 text-center text-slate-500 text-sm">
                   <p>© 2026 Tu Asesor | Álvaro. Todos los derechos reservados.</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-4">
-                    <a href="/politica-privacidad" className="hover:text-white transition-colors">Política de Privacidad</a>
-                    <span>|</span>
-                    <a href="/aviso-legal" className="hover:text-white transition-colors">Aviso Legal</a>
-                    <span>|</span>
-                    <a href="/politica-cookies" className="hover:text-white transition-colors">Política de Cookies</a>
+                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-slate-400">
+                    <Link href="/politica-privacidad" className="hover:text-[#FBBF24] transition-colors duration-200">Política de Privacidad</Link>
+                    <span className="text-slate-600">|</span>
+                    <Link href="/aviso-legal" className="hover:text-[#FBBF24] transition-colors duration-200">Aviso Legal</Link>
+                    <span className="text-slate-600">|</span>
+                    <Link href="/politica-cookies" className="hover:text-[#FBBF24] transition-colors duration-200">Política de Cookies</Link>
                   </div>
                 </div>
               </div>

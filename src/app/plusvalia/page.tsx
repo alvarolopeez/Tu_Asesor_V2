@@ -201,30 +201,28 @@ export default function PlusvaliaPage() {
   };
 
   return (
-    <main className="min-h-screen pt-40 pb-20 bg-slate-50 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-0 w-full h-full bg-[url('/assets/images/pattern.svg')] opacity-5"></div>
-      </div>
-
-
+    <main className="min-h-screen pt-40 pb-20 bg-[#0F172A] text-white relative overflow-hidden">
+      {/* Elementos decorativos */}
+      <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FBBF24]/10 rounded-full mix-blend-screen filter blur-3xl opacity-30 z-0"></div>
+      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full mix-blend-screen filter blur-3xl opacity-20 z-0"></div>
 
       <div className="container mx-auto px-4 max-w-4xl relative z-10">
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-[#2C3E50] mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Calculadoras de Impuestos
           </h1>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
+          <p className="text-xl text-slate-300 font-light max-w-2xl mx-auto">
             Descubre cuánto pagarás al vender tu vivienda. Calcula la Plusvalía Municipal de Sevilla o el IRPF con coeficientes de abatimiento.
           </p>
         </div>
 
-        <div className="glass-effect p-8 md:p-12 rounded-3xl border border-[#2C3E50]/20 shadow-2xl relative z-10">
+        <div className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md p-8 md:p-12 rounded-3xl shadow-2xl relative z-10">
 
           {step === 1 && (
             <div className="space-y-8 animate-in fade-in duration-500">
 
-              <div className="flex flex-col sm:flex-row justify-center mb-8 bg-slate-800 p-1 rounded-xl w-fit mx-auto border border-white/10 gap-1">
+              <div className="flex flex-col sm:flex-row justify-center mb-8 bg-slate-900 p-1 rounded-xl w-fit mx-auto border border-white/5 gap-1">
                 <button
                   onClick={() => setTaxType('municipal')}
                   className={`px-6 py-2 rounded-lg font-bold transition-all ${taxType === 'municipal' ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-white hover:bg-white/10'}`}
@@ -241,78 +239,84 @@ export default function PlusvaliaPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-slate-300 text-sm font-medium">Precio de Compra (Original)</label>
+                  <label htmlFor="valorAdquisicion" className="text-slate-200 text-sm font-medium">Precio de Compra (Original)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
                     <input
                       type="number"
+                      id="valorAdquisicion"
                       value={formData.valorAdquisicion}
                       onChange={(e) => setFormData({ ...formData, valorAdquisicion: e.target.value })}
                       placeholder="Ej: 150000"
-                      className="w-full bg-white border border-transparent rounded-xl py-3 pl-10 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-slate-400 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-slate-300 text-sm font-medium">Fecha de Compra</label>
+                  <label htmlFor="fechaAdquisicion" className="text-slate-200 text-sm font-medium">Fecha de Compra</label>
                   <input
                     type="date"
+                    id="fechaAdquisicion"
                     value={formData.fechaAdquisicion}
                     onChange={(e) => setFormData({ ...formData, fechaAdquisicion: e.target.value })}
-                    className="w-full bg-white border border-transparent rounded-xl py-3 px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-slate-300 text-sm font-medium">Precio de Venta (Estimado)</label>
+                  <label htmlFor="valorVenta" className="text-slate-200 text-sm font-medium">Precio de Venta (Estimado)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
                     <input
                       type="number"
+                      id="valorVenta"
                       value={formData.valorVenta}
                       onChange={(e) => setFormData({ ...formData, valorVenta: e.target.value })}
                       placeholder="Ej: 210000"
-                      className="w-full bg-white border border-transparent rounded-xl py-3 pl-10 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                      className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-slate-400 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-slate-300 text-sm font-medium">Fecha de Venta</label>
+                  <label htmlFor="fechaVenta" className="text-slate-200 text-sm font-medium">Fecha de Venta</label>
                   <input
                     type="date"
+                    id="fechaVenta"
                     value={formData.fechaVenta}
                     onChange={(e) => setFormData({ ...formData, fechaVenta: e.target.value })}
-                    className="w-full bg-white border border-transparent rounded-xl py-3 px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                    className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                   />
                 </div>
 
                 {taxType === 'municipal' && (
                   <>
                     <div className="space-y-2">
-                      <label className="text-slate-300 text-sm font-medium">Valor Catastral del Suelo</label>
+                      <label htmlFor="valorCatastralSuelo" className="text-slate-200 text-sm font-medium">Valor Catastral del Suelo</label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">€</span>
                         <input
                           type="number"
+                          id="valorCatastralSuelo"
                           value={formData.valorCatastralSuelo}
                           onChange={(e) => setFormData({ ...formData, valorCatastralSuelo: e.target.value })}
                           placeholder="Consultar en el IBI"
-                          className="w-full bg-white border border-transparent rounded-xl py-3 pl-10 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
+                          className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-slate-400 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-slate-300 text-sm font-medium">Municipio</label>
+                      <label htmlFor="municipio" className="text-slate-200 text-sm font-medium">Municipio</label>
                       <select
+                        id="municipio"
                         value={formData.municipio}
                         onChange={(e) => setFormData({ ...formData, municipio: e.target.value })}
-                        className="w-full bg-white border border-transparent rounded-xl py-3 px-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all appearance-none"
+                        className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all appearance-none cursor-pointer"
                       >
                         {MUNICIPIOS_SEVILLA.map(m => (
-                          <option key={m} value={m} className="text-slate-800">{m}</option>
+                          <option key={m} value={m} className="bg-[#0F172A] text-white">{m}</option>
                         ))}
                       </select>
                     </div>
@@ -331,7 +335,7 @@ export default function PlusvaliaPage() {
 
               <button
                 onClick={calculatePlusvalia}
-                className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold py-4 text-xl rounded-xl flex items-center justify-center gap-3 group transition-all shadow-lg"
+                className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-extrabold py-4 text-xl rounded-xl flex items-center justify-center gap-3 group transition-all shadow-lg active:scale-95 duration-200"
               >
                 <Calculator size={24} />
                 Calcular Impuesto
@@ -375,7 +379,7 @@ export default function PlusvaliaPage() {
                 )}
               </div>
 
-              <div className="bg-white/5 p-8 rounded-2xl border border-white/10 text-left">
+              <div className="bg-[#0F172A]/50 p-8 rounded-2xl border border-white/5 text-left backdrop-blur-sm">
                 <h3 className="text-xl font-bold text-white mb-6">Recibe el Informe Detallado</h3>
                 <p className="text-slate-300 mb-8 text-sm">
                   Introduce tus datos para desbloquear el desglose completo y recibir una consulta gratuita sobre cómo reducir este impuesto legalmente.
@@ -386,33 +390,38 @@ export default function PlusvaliaPage() {
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input
                       type="text"
+                      id="nombre"
                       required
                       minLength={2}
                       maxLength={100}
                       placeholder="Tu Nombre"
                       value={formData.nombre}
                       onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                      className="w-full bg-white border border-transparent rounded-xl py-4 pl-12 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] placeholder:text-slate-400"
                     />
+                    <label htmlFor="nombre" className="sr-only">Tu Nombre</label>
                   </div>
                   <div className="relative">
                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input
                       type="tel"
+                      id="telefono"
                       required
                       pattern="[0-9]{9,15}"
                       title="Introduce un teléfono válido (9-15 dígitos)"
                       placeholder="Tu Teléfono"
                       value={formData.telefono}
                       onChange={(e) => setFormData({ ...formData, telefono: e.target.value.replace(/[^0-9]/g, '') })}
-                      className="w-full bg-white border border-transparent rounded-xl py-4 pl-12 pr-4 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] placeholder:text-slate-400"
                     />
+                    <label htmlFor="telefono" className="sr-only">Tu Teléfono</label>
                   </div>
 
                   {/* Consentimiento de contacto comercial */}
-                  <label className="flex items-start gap-3 cursor-pointer group">
+                  <label htmlFor="consent" className="flex items-start gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
+                      id="consent"
                       checked={consent}
                       onChange={(e) => { setConsent(e.target.checked); setSubmitError(null); }}
                       className="mt-1 w-4 h-4 accent-[#FBBF24] rounded"
@@ -431,8 +440,8 @@ export default function PlusvaliaPage() {
                   <button
                     type="submit"
                     disabled={submitting || !consent}
-                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg ${consent
-                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer'
+                    className={`w-full py-4 rounded-xl text-lg font-bold transition-all shadow-lg active:scale-95 ${consent
+                        ? 'bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] cursor-pointer font-extrabold'
                         : 'bg-slate-600 text-slate-400 cursor-not-allowed'
                       }`}
                   >
@@ -455,7 +464,7 @@ export default function PlusvaliaPage() {
 
               {results?.tipo === 'municipal' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white/10 p-6 rounded-2xl border border-white/20">
+                  <div className="bg-white/5 border border-white/10 p-6 rounded-2xl">
                     <h4 className="text-lg font-semibold text-white mb-4">Método Objetivo</h4>
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
@@ -473,7 +482,7 @@ export default function PlusvaliaPage() {
                     </div>
                   </div>
 
-                  <div className={`bg-white/10 p-6 rounded-2xl border ${results?.mejorOpcion === "Método Real" ? 'border-[#FBBF24] ring-2 ring-[#FBBF24]/20' : 'border-white/20'}`}>
+                  <div className={`bg-white/5 p-6 rounded-2xl border ${results?.mejorOpcion === "Método Real" ? 'border-[#FBBF24] ring-2 ring-[#FBBF24]/20' : 'border-white/10'}`}>
                     <div className="flex justify-between items-start mb-4">
                       <h4 className="text-lg font-semibold text-white">Método Real</h4>
                       {results?.mejorOpcion === "Método Real" && (
@@ -497,7 +506,7 @@ export default function PlusvaliaPage() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-white/10 p-6 rounded-2xl border border-white/20 max-w-lg mx-auto">
+                <div className="bg-white/5 p-6 rounded-2xl border border-white/10 max-w-lg mx-auto">
                   <h4 className="text-lg font-semibold text-white mb-4">Desglose IRPF</h4>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
@@ -516,7 +525,7 @@ export default function PlusvaliaPage() {
                 </div>
               )}
 
-              <div className="bg-[#FBBF24] p-8 rounded-2xl text-[#2C3E50] text-center">
+              <div className="bg-[#FBBF24] p-8 rounded-2xl text-[#2C3E50] text-center shadow-lg">
                 <p className="text-sm font-bold uppercase tracking-wider mb-2">Cuota Final Estimada</p>
                 <p className="text-5xl font-black mb-4">{results?.tipo === 'municipal' ? results?.cuotaFinal.toFixed(2) : results?.cuotaIRPF.toFixed(2)} €</p>
                 {results?.tipo === 'municipal' && (
@@ -531,8 +540,11 @@ export default function PlusvaliaPage() {
                   "Hola {formData.nombre}, ya tengo tu cálculo. Te contactaré en breve al {formData.telefono} para explicarte cómo tramitarlo sin errores."
                 </p>
                 <button
-                  onClick={() => window.location.href = BUSINESS.whatsappUrl(`Hola Álvaro, acabo de calcular mi ${results?.tipo === 'municipal' ? 'plusvalía municipal' : 'plusvalía fiscal'} (${(results?.tipo === 'municipal' ? (results as any).cuotaFinal : (results as any).cuotaIRPF).toFixed(2)}€) y me gustaría que me ayudaras con la venta.`)}
-                  className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-8 flex items-center justify-center gap-2 mx-auto rounded-xl font-bold transition-all shadow-lg"
+                  onClick={() => {
+                    const cuota = results?.tipo === 'municipal' ? results.cuotaFinal : (results?.tipo === 'fiscal' ? results.cuotaIRPF : 0);
+                    window.location.href = BUSINESS.whatsappUrl(`Hola Álvaro, acabo de calcular mi ${results?.tipo === 'municipal' ? 'plusvalía municipal' : 'plusvalía fiscal'} (${cuota.toFixed(2)}€) y me gustaría que me ayudaras con la venta.`);
+                  }}
+                  className="btn bg-[#25D366] hover:bg-[#128C7E] text-white border-none py-4 px-8 flex items-center justify-center gap-2 mx-auto rounded-xl font-extrabold transition-all shadow-lg active:scale-95 duration-200"
                 >
                   Confirmar por WhatsApp
                 </button>
