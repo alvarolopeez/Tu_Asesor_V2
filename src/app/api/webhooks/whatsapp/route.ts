@@ -11,7 +11,7 @@ import { processMessage } from '@/lib/chatbot/engine';
  * Requisitos:
  * - App creada en Facebook Developers (developers.facebook.com)
  * - WhatsApp Business API configurada
- * - Webhook URL registrada: https://tuasesoralvaro.es/api/webhooks/whatsapp
+ * - Webhook URL registrada: https://tuasesoralvaro.com/api/webhooks/whatsapp
  * - WHATSAPP_VERIFY_TOKEN configurado en .env.local
  * - WHATSAPP_ACCESS_TOKEN configurado en .env.local (para enviar respuestas)
  * - WHATSAPP_PHONE_NUMBER_ID configurado en .env.local
@@ -373,7 +373,7 @@ function generateChatbotResponse(message: string) {
 
   if (lower.includes('valorar') || lower.includes('valoración') || lower.includes('vender') || lower.includes('tasar')) {
     return {
-      response: '📊 ¡Genial! Puedes obtener una valoración orientativa gratuita aquí:\n👉 https://tuasesoralvaro.es/valoracion\n\nSi prefieres una valoración presencial más precisa, Álvaro puede visitarte sin compromiso. ¿Qué prefieres?',
+      response: '📊 ¡Genial! Puedes obtener una valoración orientativa gratuita aquí:\n👉 https://tuasesoralvaro.com/valoracion\n\nSi prefieres una valoración presencial más precisa, Álvaro puede visitarte sin compromiso. ¿Qué prefieres?',
       intent: 'valuation',
       confidence: 0.90,
     };
@@ -381,7 +381,7 @@ function generateChatbotResponse(message: string) {
 
   if (lower.includes('plusvalia') || lower.includes('plusvalía') || lower.includes('impuesto')) {
     return {
-      response: '🧮 Tenemos una calculadora de plusvalía municipal gratuita:\n👉 https://tuasesoralvaro.es/plusvalia\n\nTe calcula exactamente lo que tendrías que pagar. ¿Necesitas ayuda con algo más?',
+      response: '🧮 Tenemos una calculadora de plusvalía municipal gratuita:\n👉 https://tuasesoralvaro.com/plusvalia\n\nTe calcula exactamente lo que tendrías que pagar. ¿Necesitas ayuda con algo más?',
       intent: 'general_inquiry',
       confidence: 0.85,
     };

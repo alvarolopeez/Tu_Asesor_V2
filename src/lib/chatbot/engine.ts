@@ -310,7 +310,7 @@ function keywordFallback(message: string, conversationId: string): ChatbotEngine
 
   if (lower.includes('valorar') || lower.includes('valoración') || lower.includes('vender') || lower.includes('tasar')) {
     return {
-      response: '📊 ¡Genial! Valoración gratuita aquí:\n👉 https://tuasesoralvaro.es/valoracion\n\n¿Prefieres una valoración presencial? Álvaro puede visitarte sin compromiso.',
+      response: '📊 ¡Genial! Valoración gratuita aquí:\n👉 https://tuasesoralvaro.com/valoracion\n\n¿Prefieres una valoración presencial? Álvaro puede visitarte sin compromiso.',
       intent: 'valuation',
       confidence: 0.90,
       data_extracted: {},
