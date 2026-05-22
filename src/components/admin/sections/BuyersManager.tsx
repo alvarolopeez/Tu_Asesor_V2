@@ -59,6 +59,7 @@ interface BuyerActivityLog {
   notes: string | null;
   event_date: string;
   created_at: string;
+  property_id?: string | null;
 }
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────────
@@ -143,6 +144,8 @@ export default function BuyersManager() {
   const [logNotes, setLogNotes] = useState("");
   const [logDate, setLogDate] = useState(new Date().toISOString().substring(0, 16));
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [formLogPropertyId, setFormLogPropertyId] = useState("");
+  const [properties, setProperties] = useState<any[]>([]);
 
   // Fetch Buyers from Supabase
   const fetchBuyers = async () => {
@@ -183,8 +186,23 @@ export default function BuyersManager() {
     }
   };
 
+  const fetchProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('id, title, price')
+        .order('title', { ascending: true });
+
+      if (error) throw error;
+      setProperties(data || []);
+    } catch (error: any) {
+      console.error("Error al cargar propiedades:", error.message);
+    }
+  };
+
   useEffect(() => {
     fetchBuyers();
+    fetchProperties();
   }, []);
 
   // Update selected buyer data dynamically when a change occurs
@@ -354,7 +372,8 @@ export default function BuyersManager() {
       event_type: logType,
       title: logTitle,
       notes: logNotes || null,
-      event_date: new Date(logDate).toISOString()
+      event_date: new Date(logDate).toISOString(),
+      property_id: formLogPropertyId || null
     };
 
     try {
@@ -379,6 +398,7 @@ export default function BuyersManager() {
 
       setLogTitle("");
       setLogNotes("");
+      setFormLogPropertyId("");
       setLogDate(new Date().toISOString().substring(0, 16));
       setEditingLogId(null);
       setShowLogForm(false);
@@ -901,6 +921,7 @@ export default function BuyersManager() {
                       setEditingLogId(null);
                       setLogTitle("");
                       setLogNotes("");
+                      setFormLogPropertyId("");
                       setShowLogForm(!showLogForm);
                     }}
                     className="text-xs font-bold text-[#FBBF24] hover:text-white flex items-center gap-1 transition-colors bg-white/5 border border-white/15 px-2.5 py-1 rounded-lg cursor-pointer"
@@ -969,6 +990,22 @@ export default function BuyersManager() {
                       />
                     </div>
 
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Vincular a Inmueble (Opcional)</label>
+                      <select
+                        value={formLogPropertyId}
+                        onChange={(e) => setFormLogPropertyId(e.target.value)}
+                        className="w-full bg-[#0F172A] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#FBBF24]"
+                      >
+                        <option value="">-- No vincular a ningún inmueble --</option>
+                        {properties.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title} ({p.price.toLocaleString("es-ES")}€)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="flex justify-end gap-2 pt-1">
                       <button
                         type="button"
@@ -1027,6 +1064,16 @@ export default function BuyersManager() {
                               </p>
                             )}
 
+                            {log.property_id && (
+                              <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2 py-1 rounded-lg text-[10px] text-slate-300 w-fit mt-2">
+                                <Home size={10} className="text-[#FBBF24]" />
+                                <span className="font-medium">Vinculado a:</span>
+                                <span className="font-semibold text-[#FBBF24]">
+                                  {properties.find(p => p.id === log.property_id)?.title || "Inmueble"}
+                                </span>
+                              </div>
+                            )}
+
                             {/* Hover Edit/Delete controls for Manual logs */}
                             <div className="flex justify-end gap-2 pt-1 opacity-0 group-hover/log:opacity-100 transition-opacity">
                               <button
@@ -1035,6 +1082,7 @@ export default function BuyersManager() {
                                   setLogType(log.event_type);
                                   setLogTitle(log.title);
                                   setLogNotes(log.notes || "");
+                                  setFormLogPropertyId(log.property_id || "");
                                   setLogDate(new Date(log.event_date).toISOString().substring(0, 16));
                                   setShowLogForm(true);
                                 }}

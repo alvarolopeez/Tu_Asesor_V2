@@ -25,6 +25,8 @@ import type {
   WebVisitRow,
   ExpenseRow,
   SystemErrorRow,
+  BuyerActivityLogRow,
+  BuyerDemandRow,
 } from "./dashboard/types";
 
 type ActiveTab = "marketing" | "operaciones" | "finanzas" | "ecosistema";
@@ -44,6 +46,8 @@ export default function DashboardOverview() {
   const [webVisits, setWebVisits] = useState<WebVisitRow[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [systemErrors, setSystemErrors] = useState<SystemErrorRow[]>([]);
+  const [buyerActivityLogs, setBuyerActivityLogs] = useState<BuyerActivityLogRow[]>([]);
+  const [buyersDemands, setBuyersDemands] = useState<BuyerDemandRow[]>([]);
   const [selectedErrorId, setSelectedErrorId] = useState<string | null>(null);
   const [dbLatency, setDbLatency] = useState<number | null>(14);
   const [apiLatency, setApiLatency] = useState<number | null>(null);
@@ -224,7 +228,9 @@ export default function DashboardOverview() {
         { data: logsData },
         { data: visitsData },
         { data: expensesData },
-        { data: errorsData }
+        { data: errorsData },
+        { data: activityLogsData },
+        { data: buyersDemandsData }
       ] = await Promise.all([
         supabase.from("properties").select("*"),
         supabase.from("leads").select("*"),
@@ -234,7 +240,9 @@ export default function DashboardOverview() {
         supabase.from("n8n_webhook_logs").select("*"),
         supabase.from("web_visits").select("*"),
         supabase.from("operating_expenses").select("*").order("created_at", { ascending: false }),
-        supabase.from("system_errors").select("*").order("created_at", { ascending: false })
+        supabase.from("system_errors").select("*").order("created_at", { ascending: false }),
+        supabase.from("buyer_activity_logs").select("*").order("event_date", { ascending: false }),
+        supabase.from("buyers_demands").select("id, name, phone, email, max_budget, status")
       ]);
 
       setProperties(propsData || []);
@@ -245,6 +253,8 @@ export default function DashboardOverview() {
       setWebhookLogs(logsData || []);
       setWebVisits(visitsData || []);
       setSystemErrors(errorsData || []);
+      setBuyerActivityLogs(activityLogsData || []);
+      setBuyersDemands(buyersDemandsData || []);
 
       // Auto-seeding default baseline operating expenses if they are missing
       let finalExpenses = expensesData || [];
@@ -562,6 +572,77 @@ export default function DashboardOverview() {
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            {/* Buyer Feedback & System Activity */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-black text-slate-950 uppercase tracking-widest border-b border-slate-200 pb-1 flex items-center gap-1.5">
+                Feedback Real y Actividad de Compradores
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <p className="text-slate-500 font-semibold">Visitas Físicas Realizadas</p>
+                  <p className="text-base font-bold text-slate-950">
+                    {appointments.filter(appt => appt.property_id === selectedProperty.id && appt.type === 'visita').length} visitas
+                  </p>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                  <p className="text-slate-500 font-semibold">Comentarios / Interacciones</p>
+                  <p className="text-base font-bold text-slate-950">
+                    {buyerActivityLogs.filter(act => act.property_id === selectedProperty.id).length} interacciones
+                  </p>
+                </div>
+              </div>
+
+              {buyerActivityLogs.filter(act => act.property_id === selectedProperty.id).length > 0 ? (
+                <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+                      <tr>
+                        <th className="px-3 py-2">Fecha</th>
+                        <th className="px-3 py-2">Comprador</th>
+                        <th className="px-3 py-2">Tipo</th>
+                        <th className="px-3 py-2">Notas y Comentarios de la Visita</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {buyerActivityLogs
+                        .filter(act => act.property_id === selectedProperty.id)
+                        .map(act => {
+                          const buyer = buyersDemands.find(b => b.id === act.buyer_id);
+                          const buyerName = buyer ? buyer.name : "Comprador Interesado";
+                          return (
+                            <tr key={act.id}>
+                              <td className="px-3 py-2 text-slate-500 whitespace-nowrap">
+                                {new Date(act.event_date).toLocaleDateString()}
+                              </td>
+                              <td className="px-3 py-2 text-slate-900 font-bold">
+                                {buyerName}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  act.event_type === 'oferta' ? 'bg-emerald-100 text-emerald-800' :
+                                  act.event_type === 'visita' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-slate-100 text-slate-800'
+                                }`}>
+                                  {act.event_type.toUpperCase()}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600 leading-normal">
+                                {act.notes || act.title}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-lg border border-slate-100 text-center">
+                  No se han registrado comentarios ni feedback directo de compradores para esta propiedad aún.
+                </p>
+              )}
             </div>
 
             {/* AI Advisor opinion text */}

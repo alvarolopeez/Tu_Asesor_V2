@@ -118,3 +118,24 @@ export interface SystemErrorRow {
   details: Record<string, unknown>
   created_at: string
 }
+
+export interface BuyerActivityLogRow {
+  id: string
+  buyer_id: string
+  event_type: string
+  title: string
+  notes: string | null
+  event_date: string
+  created_at: string
+  property_id?: string | null
+}
+
+export interface BuyerDemandRow {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  max_budget: number
+  status: string
+}
+
