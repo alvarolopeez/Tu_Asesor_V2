@@ -4,9 +4,49 @@
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
 ## 📥 Peticiones Pendientes
-*(No hay tareas pendientes en este momento)*
+- ⏳ **Álvaro debe configurar** `ADVISOR_WHATSAPP_PHONE=34XXXXXXXXX` en `.env.local` con su número personal para recibir notificaciones de escalación del bot.
+- ⏳ **Producción**: Configurar las mismas variables de entorno en Netlify (panel > Site settings > Environment variables).
 
 ## ✅ Peticiones Completadas
+
+### ✅ [2026-05-22] Fase 4 — Configuración Completa N8N + Difusión Inteligente + Escalación
+
+**Workflows de N8N configurados y actualizados:**
+1. **WhatsApp Bot — Tu Asesor** (`SCHdZGrCyWVvBsMZ`)
+   - Webhook: `POST /webhook/whatsapp-incoming`
+   - Procesa mensajes reenviados desde Next.js → registra interacción → consulta propiedades → responde
+   - URL: https://alvaroolopez.app.n8n.cloud/workflow/SCHdZGrCyWVvBsMZ
+
+2. **Difusión Inteligente — Smart Matchmaker** (`6E0AP0gqLUliPQtN`) [NUEVO]
+   - Webhook: `POST /webhook/smart-diffusion`
+   - Recibe payload enriquecido desde `/api/n8n/diffusion/` con propiedad + leads coincidentes
+   - Itera cada destinatario con `SplitInBatches` → envía WhatsApp personalizado vía Meta API → registra en CRM
+   - URL: https://alvaroolopez.app.n8n.cloud/workflow/6E0AP0gqLUliPQtN
+
+3. **Notificación Nuevo Lead** (`QikfXMJumWbpI3wL`)
+   - Webhook: `POST /webhook/new-lead`
+   - Recibe alerta de nuevo lead → envía mensaje de bienvenida por WhatsApp → registra en log
+   - URL: https://alvaroolopez.app.n8n.cloud/workflow/QikfXMJumWbpI3wL
+
+4. **Seguimiento Leads Diario** (`VnXhrEh2G8AeR0DT`)
+   - Cron: L-V a las 9:00 AM
+   - Consulta propiedades activas → genera resumen → registra en log
+   - URL: https://alvaroolopez.app.n8n.cloud/workflow/VnXhrEh2G8AeR0DT
+
+**Credenciales configuradas en `.env.local`:**
+- `WHATSAPP_ACCESS_TOKEN` — Token permanente de Meta (System User)
+- `WHATSAPP_PHONE_NUMBER_ID` — `1061320817073599`
+- `WHATSAPP_BUSINESS_ACCOUNT_ID` — `860433866401549`
+- `APP_ID` — `1018904287367632`
+- `APP_SECRET` — Configurado
+- `ADVISOR_WHATSAPP_PHONE` — Pendiente de número real de Álvaro
+
+**Mejoras en el webhook de WhatsApp:**
+- 🔔 **Escalación inteligente**: Cuando el bot detecta `should_escalate`, ahora envía automáticamente un WhatsApp a Álvaro con:
+  - Nombre del cliente, teléfono, último mensaje, intención detectada y hora
+  - El asesor puede responder directamente al cliente desde su teléfono personal
+
+**Build:** ✅ Verificado — 0 errores
 
 ### ✅ [2026-05-22] Fase 3 — Integración de Motor Chatbot en WhatsApp & Seguridad en Campañas de Difusión N8N
 

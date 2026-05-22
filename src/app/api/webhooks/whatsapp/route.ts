@@ -24,6 +24,7 @@ import { processMessage } from '@/lib/chatbot/engine';
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+const ADVISOR_PHONE = process.env.ADVISOR_WHATSAPP_PHONE || ''; // Teléfono de Álvaro para escalaciones
 
 // ─── GET: Verificación del Webhook por Meta ──────────
 export async function GET(request: NextRequest) {
@@ -121,12 +122,27 @@ export async function POST(request: NextRequest) {
         confidence: chatbotConfidence,
       });
 
-      // Si hay escalación, actualizar conversación
+      // Si hay escalación, actualizar conversación y notificar a Álvaro
       if (shouldEscalate) {
         await supabase
           .from('chatbot_conversations')
           .update({ status: 'escalated', escalated_to: 'alvaro' })
           .eq('id', conversationId);
+
+        // 🔔 Notificación de escalación al asesor vía WhatsApp
+        if (ADVISOR_PHONE && ACCESS_TOKEN && PHONE_NUMBER_ID) {
+          const escalationMessage =
+            `🚨 *Escalación de Chat*\n\n` +
+            `👤 *Lead:* ${parsed.contactName}\n` +
+            `📱 *Teléfono:* ${parsed.phoneNumber}\n` +
+            `💬 *Último mensaje:* "${parsed.messageText}"\n` +
+            `🤖 *Intención detectada:* ${chatbotIntent || 'ESCALATE'}\n` +
+            `⏰ *Hora:* ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}\n\n` +
+            `El cliente ha solicitado hablar con un asesor. Respóndele directamente al ${parsed.phoneNumber}.`;
+
+          await sendWhatsAppMessage(ADVISOR_PHONE, escalationMessage);
+          console.log(`[WhatsApp] 🔔 Escalación enviada a Álvaro por lead ${parsed.contactName}`);
+        }
       }
     }
 
