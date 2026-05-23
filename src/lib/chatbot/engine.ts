@@ -288,8 +288,10 @@ async function callGemini(
   });
 
   try {
+    const modelName = LLM_MODEL === "gemini-1.5-flash" ? "gemini-flash-latest" : LLM_MODEL;
+
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${LLM_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: {
