@@ -16,10 +16,11 @@ import { join } from 'path';
  */
 
 // ─── Configuración LLM ──────────────────────────────
-const LLM_PROVIDER = process.env.LLM_PROVIDER || 'keywords'; // 'openai' | 'anthropic' | 'keywords'
+const LLM_PROVIDER = process.env.LLM_PROVIDER || 'keywords'; // 'openai' | 'anthropic' | 'gemini' | 'keywords'
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
-const LLM_MODEL = process.env.LLM_MODEL || 'gpt-4o-mini';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const LLM_MODEL = process.env.LLM_MODEL || 'gemini-1.5-flash';
 
 // ─── Interfaz del Engine ─────────────────────────────
 interface EngineInput {
@@ -49,6 +50,9 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
   let result: ChatbotEngineResponse;
 
   switch (LLM_PROVIDER) {
+    case 'gemini':
+      result = await callGemini(input.message, history, properties, input.leadContext);
+      break;
     case 'openai':
       result = await callOpenAI(input.message, history, properties, input.leadContext);
       break;
@@ -237,6 +241,91 @@ async function callAnthropic(
     return parseLLMResponse(content, '');
   } catch (error) {
     console.error('[Anthropic] Error de red:', error);
+    return keywordFallback(message, '');
+  }
+}
+
+/**
+ * Llamada a Google Gemini (Gemini 1.5 Flash / Pro)
+ */
+async function callGemini(
+  message: string,
+  history: Array<{ role: string; content: string }>,
+  properties: string,
+  leadContext?: EngineInput['leadContext']
+): Promise<ChatbotEngineResponse> {
+  if (!GEMINI_API_KEY) {
+    console.warn('[Chatbot Engine] Gemini API key no configurada, usando fallback');
+    return keywordFallback(message, '');
+  }
+
+  const systemPrompt = buildSystemPrompt(properties, history);
+
+  // Mapear historial al formato de Gemini (roles: user / model)
+  const geminiMessages = history.map(m => ({
+    role: m.role === 'user' ? 'user' : 'model',
+    parts: [{ text: m.content }]
+  }));
+
+  // Agregar contexto del cliente si existe
+  if (leadContext?.name) {
+    geminiMessages.unshift({
+      role: 'user',
+      parts: [{
+        text: `Contexto del cliente actual: Nombre: ${leadContext.name}, Teléfono: ${leadContext.phone || 'desconocido'}, Tipo: ${leadContext.type || 'desconocido'}. Por favor, asume esta identidad en la conversación.`
+      }]
+    });
+    geminiMessages.unshift({
+      role: 'model',
+      parts: [{ text: 'Entendido. Tengo el contexto del cliente y responderé de forma personalizada.' }]
+    });
+  }
+
+  // Agregar mensaje actual del usuario
+  geminiMessages.push({
+    role: 'user',
+    parts: [{ text: message }]
+  });
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${LLM_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: geminiMessages,
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.7,
+            maxOutputTokens: 800,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error('[Gemini] Error:', response.status, errBody);
+      return keywordFallback(message, '');
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      console.error('[Gemini] Respuesta vacía de candidatos');
+      return keywordFallback(message, '');
+    }
+
+    return parseLLMResponse(content, '');
+  } catch (error) {
+    console.error('[Gemini] Error de red:', error);
     return keywordFallback(message, '');
   }
 }

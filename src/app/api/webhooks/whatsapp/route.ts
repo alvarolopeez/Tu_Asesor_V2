@@ -68,26 +68,39 @@ export async function POST(request: NextRequest) {
     // 1. Buscar o crear lead por teléfono
     const leadId = await findOrCreateLead(parsed.phoneNumber, parsed.contactName);
 
-    // 2. Buscar o crear conversación activa
-    const conversationId = await findOrCreateConversation(
+    // 2. Buscar o crear conversación activa/escalada
+    const convInfo = await findOrCreateConversation(
       parsed.phoneNumber, leadId, parsed.contactName
     );
 
-    // 3. Guardar el mensaje del usuario
-    if (conversationId) {
-      await supabase.from('chatbot_messages').insert({
-        conversation_id: conversationId,
-        role: 'user',
-        content: parsed.messageText,
-        wa_message_id: parsed.messageId,
-      });
+    if (!convInfo) {
+      return NextResponse.json({ error: 'Could not create or find conversation' }, { status: 500 });
     }
 
-    // 4. Generar respuesta del chatbot (usando el motor oficial de IA)
+    const { id: conversationId, status: conversationStatus } = convInfo;
+
+    // 3. Guardar el mensaje del usuario
+    await supabase.from('chatbot_messages').insert({
+      conversation_id: conversationId,
+      role: 'user',
+      content: parsed.messageText,
+      wa_message_id: parsed.messageId,
+    });
+
+    // 4. Generar respuesta del chatbot (usando el motor oficial de IA) si no está en modo humano
     let chatbotResponseText = '';
     let chatbotIntent: string | null = null;
     let chatbotConfidence = 0.5;
     let shouldEscalate = false;
+
+    if (conversationStatus === 'escalated') {
+      console.log(`[WhatsApp] 🚫 Chat en "Modo Humano" (escalado) para ${parsed.phoneNumber}. Omitiendo respuesta automática de la IA.`);
+      return NextResponse.json({
+        status: 'ok',
+        type: 'escalated_to_agent',
+        message_received: parsed.messageText,
+      });
+    }
 
     if (conversationId) {
       const chatbotResult = await processMessage({
@@ -331,22 +344,22 @@ async function findOrCreateLead(phone: string, name: string): Promise<string | n
 }
 
 /**
- * Busca una conversación activa o crea una nueva.
+ * Busca una conversación activa o escalada, o crea una nueva.
  */
 async function findOrCreateConversation(
   phone: string,
   leadId: string | null,
   contactName: string
-): Promise<string | null> {
+): Promise<{ id: string; status: string } | null> {
   const { data: existing } = await supabase
     .from('chatbot_conversations')
-    .select('id')
+    .select('id, status')
     .eq('wa_phone_number', phone)
-    .eq('status', 'active')
+    .in('status', ['active', 'escalated'])
     .limit(1);
 
   if (existing && existing.length > 0) {
-    return existing[0].id;
+    return { id: existing[0].id, status: existing[0].status };
   }
 
   const { data: newConv } = await supabase
@@ -358,10 +371,10 @@ async function findOrCreateConversation(
       status: 'active',
       metadata: { contact_name: contactName },
     })
-    .select('id')
+    .select('id, status')
     .single();
 
-  return newConv?.id || null;
+  return newConv ? { id: newConv.id, status: newConv.status } : null;
 }
 
 /**
