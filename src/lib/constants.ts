@@ -11,7 +11,7 @@ export const BUSINESS = {
   phoneIntl: '34697223944',
   email: 'tuasesoralvaro@gmail.com',
   whatsappUrl: (message: string) =>
-    `https://wa.me/34697223944?text=${encodeURIComponent(message)}`,
+    `https://wa.me/34694216833?text=${encodeURIComponent(message)}`,
   defaultWhatsappMessage: 'Hola Álvaro, me gustaría recibir más información.',
 } as const;
 

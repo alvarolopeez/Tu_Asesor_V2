@@ -9,6 +9,18 @@ Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO camb
 
 ## ✅ Peticiones Completadas
 
+### 🟡 [2026-05-23] Petición del Director General — Eliminación de Widget de Chat Flotante y Redirección de CTA a WhatsApp del Chatbot
+* **Completado por**: Agente Web
+* **Detalles**:
+  1. **Remoción de FloatingChatWidget (`src/components/LayoutWrapper.tsx`)**:
+     * Eliminamos la importación y la renderización del widget flotante de chat amarillo (`<FloatingChatWidget />`) en `LayoutWrapper.tsx`.
+     * Esto desactiva el chatbot flotante del frontend de forma limpia, mejorando el rendimiento y evitando interferencias con el widget flotante principal de WhatsApp.
+  2. **Actualización de Redirección de WhatsApp (`src/lib/constants.ts`)**:
+     * Modificamos la función `whatsappUrl` para que apunte directamente al número del chatbot automatizado (`34694216833`) en vez de al número personal de Álvaro (`34697223944`).
+     * Esto garantiza que todas las solicitudes de contacto y redirecciones de WhatsApp que interactúen con la web pública sean atendidas directamente por el flujo de chat inteligente.
+  3. **Verificación de Compilación Exitosa (`npm run build`)**:
+     * Ejecutamos una compilación local rápida (`npm run build`) y validamos que todo el proyecto compile sin ningún error de tipo en TypeScript ni advertencias, logrando una compilación 100% limpia.
+
 ### 🟠 [2026-05-22] Petición del Director General — Fase Final de Unificación Estética Global (Fondo Oscuro Premium, Testimonios Glassmorphic, Suscripción, Header y Footer)
 * **Completado por**: Agente Web
 * **Detalles**:
