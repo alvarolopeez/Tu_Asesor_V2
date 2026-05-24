@@ -1,3 +1,5 @@
+"use server"
+
 import { supabase } from './supabase'
 
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || ''

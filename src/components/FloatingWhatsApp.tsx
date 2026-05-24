@@ -34,7 +34,7 @@ export default function FloatingWhatsApp() {
     <>
       {/* Menú Flotante de Paula (Asistente Virtual) */}
       <div
-        className={`fixed bottom-6 right-[88px] w-[300px] sm:w-[350px] bg-[#1E293B]/95 text-white border border-white/10 rounded-2xl shadow-2xl p-4 backdrop-blur-xl z-[95] flex flex-col gap-3 transition-all duration-500 ease-out transform ${
+        className={`fixed bottom-6 right-[88px] w-[300px] sm:w-[350px] bg-[#1E293B]/95 text-white border border-white/10 rounded-2xl shadow-2xl p-4 backdrop-blur-xl z-[95] flex flex-col gap-3 transition-all duration-500 ease-out transform after:content-[''] after:absolute after:bottom-[24px] after:right-[-8px] after:border-l-[8px] after:border-l-[#1E293B]/95 after:border-y-[8px] after:border-y-transparent after:drop-shadow-[2px_0_0_rgba(255,255,255,0.05)] ${
           showBubble && !isDismissed
             ? "opacity-100 translate-x-0 scale-100 pointer-events-auto"
             : "opacity-0 translate-x-4 scale-95 pointer-events-none"

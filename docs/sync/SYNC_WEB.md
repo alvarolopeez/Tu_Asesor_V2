@@ -24,7 +24,10 @@ Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO camb
      * Eliminada la animación `animate-bounce` del botón flotante para otorgar un aspecto estático y limpio en la esquina inferior derecha.
      * Creado un disparador temporal (`setTimeout`) a los 10 segundos de la entrada del usuario a la web que despliega suavemente un bocadillo premium dark-glassmorphic (`bg-[#1E293B]/95 border-white/10 backdrop-blur-xl`).
      * Presenta la asesora virtual Paula con un avatar animado y un punto verde de "en línea", un bocadillo de bienvenida y un textarea interactivo que redirige al usuario a WhatsApp Web/Móvil enviando el mensaje personalizado. Incluye un botón discreto de cerrar `[X]`.
-  5. **Verificación del Linter y Compilación**:
+     * **Hotfix Visual**: Añadido un puntero triangular a la derecha del bocadillo de chat mediante pseudo-elementos Tailwind (`after:content-[''] after:absolute after:bottom-[24px]...`) para emular perfectamente un globo de diálogo flotante.
+  5. **Migración de Capa de Mapa a CartoDB Voyager (`BuyerMap.tsx`)**:
+     * Migrada la fuente de mapas de OpenStreetMap estándar a **CartoDB Voyager** (`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`) con subdominios `abcd` y `maxZoom: 20`, previniendo que los adblockers en producción interfieran con la carga de los tiles del mapa y optimizando significativamente la nitidez y resolución del mapa interactivo de zonas de Sevilla.
+  6. **Verificación del Linter y Compilación**:
      * Ejecutada la compilación completa de Next.js (`npm run build`) con un éxito rotundo (100% libre de errores) y verificado con `gitnexus_detect_changes()`.
 
 ### 🟡 [2026-05-24] Petición del Director General — Mejoras Premium, Validación y Reestructuraciones Visuales en Catálogo y Formularios

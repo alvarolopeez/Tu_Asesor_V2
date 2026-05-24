@@ -14,6 +14,7 @@ Lista de mejoras premium implementadas en el front-end y la web pública para un
   - [x] Añadido checkbox de consentimiento obligatorio de RGPD para contacto por WhatsApp/Email en el Paso 1.
   - [x] Sincronización en Supabase de la aceptación de RGPD y hora exacta de consentimiento dentro del JSON de metadatos `preferences`.
   - [x] Corregido renderizado gris/blanco del mapa de Leaflet en `BuyerMap.tsx` añadiendo `map.invalidateSize()` con `setTimeout` de 150ms en la inicialización.
+  - [x] Reemplazada la capa de OpenStreetMap con **CartoDB Voyager** (`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`) con subdominios `abcd` y `maxZoom: 20` para evitar bloqueos por adblockers en producción y optimizar la resolución.
 
 - [x] **2. Reestructuración de Catálogo (`/comprar/page.tsx`)**
   - [x] Toda la tarjeta de propiedad del catálogo es ahora clicable (`cursor-pointer hover:border-[#FBBF24]/30`) para abrir el detalle.
@@ -44,3 +45,4 @@ Lista de mejoras premium implementadas en el front-end y la web pública para un
   - [x] Removida la animación de rebote del botón flotante verde para dejarlo limpio, estático e impecable.
   - [x] Diseñado e implementado un temporizador de 10 segundos para desplegar a la asesora virtual Paula de manera elegante con un avatar animado y un punto verde de "en línea" con un efecto glow.
   - [x] Añadido un campo de texto interactivo con un botón de envío directo a WhatsApp utilizando el mensaje personalizado y una opción discreta para descartar/cerrar el bocadillo.
+  - [x] Añadido un puntero triangular a la derecha del bocadillo de chat mediante pseudo-elementos Tailwind (`after:content-[''] after:absolute after:bottom-[24px]...`) para emular perfectamente un globo de diálogo flotante.

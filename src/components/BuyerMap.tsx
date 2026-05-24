@@ -52,10 +52,11 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
       doubleClickZoom: true,
     });
 
-    // Add bright street tiles (Standard OSM - normal bright look)
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
+    // Add bright street tiles (CartoDB Voyager - avoids adblockers and offers high quality)
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: "abcd",
+      maxZoom: 20,
     }).addTo(map);
 
     // Custom zoom control in bottom-right
