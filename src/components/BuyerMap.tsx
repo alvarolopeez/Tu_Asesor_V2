@@ -28,6 +28,10 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
   const isDrawingGestureRef = useRef(false);
   const currentPointsRef = useRef<L.LatLng[]>([]);
   const tempPolylineRef = useRef<L.Polyline | null>(null);
+  const forceMapRedrawRef = useRef<(() => void) | null>(null);
+
+  // Stable function to call forceMapRedraw from state-update callbacks
+  const forceMapRedraw = () => forceMapRedrawRef.current?.();
 
   // Keep state sync
   useEffect(() => {
@@ -144,6 +148,8 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
       const points = currentPointsRef.current;
       if (points.length < 3) {
         toastError("El área es muy pequeña. Dibuja un círculo más amplio.");
+        // Force tiles to re-render even on cancelled drawing
+        forceMapRedraw();
         return;
       }
 
@@ -152,7 +158,37 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
       setLocalPolygons((prev) => [...prev, coords]);
       setIsDrawingMode(false);
       setShowDrawingOptions(true);
+
+      // Force map tile re-render after drawing finishes
+      forceMapRedraw();
     };
+
+    // Helper function to force Leaflet to re-render tiles after drawing
+    // This solves the blank/white screen that occurs because pointer event
+    // interception during drawing disrupts Leaflet's tile loading pipeline.
+    const forceMapRedrawFn = () => {
+      const m = mapRef.current;
+      if (!m) return;
+
+      // Schedule multiple re-render attempts with increasing delays
+      // to ensure tiles are fully recovered
+      requestAnimationFrame(() => {
+        m.invalidateSize();
+      });
+      setTimeout(() => {
+        if (mapRef.current) {
+          // Tiny sub-pixel pan forces Leaflet to re-evaluate & reload all tiles
+          mapRef.current.panBy([1, 0], { animate: false });
+          mapRef.current.panBy([-1, 0], { animate: false });
+        }
+      }, 50);
+      setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 200);
+    };
+    forceMapRedrawRef.current = forceMapRedrawFn;
 
     container.addEventListener("pointerdown", handlePointerDown, { passive: false });
     container.addEventListener("pointermove", handlePointerMove, { passive: false });
@@ -243,11 +279,7 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     }
 
     // Force map to recalculate its viewport and redraw tiles after mode change to prevent blank/white states
-    setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-      }
-    }, 100);
+    forceMapRedraw();
   }, [isDrawingMode]);
 
   const handleStartDrawing = () => {
