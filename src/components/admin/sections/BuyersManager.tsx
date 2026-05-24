@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import ZoneSelectorPremium from "./ZoneSelectorPremium";
 import { 
   Users, 
   Search, 
@@ -1016,27 +1017,13 @@ export default function BuyersManager() {
                       )}
                     </div>
                     
-                    {/* Add zone quick dropdown */}
-                    <div className="mt-3 flex gap-2">
-                      <select
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val && !selectedBuyer.preferred_zones?.includes(val)) {
-                            const updatedZones = [...(selectedBuyer.preferred_zones || []), val];
-                            saveMatchingCriteria(selectedBuyer, { preferred_zones: updatedZones });
-                          }
-                          e.target.value = ""; // Reset
-                        }}
-                        className="bg-[#0F172A] border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-300 focus:outline-none focus:border-[#FBBF24] max-w-[200px] cursor-pointer"
-                      >
-                        <option value="">+ Añadir zona de interés</option>
-                        <optgroup label="Sevilla Capital">
-                          {SEVILLA_ZONAS_CAPITAL.filter(z => !selectedBuyer.preferred_zones?.includes(z)).map(z => <option key={z} value={z}>{z}</option>)}
-                        </optgroup>
-                        <optgroup label="Aljarafe / Provincia">
-                          {SEVILLA_ZONAS_PUEBLOS.filter(z => !selectedBuyer.preferred_zones?.includes(z)).map(z => <option key={z} value={z}>{z}</option>)}
-                        </optgroup>
-                      </select>
+                    {/* Premium Zone Selector with Tree, Search & AI Copilot */}
+                    <div className="mt-4 border-t border-white/5 pt-4">
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide mb-2">Asistente de Zonas (Árbol, Buscador y Copilot IA)</span>
+                      <ZoneSelectorPremium
+                        selectedZones={selectedBuyer.preferred_zones || []}
+                        onChange={(updatedZones) => saveMatchingCriteria(selectedBuyer, { preferred_zones: updatedZones })}
+                      />
                     </div>
                   </div>
                 </div>
@@ -1410,54 +1397,10 @@ export default function BuyersManager() {
               {/* Bloque 4: Zonas de Sevilla */}
               <div className="space-y-3 border-t border-white/5 pt-4">
                 <h4 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">4. Barrios y Zonas de Sevilla de Interés</h4>
-                
-                <div className="space-y-3 bg-[#0F172A] p-4 rounded-xl border border-white/5">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Sevilla Capital</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SEVILLA_ZONAS_CAPITAL.map((zone) => {
-                        const active = formPreferredZones.includes(zone);
-                        return (
-                          <button
-                            type="button"
-                            key={zone}
-                            onClick={() => toggleZoneInForm(zone)}
-                            className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                              active 
-                                ? 'bg-[#FBBF24] border-[#FBBF24] text-[#2C3E50] font-bold scale-105' 
-                                : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'
-                            }`}
-                          >
-                            {zone}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-white/5 pt-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-2">Aljarafe / Municipios</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {SEVILLA_ZONAS_PUEBLOS.map((zone) => {
-                        const active = formPreferredZones.includes(zone);
-                        return (
-                          <button
-                            type="button"
-                            key={zone}
-                            onClick={() => toggleZoneInForm(zone)}
-                            className={`text-xs px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                              active 
-                                ? 'bg-[#FBBF24] border-[#FBBF24] text-[#2C3E50] font-bold scale-105' 
-                                : 'bg-white/5 border-white/10 text-slate-300 hover:border-white/20'
-                            }`}
-                          >
-                            {zone}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+                <ZoneSelectorPremium
+                  selectedZones={formPreferredZones}
+                  onChange={setFormPreferredZones}
+                />
               </div>
 
               {/* Form Buttons */}

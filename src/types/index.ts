@@ -193,3 +193,14 @@ export interface RentabilidadResult {
   rentabilidadNeta: number;
   roe: number;
 }
+
+// ─── AI ZONE COPILOT ─────────────────────────────────
+export interface AiZoneCopilotRequest {
+  text: string;
+}
+
+export interface AiZoneCopilotResponse {
+  detected_zones: string[];
+  reasoning: string;
+}
+
