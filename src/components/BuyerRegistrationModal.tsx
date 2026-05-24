@@ -188,6 +188,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
     maxFloorWithoutElevator: "Indiferente",
     paymentMethod: "Hipoteca",
     mortgageStatus: "Necesito estudio",
+    savingsContribution: "", // Aportación de ahorros
     additionalNotes: "",
   });
 
@@ -341,6 +342,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         maxFloorWithoutElevator: formData.propertyType === "Piso" ? formData.maxFloorWithoutElevator : null,
         paymentMethod: formData.paymentMethod,
         mortgageStatus: formData.paymentMethod === "Hipoteca" ? formData.mortgageStatus : null,
+        savingsContribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
         rgpd_accepted: rgpdAccepted,
         rgpd_accepted_at: new Date().toISOString(),
         additionalNotes: formData.additionalNotes || null,
@@ -406,7 +408,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
             property_type: formData.propertyType,
             preferred_zones: preferredZones,
             funding_type: formData.paymentMethod,
-            savings_contribution: formData.paymentMethod === "Al contado" ? Number(formData.maxPrice) : 0,
+            savings_contribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
             status: "Búsqueda activa",
             updated_at: new Date().toISOString(),
             last_activity_at: new Date().toISOString()
@@ -414,6 +416,22 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
           .eq("id", existingBuyers[0].id);
 
         if (updateBuyerError) throw updateBuyerError;
+
+        // Inyecta un hito de actualización en la tabla buyer_activity_logs para dejar constancia de los comentarios
+        const { error: logUpdateError } = await supabase
+          .from("buyer_activity_logs")
+          .insert([
+            {
+              buyer_id: existingBuyers[0].id,
+              event_type: 'IA WhatsApp',
+              title: 'Actualización de perfil online',
+              notes: 'El comprador ha actualizado sus preferencias desde la web pública.\nPreferencia en zonas: ' + preferredZones.join(', ') + (formData.additionalNotes ? '\n\nComentario del comprador:\n' + formData.additionalNotes : ''),
+              event_date: new Date().toISOString()
+            }
+          ]);
+        if (logUpdateError) {
+          console.error("Error creating buyer activity update log:", logUpdateError);
+        }
       } else {
         // Si no existe, insértalo con los mismos campos y añade min_budget = 0, min_sqm = 0, created_at = new Date().toISOString()
         const { data: newBuyer, error: insertBuyerError } = await supabase
@@ -431,7 +449,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
               property_type: formData.propertyType,
               preferred_zones: preferredZones,
               funding_type: formData.paymentMethod,
-              savings_contribution: formData.paymentMethod === "Al contado" ? Number(formData.maxPrice) : 0,
+              savings_contribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
               status: "Búsqueda activa",
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -452,7 +470,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                 buyer_id: newBuyer.id,
                 event_type: 'IA WhatsApp',
                 title: 'Registro público online',
-                notes: 'Se ha registrado de forma autónoma desde la web pública con preferencia en zonas: ' + preferredZones.join(', '),
+                notes: 'Se ha registrado de forma autónoma desde la web pública con preferencia en zonas: ' + preferredZones.join(', ') + (formData.additionalNotes ? '\n\nComentario del comprador:\n' + formData.additionalNotes : ''),
                 event_date: new Date().toISOString()
               }
             ]);
@@ -883,31 +901,46 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                   </div>
 
                   {formData.paymentMethod === "Hipoteca" && (
-                    <div className="space-y-2 animate-fadeIn">
-                      <label className="text-sm font-semibold text-slate-700">Estado de tu hipoteca</label>
-                      <div className="flex flex-col gap-3">
-                        <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-slate-800 bg-white">
-                          <input 
-                            type="radio" 
-                            name="mortgageStatus"
-                            value="Preconcedida"
-                            checked={formData.mortgageStatus === "Preconcedida"}
-                            onChange={handleChange}
-                            className="text-[#FBBF24] focus:ring-[#FBBF24] w-5 h-5"
-                          />
-                          <span className="ml-3 font-medium">La tengo preconcedida</span>
-                        </label>
-                        <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-slate-800 bg-white">
-                          <input 
-                            type="radio" 
-                            name="mortgageStatus"
-                            value="Necesito estudio"
-                            checked={formData.mortgageStatus === "Necesito estudio"}
-                            onChange={handleChange}
-                            className="text-[#FBBF24] focus:ring-[#FBBF24] w-5 h-5"
-                          />
-                          <span className="ml-3 font-medium">Necesito que me hagan un estudio / buscar hipoteca</span>
-                        </label>
+                    <div className="space-y-5 animate-fadeIn">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Aportación de ahorros propia (€)</label>
+                        <input
+                          type="number"
+                          name="savingsContribution"
+                          placeholder="Ej: 35000"
+                          value={formData.savingsContribution}
+                          onChange={handleChange}
+                          className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-500 italic">Indica con qué importe de fondos propios cuentas (para la entrada inicial y gastos aproximados del 10%-12%).</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Estado de tu hipoteca</label>
+                        <div className="flex flex-col gap-3">
+                          <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-slate-800 bg-white">
+                            <input 
+                              type="radio" 
+                              name="mortgageStatus"
+                              value="Preconcedida"
+                              checked={formData.mortgageStatus === "Preconcedida"}
+                              onChange={handleChange}
+                              className="text-[#FBBF24] focus:ring-[#FBBF24] w-5 h-5"
+                            />
+                            <span className="ml-3 font-medium">La tengo preconcedida</span>
+                          </label>
+                          <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-slate-800 bg-white">
+                            <input 
+                              type="radio" 
+                              name="mortgageStatus"
+                              value="Necesito estudio"
+                              checked={formData.mortgageStatus === "Necesito estudio"}
+                              onChange={handleChange}
+                              className="text-[#FBBF24] focus:ring-[#FBBF24] w-5 h-5"
+                            />
+                            <span className="ml-3 font-medium">Necesito que me hagan un estudio / buscar hipoteca</span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   )}

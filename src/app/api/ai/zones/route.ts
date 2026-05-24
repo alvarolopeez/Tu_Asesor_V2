@@ -67,6 +67,33 @@ Pueblos del Aljarafe / Provincia:
 - "Dos Hermanas - Montequinto / Arco Norte"
 - "Dos Hermanas - Condequinto (Urbanización)"
 - "Dos Hermanas - Entrenúcleos"
+- "Gines - Gines Centro / Casco Antiguo"
+- "Gines - Las Brisas"
+- "Gines - Urbanización El Prado"
+- "Gines - Europa / La Florida"
+- "Castilleja de la Cuesta - Castilleja Centro"
+- "Castilleja de la Cuesta - Nueva Sevilla"
+- "Castilleja de la Cuesta - El Faro / Real de la Alhambra"
+- "San Juan de Aznalfarache - Barrio Bajo / Parada de Metro"
+- "San Juan de Aznalfarache - Barrio Alto"
+- "San Juan de Aznalfarache - Valparaíso / Real Club de Golf"
+- "Espartinas - Espartinas Centro"
+- "Espartinas - Cerro del Viento"
+- "Espartinas - Urbanización El Retiro"
+- "Espartinas - Las Solanas"
+- "Alcalá de Guadaíra - Alcalá Centro"
+- "Alcalá de Guadaíra - Campo de las Beatas"
+- "Alcalá de Guadaíra - Silos / La Rinconada"
+- "Alcalá de Guadaíra - La Nogalera"
+- "La Rinconada - San José de la Rinconada Centro"
+- "La Rinconada - La Rinconada Centro"
+- "La Rinconada - El Mirador / La Paz"
+- "Utrera - Utrera Centro"
+- "Utrera - Consolación"
+- "Utrera - La Mulata / Naranjal de Castillo"
+- "Mairena del Alcor / El Viso - Mairena del Alcor Centro"
+- "Mairena del Alcor / El Viso - El Viso del Alcor Centro"
+- "Mairena del Alcor / El Viso - Urbanizaciones / Los Alcores"
 `;
 
 const SYSTEM_INSTRUCTION = `
@@ -332,6 +359,46 @@ function localKeywordDetector(text: string) {
       keywords: ['entrenucleos', 'entrenúcleos'],
       zoneId: 'Dos Hermanas - Entrenúcleos',
       reason: 'zona vanguardista de Entrenúcleos'
+    },
+    {
+      keywords: ['gines', 'casco antiguo gines', 'el prado gines', 'las brisas gines'],
+      zoneId: 'Gines - Gines Centro / Casco Antiguo',
+      reason: 'municipio de Gines o sus urbanizaciones'
+    },
+    {
+      keywords: ['castilleja', 'nueva sevilla', 'el faro castilleja'],
+      zoneId: 'Castilleja de la Cuesta - Castilleja Centro',
+      reason: 'municipio de Castilleja de la Cuesta'
+    },
+    {
+      keywords: ['san juan de aznalfarache', 'san juan bajo', 'san juan alto', 'valparaiso san juan', 'valparaíso san juan'],
+      zoneId: 'San Juan de Aznalfarache - Barrio Alto',
+      reason: 'municipio de San Juan de Aznalfarache'
+    },
+    {
+      keywords: ['espartinas', 'cerro del viento espartinas', 'el retiro espartinas'],
+      zoneId: 'Espartinas - Espartinas Centro',
+      reason: 'municipio de Espartinas'
+    },
+    {
+      keywords: ['alcala de guadaira', 'alcalá de guadaira', 'alcala de guadaíra', 'alcalá de guadaíra', 'silos alcala', 'campo de las beatas'],
+      zoneId: 'Alcalá de Guadaíra - Alcalá Centro',
+      reason: 'municipio de Alcalá de Guadaíra'
+    },
+    {
+      keywords: ['rinconada', 'san jose de la rinconada', 'san josé de la rinconada'],
+      zoneId: 'La Rinconada - San José de la Rinconada Centro',
+      reason: 'municipio de La Rinconada'
+    },
+    {
+      keywords: ['utrera', 'consolacion utrera', 'la mulata utrera'],
+      zoneId: 'Utrera - Utrera Centro',
+      reason: 'municipio de Utrera'
+    },
+    {
+      keywords: ['mairena del alcor', 'el viso del alcor', 'los alcores'],
+      zoneId: 'Mairena del Alcor / El Viso - Mairena del Alcor Centro',
+      reason: 'zona de Los Alcores (Mairena o El Viso)'
     }
   ];
 

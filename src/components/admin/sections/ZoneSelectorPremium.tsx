@@ -149,6 +149,81 @@ export const SEVILLA_TAXONOMY: Record<string, SevillaTaxonomyData> = {
       "Condequinto (Urbanización)",
       "Entrenúcleos"
     ]
+  },
+  "Gines": {
+    label: "Gines",
+    isCapital: false,
+    barrios: [
+      "Gines Centro / Casco Antiguo",
+      "Las Brisas",
+      "Urbanización El Prado",
+      "Europa / La Florida"
+    ]
+  },
+  "Castilleja de la Cuesta": {
+    label: "Castilleja de la Cuesta",
+    isCapital: false,
+    barrios: [
+      "Castilleja Centro",
+      "Nueva Sevilla",
+      "El Faro / Real de la Alhambra"
+    ]
+  },
+  "San Juan de Aznalfarache": {
+    label: "San Juan de Aznalfarache",
+    isCapital: false,
+    barrios: [
+      "Barrio Bajo / Parada de Metro",
+      "Barrio Alto",
+      "Valparaíso / Real Club de Golf"
+    ]
+  },
+  "Espartinas": {
+    label: "Espartinas",
+    isCapital: false,
+    barrios: [
+      "Espartinas Centro",
+      "Cerro del Viento",
+      "Urbanización El Retiro",
+      "Las Solanas"
+    ]
+  },
+  "Alcalá de Guadaíra": {
+    label: "Alcalá de Guadaíra",
+    isCapital: false,
+    barrios: [
+      "Alcalá Centro",
+      "Campo de las Beatas",
+      "Silos / La Rinconada",
+      "La Nogalera"
+    ]
+  },
+  "La Rinconada": {
+    label: "La Rinconada / San José",
+    isCapital: false,
+    barrios: [
+      "San José de la Rinconada Centro",
+      "La Rinconada Centro",
+      "El Mirador / La Paz"
+    ]
+  },
+  "Utrera": {
+    label: "Utrera",
+    isCapital: false,
+    barrios: [
+      "Utrera Centro",
+      "Consolación",
+      "La Mulata / Naranjal de Castillo"
+    ]
+  },
+  "Mairena del Alcor / El Viso": {
+    label: "Mairena del Alcor / El Viso",
+    isCapital: false,
+    barrios: [
+      "Mairena del Alcor Centro",
+      "El Viso del Alcor Centro",
+      "Urbanizaciones / Los Alcores"
+    ]
   }
 };
 
@@ -267,10 +342,17 @@ export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSel
     setAiProposedZones([]);
 
     try {
+      // Get the Supabase access token for API authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       // Safe POST call under dynamic server authentication check
       const response = await fetch("/api/ai/zones", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token || ''}`
+        },
         body: JSON.stringify({ text: userText }),
       });
 
