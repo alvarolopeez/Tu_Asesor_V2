@@ -65,6 +65,11 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     polygonLayerGroupRef.current = polygonGroup;
     mapRef.current = map;
 
+    // Fix map loading gray/white inside modal by invalidating size after render
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 150);
+
     // Pointer gesture event listeners for freehand drawing
     const container = mapContainerRef.current;
 

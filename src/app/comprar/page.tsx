@@ -438,7 +438,8 @@ export default function ComprarPage() {
               return (
                 <div 
                   key={p.id}
-                  className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] flex flex-col group"
+                  onClick={() => setSelectedProperty(p)}
+                  className="glass-effect bg-[#1E293B]/70 border border-white/5 backdrop-blur-md rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] flex flex-col group cursor-pointer hover:border-[#FBBF24]/30"
                 >
                   {/* Foto con Hover */}
                   <div className="relative h-60 w-full overflow-hidden bg-slate-800">
@@ -492,12 +493,11 @@ export default function ComprarPage() {
 
                     {/* CTA */}
                     <div className="mt-auto">
-                      <button 
-                        onClick={() => setSelectedProperty(p)}
-                        className="w-full bg-white/5 border border-white/20 text-white font-bold py-3 rounded-xl transition-all duration-300 group-hover:bg-[#FBBF24] group-hover:text-[#2C3E50] group-hover:border-[#FBBF24] text-center block"
+                      <div 
+                        className="w-full bg-white/5 border border-white/20 text-white font-bold py-3 rounded-xl transition-all duration-300 group-hover:bg-[#FBBF24] group-hover:text-[#2C3E50] group-hover:border-[#FBBF24] text-center block text-sm"
                       >
-                        Ver Ficha Completa
-                      </button>
+                        Ver Detalle Completo
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -508,132 +508,143 @@ export default function ComprarPage() {
 
       </div>
 
-      {/* Modal Premium de Detalle */}
+      {/* Fullscreen Premium Detail View */}
       {selectedProperty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-5xl my-8 bg-[#1E293B]/95 border border-white/10 rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 backdrop-blur-xl">
-            
-            {/* Botón Cerrar */}
+        <div className="fixed inset-0 z-50 bg-[#0f172a] overflow-y-auto flex flex-col animate-fadeIn">
+          {/* Navigation Bar */}
+          <div className="sticky top-0 z-50 bg-[#0f172a]/90 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between">
             <button 
               onClick={() => setSelectedProperty(null)}
-              aria-label="Cerrar ficha"
-              className="absolute top-4 right-4 z-10 bg-black/40 hover:bg-black/60 text-white p-2 rounded-full transition-colors border border-white/10"
+              className="flex items-center gap-2 text-slate-300 hover:text-[#FBBF24] font-semibold transition-colors text-sm group"
             >
-              <X size={20} />
+              <ChevronLeft size={20} className="transition-transform group-hover:-translate-x-1" />
+              Volver al catálogo
             </button>
+            <div className="hidden sm:block text-slate-400 text-xs font-medium">
+              Inmueble Ref: {selectedProperty.id.substring(0, 8).toUpperCase()}
+            </div>
+          </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2">
+          <div className="flex-grow container mx-auto px-4 py-8 max-w-7xl">
+            <div className="flex flex-col lg:flex-row gap-8">
               
-              {/* Columna Izquierda: Galería e Información */}
-              <div className="p-6 md:p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10">
-                <div>
-                  {/* Carrusel de Imágenes */}
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-slate-800 mb-6 shadow-inner group">
-                    <img 
-                      src={selectedProperty.images && selectedProperty.images.length > 0 ? selectedProperty.images[activeImageIdx] : fallbackImage} 
-                      alt={selectedProperty.title} 
-                      className="w-full h-full object-cover"
-                    />
-                    
-                    {/* Controles de Navegación si hay más de 1 imagen */}
-                    {selectedProperty.images && selectedProperty.images.length > 1 && (
-                      <>
-                        <button 
-                          onClick={() => setActiveImageIdx(prev => prev === 0 ? selectedProperty.images.length - 1 : prev - 1)}
-                          aria-label="Imagen anterior"
-                          className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 p-1.5 rounded-full text-white transition-colors"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                        <button 
-                          onClick={() => setActiveImageIdx(prev => prev === selectedProperty.images.length - 1 ? 0 : prev + 1)}
-                          aria-label="Siguiente imagen"
-                          className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/75 p-1.5 rounded-full text-white transition-colors"
-                        >
-                          <ChevronRight size={20} />
-                        </button>
-                        
-                        {/* Indicador de posición */}
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/50 px-2.5 py-1 rounded-full text-xs font-semibold">
-                          {activeImageIdx + 1} / {selectedProperty.images.length}
-                        </div>
-                      </>
-                    )}
-                  </div>
+              {/* Columna Izquierda: Galería e Información (65%) */}
+              <div className="w-full lg:w-[65%] space-y-6">
+                
+                {/* Carrusel de Imágenes Premium */}
+                <div className="relative aspect-[21/9] rounded-2xl overflow-hidden bg-slate-800 shadow-2xl group border border-white/5">
+                  <img 
+                    src={selectedProperty.images && selectedProperty.images.length > 0 ? selectedProperty.images[activeImageIdx] : fallbackImage} 
+                    alt={selectedProperty.title} 
+                    className="w-full h-full object-cover transition-transform duration-750 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+                  
+                  {/* Controles de Navegación si hay más de 1 imagen */}
+                  {selectedProperty.images && selectedProperty.images.length > 1 && (
+                    <>
+                      <button 
+                        onClick={() => setActiveImageIdx(prev => prev === 0 ? selectedProperty.images.length - 1 : prev - 1)}
+                        aria-label="Imagen anterior"
+                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#FBBF24] hover:text-[#0f172a] p-2.5 rounded-full text-white transition-all shadow-lg active:scale-95 border border-white/10"
+                      >
+                        <ChevronLeft size={22} />
+                      </button>
+                      <button 
+                        onClick={() => setActiveImageIdx(prev => prev === selectedProperty.images.length - 1 ? 0 : prev + 1)}
+                        aria-label="Siguiente imagen"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-[#FBBF24] hover:text-[#0f172a] p-2.5 rounded-full text-white transition-all shadow-lg active:scale-95 border border-white/10"
+                      >
+                        <ChevronRight size={22} />
+                      </button>
+                      
+                      {/* Indicador de posición premium */}
+                      <div className="absolute bottom-4 left-6 bg-black/60 border border-white/10 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider text-slate-200 backdrop-blur-sm">
+                        {activeImageIdx + 1} / {selectedProperty.images.length} fotos
+                      </div>
+                    </>
+                  )}
+                </div>
 
-                  {/* Título, Zona y Precio */}
-                  <div className="mb-6">
-                    <div className="flex items-center text-slate-400 text-sm gap-1 mb-2">
-                      <MapPin size={16} className="text-[#FBBF24]" />
-                      <span>{selectedDetails?.zona}</span>
+                {/* Título, Zona y Precio */}
+                <div className="bg-[#1E293B]/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center text-slate-400 text-sm gap-1.5">
+                        <MapPin size={16} className="text-[#FBBF24]" />
+                        <span>{selectedDetails?.zona}</span>
+                      </div>
+                      <h2 className="text-3xl font-extrabold tracking-tight text-white font-heading">
+                        {selectedProperty.title}
+                      </h2>
                     </div>
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 font-heading">
-                      {selectedProperty.title}
-                    </h2>
-                    <div className="text-3xl font-extrabold text-[#FBBF24]">
+                    <div className="text-4xl font-black text-[#FBBF24] drop-shadow-md">
                       {selectedProperty.price.toLocaleString('es-ES')} €
                     </div>
                   </div>
 
-                  {/* Ficha de Specs */}
-                  <div className="grid grid-cols-3 gap-4 p-4 rounded-xl bg-white/5 border border-white/5 text-center mb-6 text-sm">
-                    <div>
+                  {/* Ficha de specs en tarjetas de cristal */}
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/5">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center backdrop-blur-md hover:bg-white/10 transition-colors">
                       <div className="text-slate-400 text-xs mb-1">Dormitorios</div>
-                      <div className="font-bold flex items-center justify-center gap-1">
-                        <BedDouble size={16} className="text-[#FBBF24]" />
+                      <div className="text-lg font-black flex items-center justify-center gap-1.5 text-white">
+                        <BedDouble size={20} className="text-[#FBBF24]" />
                         {selectedDetails?.rooms}
                       </div>
                     </div>
-                    <div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center backdrop-blur-md hover:bg-white/10 transition-colors">
                       <div className="text-slate-400 text-xs mb-1">Baños</div>
-                      <div className="font-bold flex items-center justify-center gap-1">
-                        <Bath size={16} className="text-[#FBBF24]" />
+                      <div className="text-lg font-black flex items-center justify-center gap-1.5 text-white">
+                        <Bath size={20} className="text-[#FBBF24]" />
                         {selectedDetails?.baths}
                       </div>
                     </div>
-                    <div>
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-center backdrop-blur-md hover:bg-white/10 transition-colors">
                       <div className="text-slate-400 text-xs mb-1">Superficie</div>
-                      <div className="font-bold flex items-center justify-center gap-1">
-                        <Ruler size={16} className="text-[#FBBF24]" />
+                      <div className="text-lg font-black flex items-center justify-center gap-1.5 text-white">
+                        <Ruler size={20} className="text-[#FBBF24]" />
                         {selectedDetails?.sqm} m²
                       </div>
                     </div>
                   </div>
-
-                  {/* Descripción */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-[#FBBF24] mb-2 uppercase tracking-wider">Descripción</h4>
-                    <p className="text-slate-300 text-sm leading-relaxed max-h-48 overflow-y-auto pr-2">
-                      {selectedProperty.description || "Precioso inmueble cuidadosamente seleccionado. Cuenta con excelentes características y ubicación. Contáctanos directamente para recibir la ficha completa del inmueble."}
-                    </p>
-                  </div>
                 </div>
 
-                {/* WhatsApp Direct */}
-                <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
-                  <div className="text-xs text-slate-400">
-                    ¿Quieres recibir más fotos o plano técnico?
+                {/* Descripción limpia */}
+                <div className="bg-[#1E293B]/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm space-y-4">
+                  <h3 className="text-lg font-bold text-[#FBBF24] border-b border-white/5 pb-2">Descripción del inmueble</h3>
+                  <p className="text-slate-300 text-base leading-relaxed whitespace-pre-line">
+                    {selectedProperty.description || "Precioso inmueble cuidadosamente seleccionado. Cuenta con excelentes características y ubicación. Contáctanos directamente para recibir la ficha completa del inmueble."}
+                  </p>
+                </div>
+
+                {/* WhatsApp Directo con Álvaro */}
+                <div className="bg-[#1E293B]/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="text-center sm:text-left">
+                    <h4 className="text-white font-bold text-sm">¿Deseas recibir más información técnica?</h4>
+                    <p className="text-xs text-slate-400">Te enviaremos planos detallados, fotos adicionales y resolvemos tus dudas al instante.</p>
                   </div>
                   <a 
                     href={BUSINESS.whatsappUrl(`Hola Álvaro, estoy interesado en el inmueble "${selectedProperty.title}" (${selectedProperty.price.toLocaleString('es-ES')}€).`)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-xs"
+                    className="w-full sm:w-auto bg-[#25D366] hover:bg-[#128C7E] text-white font-bold px-8 py-4 rounded-xl transition-all duration-300 text-center flex items-center justify-center gap-3 shadow-[0_4px_20px_rgba(37,211,102,0.3)] hover:scale-[1.03]"
                   >
-                    <Phone size={14} /> WhatsApp Directo
+                    <Phone size={18} />
+                    <span>WhatsApp Directo con Álvaro</span>
                   </a>
                 </div>
+
               </div>
 
-              {/* Columna Derecha: Sistema de Agendamiento Online */}
-              <div className="p-6 md:p-8 bg-black/25 flex flex-col justify-between">
+              {/* Columna Derecha: Panel Glassmorphic Agendamiento (35%) */}
+              <div className="w-full lg:w-[35%] bg-[#1E293B]/60 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl flex flex-col justify-between self-start sticky top-24">
                 
                 {/* Cabecera Agendador */}
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2 font-heading">
                     <Calendar className="text-[#FBBF24]" size={22} /> Reserva de Visita Online
                   </h3>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <p className="text-xs text-slate-300 leading-relaxed">
                     Agenda una visita en tiempo real de forma 100% online y gratuita. Tu asesor se pondrá en contacto para confirmar los detalles.
                   </p>
                 </div>
@@ -642,7 +653,7 @@ export default function ComprarPage() {
                 {!((selectedProperty.features as PropertyFeatures)?.is_visitable_online === true || (selectedProperty.features as PropertyFeatures)?.visitable_slots?.active === true) ? (
                   /* Caso No Visitable Online */
                   <div className="py-8 text-center bg-white/5 border border-white/5 rounded-2xl px-4 flex flex-col items-center justify-center h-full">
-                    <AlertCircle size={40} className="text-[#FBBF24] mb-3" />
+                    <AlertCircle size={40} className="text-[#FBBF24] mb-3 animate-pulse" />
                     <h4 className="text-sm font-semibold text-white mb-2">Agenda por WhatsApp</h4>
                     <p className="text-xs text-slate-300 mb-6 leading-relaxed max-w-xs">
                       Este inmueble tiene un calendario especial. Agenda directamente por mensaje y nos adaptaremos totalmente a tu horario.
@@ -651,7 +662,7 @@ export default function ComprarPage() {
                       href={BUSINESS.whatsappUrl(`Hola Álvaro, quiero concertar una visita para el inmueble: "${selectedProperty.title}".`)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="bg-[#FBBF24] text-[#2C3E50] font-bold px-6 py-2.5 rounded-xl text-xs hover:scale-105 transition-all flex items-center gap-2"
+                      className="w-full bg-[#FBBF24] text-[#2C3E50] font-bold px-6 py-3.5 rounded-xl text-xs hover:scale-[1.02] transition-all flex items-center justify-center gap-2 shadow-lg"
                     >
                       <Phone size={14} /> Concertar Visita por WhatsApp
                     </a>
@@ -676,12 +687,12 @@ export default function ComprarPage() {
                   </div>
                 ) : (
                   /* Agendamiento Paso a Paso */
-                  <form onSubmit={handleBookAppointment} className="flex-grow flex flex-col justify-between">
+                  <form onSubmit={handleBookAppointment} className="flex-grow flex flex-col justify-between space-y-5">
                     <div>
                       {/* 1. Selección de Día */}
-                      <div className="mb-6">
+                      <div className="mb-4">
                         <label className="block text-xs font-semibold uppercase text-slate-400 mb-2">1. Selecciona el día</label>
-                        <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                        <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
                           {calendarDays.map((d) => (
                             <button
                               key={d.isoString}
@@ -707,7 +718,7 @@ export default function ComprarPage() {
                       </div>
 
                       {/* 2. Selección de Hora */}
-                      <div className="mb-6">
+                      <div className="mb-4">
                         <label className="block text-xs font-semibold uppercase text-slate-400 mb-2">2. Selecciona la hora</label>
                         {!selectedDay ? (
                           <div className="text-xs text-slate-500 bg-white/5 border border-white/5 p-3 rounded-xl text-center">
@@ -749,7 +760,7 @@ export default function ComprarPage() {
                             placeholder="Nombre completo"
                             value={bookingName}
                             onChange={(e) => setBookingName(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-xs"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-xs"
                           />
                         </div>
 
@@ -761,7 +772,7 @@ export default function ComprarPage() {
                             placeholder="Teléfono móvil"
                             value={bookingPhone}
                             onChange={(e) => setBookingPhone(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-xs"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-xs"
                           />
                         </div>
 
@@ -772,7 +783,7 @@ export default function ComprarPage() {
                             placeholder="Email (opcional)"
                             value={bookingEmail}
                             onChange={(e) => setBookingEmail(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-xs"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#FBBF24] text-xs"
                           />
                         </div>
 
@@ -789,9 +800,9 @@ export default function ComprarPage() {
                     </div>
 
                     {/* Botón y Errores */}
-                    <div className="mt-6">
+                    <div className="mt-4">
                       {bookingError && (
-                        <div className="mb-3 text-xs text-rose-400 bg-rose-400/5 border border-rose-400/10 p-2.5 rounded-xl text-center">
+                        <div className="mb-3 text-xs text-rose-400 bg-rose-400/5 border border-rose-400/10 p-2.5 rounded-xl text-center font-medium">
                           {bookingError}
                         </div>
                       )}
@@ -799,7 +810,7 @@ export default function ComprarPage() {
                       <button
                         type="submit"
                         disabled={!selectedDay || !selectedSlot || bookingLoading}
-                        className="w-full bg-[#FBBF24] disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-[#2C3E50] font-bold py-3.5 rounded-xl transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-wider flex items-center justify-center gap-2"
+                        className="w-full bg-[#FBBF24] disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-[#2C3E50] font-black py-4 rounded-xl transition-all hover:scale-[1.02] active:scale-95 text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10"
                       >
                         {bookingLoading ? (
                           <>
@@ -819,7 +830,6 @@ export default function ComprarPage() {
               </div>
 
             </div>
-
           </div>
         </div>
       )}

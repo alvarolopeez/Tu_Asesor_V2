@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, ChevronRight, ChevronLeft, Check, Home, MapPin, Calculator, CreditCard } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import dynamic from "next/dynamic";
+import { VALIDATION } from "@/lib/constants";
 
 const BuyerMap = dynamic(() => import("./BuyerMap"), { ssr: false });
 
@@ -20,6 +21,9 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
   const [polygons, setPolygons] = useState<[number, number][][]>([]);
   const [inputMode, setInputMode] = useState<'draw' | 'type'>('draw');
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [rgpdAccepted, setRgpdAccepted] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -39,8 +43,106 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
 
   if (!isOpen) return null;
 
+  const validateField = (name: string, value: string): string => {
+    let errorMsg = "";
+    if (name === "firstName") {
+      const val = value.trim();
+      if (!val) {
+        errorMsg = "El nombre es obligatorio";
+      } else if (val.length < 2) {
+        errorMsg = "El nombre debe tener al menos 2 caracteres";
+      }
+    } else if (name === "phone") {
+      const cleanPhone = value.trim().replace(/\s+/g, '');
+      if (!cleanPhone) {
+        errorMsg = "El teléfono es obligatorio";
+      } else if (!VALIDATION.phone.regex.test(cleanPhone)) {
+        errorMsg = VALIDATION.phone.message;
+      }
+    } else if (name === "email") {
+      const val = value.trim();
+      if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        errorMsg = "Introduce un correo electrónico válido";
+      }
+    } else if (name === "location") {
+      if (inputMode === "type" && !value.trim()) {
+        errorMsg = "La ubicación es obligatoria";
+      }
+    } else if (name === "maxPrice") {
+      const num = Number(value);
+      if (!value) {
+        errorMsg = "El precio es obligatorio";
+      } else if (isNaN(num) || num <= 0) {
+        errorMsg = "El precio debe ser un número positivo mayor que 0";
+      }
+    }
+    return errorMsg;
+  };
+
+  const validateStep = (currentStep: number): boolean => {
+    const newErrors: Record<string, string> = { ...errors };
+    const newTouched = { ...touched };
+
+    if (currentStep === 1) {
+      const nameErr = validateField("firstName", formData.firstName);
+      if (nameErr) newErrors.firstName = nameErr; else delete newErrors.firstName;
+      
+      const phoneErr = validateField("phone", formData.phone);
+      if (phoneErr) newErrors.phone = phoneErr; else delete newErrors.phone;
+      
+      const emailErr = validateField("email", formData.email);
+      if (emailErr) newErrors.email = emailErr; else delete newErrors.email;
+
+      if (!rgpdAccepted) {
+        newErrors.rgpd = "Debes aceptar el consentimiento de RGPD para continuar";
+      } else {
+        delete newErrors.rgpd;
+      }
+
+      newTouched.firstName = true;
+      newTouched.phone = true;
+      newTouched.email = true;
+      newTouched.rgpd = true;
+    } else if (currentStep === 2) {
+      if (inputMode === "type") {
+        const locErr = validateField("location", formData.location);
+        if (locErr) newErrors.location = locErr; else delete newErrors.location;
+        delete newErrors.map;
+      } else {
+        if (polygons.length === 0) {
+          newErrors.map = "Debes delimitar al menos una zona en el mapa para continuar";
+        } else {
+          delete newErrors.map;
+        }
+        delete newErrors.location;
+      }
+      newTouched.location = true;
+      newTouched.map = true;
+    } else if (currentStep === 3) {
+      const priceErr = validateField("maxPrice", formData.maxPrice);
+      if (priceErr) newErrors.maxPrice = priceErr; else delete newErrors.maxPrice;
+
+      newTouched.maxPrice = true;
+    }
+
+    setErrors(newErrors);
+    setTouched(newTouched);
+
+    if (currentStep === 1) {
+      return !newErrors.firstName && !newErrors.phone && !newErrors.email && !newErrors.rgpd;
+    } else if (currentStep === 2) {
+      return inputMode === "type" ? !newErrors.location : !newErrors.map;
+    } else if (currentStep === 3) {
+      return !newErrors.maxPrice;
+    }
+
+    return true;
+  };
+
   const handleNext = () => {
-    if (step < 4) setStep(step + 1);
+    if (validateStep(step)) {
+      if (step < 4) setStep(step + 1);
+    }
   };
 
   const handlePrev = () => {
@@ -50,9 +152,20 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    if (touched[name]) {
+      const err = validateField(name, value);
+      setErrors((prev) => ({ ...prev, [name]: err }));
+    }
   };
 
   const handleSubmit = async () => {
+    // Validate all steps before submitting
+    if (!validateStep(1) || !validateStep(2) || !validateStep(3)) {
+      setError("Por favor, corrige los errores en los pasos anteriores antes de enviar.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -73,6 +186,8 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         maxFloorWithoutElevator: formData.propertyType === "Piso" ? formData.maxFloorWithoutElevator : null,
         paymentMethod: formData.paymentMethod,
         mortgageStatus: formData.paymentMethod === "Hipoteca" ? formData.mortgageStatus : null,
+        rgpd_accepted: rgpdAccepted,
+        rgpd_accepted_at: new Date().toISOString(),
       };
 
       // Check for existing lead by phone to prevent duplicates
@@ -197,9 +312,13 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="firstName"
                       value={formData.firstName}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all"
+                      onBlur={() => setTouched((prev) => ({ ...prev, firstName: true }))}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                       placeholder="Tu nombre"
                     />
+                    {touched.firstName && errors.firstName && (
+                      <p className="text-xs text-red-500 font-semibold">{errors.firstName}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Apellidos</label>
@@ -208,7 +327,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="lastName"
                       value={formData.lastName}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all"
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                       placeholder="Tus apellidos"
                     />
                   </div>
@@ -219,9 +338,13 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all"
+                      onBlur={() => setTouched((prev) => ({ ...prev, phone: true }))}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                       placeholder="Tu móvil (para WhatsApp)"
                     />
+                    {touched.phone && errors.phone && (
+                      <p className="text-xs text-red-500 font-semibold">{errors.phone}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Email</label>
@@ -230,9 +353,37 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all"
+                      onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                       placeholder="tucorreo@ejemplo.com"
                     />
+                    {touched.email && errors.email && (
+                      <p className="text-xs text-red-500 font-semibold">{errors.email}</p>
+                    )}
+                  </div>
+
+                  {/* RGPD Consent Checkbox */}
+                  <div className="space-y-2 sm:col-span-2 mt-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={rgpdAccepted}
+                        onChange={(e) => {
+                          setRgpdAccepted(e.target.checked);
+                          if (touched.rgpd) {
+                            setErrors((prev) => ({ ...prev, rgpd: e.target.checked ? "" : "Debes aceptar el consentimiento de RGPD para continuar" }));
+                          }
+                        }}
+                        onBlur={() => setTouched((prev) => ({ ...prev, rgpd: true }))}
+                        className="mt-1 text-[#FBBF24] focus:ring-[#FBBF24] rounded border-slate-300 w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-xs text-slate-600 leading-tight">
+                        Acepto la <a href="/politica-privacidad" target="_blank" className="text-[#0f172a] hover:underline font-semibold">Política de Privacidad</a> y consiento que me contacten por WhatsApp o correo electrónico para enviarme alertas de viviendas que coincidan con mis preferencias. *
+                      </span>
+                    </label>
+                    {touched.rgpd && errors.rgpd && (
+                      <p className="text-xs text-red-500 font-semibold mt-1">{errors.rgpd}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -308,6 +459,10 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                         </div>
                       )}
 
+                      {touched.map && errors.map && (
+                        <p className="text-xs text-red-500 font-semibold">{errors.map}</p>
+                      )}
+
                       <div>
                         <button
                           type="button"
@@ -324,7 +479,12 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       {/* Fullscreen Map Portal */}
                       <BuyerMap 
                         polygons={polygons} 
-                        onChange={setPolygons} 
+                        onChange={(newPolygons) => {
+                          setPolygons(newPolygons);
+                          if (newPolygons.length > 0) {
+                            setErrors((prev) => ({ ...prev, map: "" }));
+                          }
+                        }} 
                         isOpen={isMapOpen} 
                         onClose={() => setIsMapOpen(false)} 
                       />
@@ -336,10 +496,14 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                         name="location"
                         value={formData.location}
                         onChange={handleChange}
+                        onBlur={() => setTouched((prev) => ({ ...prev, location: true }))}
                         rows={3}
-                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all resize-none text-sm placeholder:text-slate-400"
+                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all resize-none text-sm placeholder:text-slate-400 text-slate-800 bg-white"
                         placeholder="Ej: Triana, Los Remedios, Nervión..."
                       />
+                      {touched.location && errors.location && (
+                        <p className="text-xs text-red-500 font-semibold">{errors.location}</p>
+                      )}
                     </div>
                   )}
 
@@ -349,7 +513,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="propertyType"
                       value={formData.propertyType}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all bg-white"
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                     >
                       <option value="Piso">Piso / Apartamento</option>
                       <option value="Casa">Casa / Chalet</option>
@@ -377,9 +541,13 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="maxPrice"
                       value={formData.maxPrice}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all"
+                      onBlur={() => setTouched((prev) => ({ ...prev, maxPrice: true }))}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                       placeholder="Ej: 150000"
                     />
+                    {touched.maxPrice && errors.maxPrice && (
+                      <p className="text-xs text-red-500 font-semibold">{errors.maxPrice}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-slate-700">Parking</label>
@@ -387,7 +555,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="parking"
                       value={formData.parking}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all bg-white"
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                     >
                       <option value="Indiferente">Indiferente</option>
                       <option value="Imprescindible">Imprescindible</option>
@@ -400,7 +568,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="minRooms"
                       value={formData.minRooms}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all bg-white"
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                     >
                       <option value="1">1 o más</option>
                       <option value="2">2 o más</option>
@@ -414,7 +582,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="minBaths"
                       value={formData.minBaths}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all bg-white"
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                     >
                       <option value="1">1 o más</option>
                       <option value="2">2 o más</option>
@@ -429,7 +597,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                         name="maxFloorWithoutElevator"
                         value={formData.maxFloorWithoutElevator}
                         onChange={handleChange}
-                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all bg-white"
+                        className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                       >
                         <option value="Indiferente">Me da igual (Busco con ascensor seguro)</option>
                         <option value="Bajo">Solo Bajos</option>
@@ -459,7 +627,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       name="paymentMethod"
                       value={formData.paymentMethod}
                       onChange={handleChange}
-                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all bg-white"
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white"
                     >
                       <option value="Hipoteca">Con Hipoteca</option>
                       <option value="Al contado">Al contado</option>
@@ -470,7 +638,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                     <div className="space-y-2 animate-fadeIn">
                       <label className="text-sm font-semibold text-slate-700">Estado de tu hipoteca</label>
                       <div className="flex flex-col gap-3">
-                        <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                        <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-slate-800 bg-white">
                           <input 
                             type="radio" 
                             name="mortgageStatus"
@@ -479,9 +647,9 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                             onChange={handleChange}
                             className="text-[#FBBF24] focus:ring-[#FBBF24] w-5 h-5"
                           />
-                          <span className="ml-3 text-slate-700 font-medium">La tengo preconcedida</span>
+                          <span className="ml-3 font-medium">La tengo preconcedida</span>
                         </label>
-                        <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                        <label className="flex items-center p-4 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors text-slate-800 bg-white">
                           <input 
                             type="radio" 
                             name="mortgageStatus"
@@ -490,7 +658,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                             onChange={handleChange}
                             className="text-[#FBBF24] focus:ring-[#FBBF24] w-5 h-5"
                           />
-                          <span className="ml-3 text-slate-700 font-medium">Necesito que me hagan un estudio / buscar hipoteca</span>
+                          <span className="ml-3 font-medium">Necesito que me hagan un estudio / buscar hipoteca</span>
                         </label>
                       </div>
                     </div>
@@ -520,12 +688,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
             {step < 4 ? (
               <button
                 onClick={handleNext}
-                disabled={
-                  (step === 1 && (!formData.firstName || !formData.phone)) ||
-                  (step === 2 && (inputMode === 'draw' ? polygons.length === 0 : !formData.location.trim())) ||
-                  (step === 3 && !formData.maxPrice)
-                }
-                className="flex items-center bg-[#0f172a] text-white px-8 py-2 rounded-lg font-bold hover:bg-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center bg-[#0f172a] text-white px-8 py-2 rounded-lg font-bold hover:bg-slate-900 transition-all"
               >
                 Siguiente
                 <ChevronRight size={20} className="ml-1" />

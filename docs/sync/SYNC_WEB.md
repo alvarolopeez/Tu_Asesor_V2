@@ -9,6 +9,27 @@ Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO camb
 
 ## ✅ Peticiones Completadas
 
+### 🟡 [2026-05-24] Petición del Director General — Mejoras Premium, Validación y Reestructuraciones Visuales en Catálogo y Formularios
+* **Completado por**: Agente Web
+* **Detalles**:
+  1. **Formulario de Comprador (`BuyerRegistrationModal.tsx` y `BuyerMap.tsx`)**:
+     * Corregidas las letras blancas sobre fondo blanco en todos los inputs, selects y textareas agregando `text-slate-800 bg-white`.
+     * Integrada validación en tiempo real y mensajes de error en rojo debajo de cada input para: Nombre (mínimo 2 caracteres), Teléfono (9-15 dígitos con la regex `VALIDATION.phone.regex`), Email (formato válido opcional), y Precio máximo (mayor que 0).
+     * Añadido checkbox de consentimiento obligatorio de RGPD para WhatsApp/Email en el Paso 1, y guardada la aceptación y hora exacta (`new Date().toISOString()`) en la metadata (`preferences.rgpd_accepted` y `preferences.rgpd_accepted_at`) enviada a Supabase.
+     * Añadido el llamado `map.invalidateSize()` con un `setTimeout` de 150ms en el bloque `useEffect` de inicialización de Leaflet en `BuyerMap.tsx`, solucionando por completo el problema de carga gris/blanco en pantallas modales.
+  2. **Reestructuración de Catálogo (`/comprar/page.tsx`)**:
+     * Se convirtió toda la tarjeta del catálogo de propiedades en clicable (`cursor-pointer hover:border-[#FBBF24]/30`), y se reemplazó el botón de la parte inferior por un indicador visual estático que dice "Ver Detalle Completo".
+     * Rediseñada la visualización de detalle a pantalla completa (`fixed inset-0 z-50 bg-[#0f172a] overflow-y-auto flex flex-col`) con barra superior y botón de navegación "Volver al catálogo" con una transición interactiva elegante.
+     * Estructurado el detalle inmersivo en 2 columnas:
+       * **Izquierda (65%)**: Carrusel premium con indicadores de fotos y controles deslizantes, especificaciones de vivienda con tarjetas de cristal templado, descripción en texto fluido y botón de WhatsApp Directo de color verde brillante (`bg-[#25D366]`).
+       * **Derecha (35%)**: Panel de cristal glassmorphic exclusivo para agendamiento de visitas online en tiempo real, integrando el flujo de reserva con el backend.
+  3. **Banner de Cookies (`CookieConsent.tsx` y `LayoutWrapper.tsx`)**:
+     * Creado un componente flotante `CookieConsent.tsx` en la esquina inferior izquierda con diseño dark-glassmorphic, con animación fluida de entrada y salida mediante transiciones nativas de Tailwind.
+     * Integrado el control persistente con `localStorage` de manera que una vez aceptado o rechazado no vuelve a mostrarse.
+     * Registrado en `LayoutWrapper.tsx` para estar disponible globalmente en toda la web pública.
+  4. **Verificación de Compilación**:
+     * Compilación local (`npm run build`) completada con un éxito rotundo del 100% sin un solo error de TypeScript o Next.js.
+
 ### 🟡 [2026-05-23] Petición del Director General — Eliminación de Widget de Chat Flotante y Redirección de CTA a WhatsApp del Chatbot
 * **Completado por**: Agente Web
 * **Detalles**:
