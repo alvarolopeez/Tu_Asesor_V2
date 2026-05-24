@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Trash2, Undo, MapPin, Check, Pencil, X, Plus } from "lucide-react";
@@ -24,26 +24,23 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
   const [isDrawingGestureActive, setIsDrawingGestureActive] = useState(false);
 
   // Refs for tracking drawing states in event handlers
-  const isDrawingModeRef = useRef(false);
   const isDrawingGestureRef = useRef(false);
   const currentPointsRef = useRef<L.LatLng[]>([]);
   const tempPolylineRef = useRef<L.Polyline | null>(null);
-  const forceMapRedrawRef = useRef<(() => void) | null>(null);
 
-  // Stable function to call forceMapRedraw from state-update callbacks
-  const forceMapRedraw = () => forceMapRedrawRef.current?.();
-
-  // Keep state sync
-  useEffect(() => {
-    isDrawingModeRef.current = isDrawingMode;
-  }, [isDrawingMode]);
+  // Toast helper for small feedback without importing extra libraries
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastError = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 4000);
+  }, []);
 
   // Keep localPolygons updated if initial prop changes (e.g. reset)
   useEffect(() => {
     setLocalPolygons(polygons);
   }, [polygons]);
 
-  // Initialize Map
+  // Initialize Map — NO pointer event listeners here. The map is left completely untouched.
   useEffect(() => {
     if (!isOpen || !mapContainerRef.current || mapRef.current) return;
 
@@ -73,7 +70,6 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     const container = mapContainerRef.current;
 
     // Professional ResizeObserver to handle modal fade-in transition, resizing, and all layout shifts automatically.
-    // This solves the blank map viewport/tile-loading bug comprehensively.
     const resizeObserver = new ResizeObserver(() => {
       if (mapRef.current) {
         mapRef.current.invalidateSize();
@@ -81,125 +77,8 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     });
     resizeObserver.observe(container);
 
-    // Pointer gesture event listeners for freehand drawing
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (!isDrawingModeRef.current || !mapRef.current) return;
-      
-      // Stop Leaflet map dragging and browser gestures
-      e.stopPropagation();
-      e.preventDefault();
-      
-      isDrawingGestureRef.current = true;
-      setIsDrawingGestureActive(true);
-      currentPointsRef.current = [];
-
-      const latlng = mapRef.current.mouseEventToLatLng(e);
-      currentPointsRef.current.push(latlng);
-
-      if (tempPolylineRef.current) {
-        tempPolylineRef.current.remove();
-      }
-
-      tempPolylineRef.current = L.polyline([latlng], {
-        color: "#FBBF24", // Golden-yellow brand color
-        weight: 4,
-        dashArray: "6, 8",
-        lineCap: "round",
-        lineJoin: "round",
-      }).addTo(mapRef.current);
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!isDrawingGestureRef.current || !mapRef.current || !tempPolylineRef.current) return;
-
-      e.stopPropagation();
-      e.preventDefault();
-
-      const latlng = mapRef.current.mouseEventToLatLng(e);
-      const points = currentPointsRef.current;
-      const lastPoint = points[points.length - 1];
-
-      if (lastPoint) {
-        const p1 = mapRef.current.latLngToContainerPoint(lastPoint);
-        const p2 = mapRef.current.latLngToContainerPoint(latlng);
-        const distance = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
-        if (distance < 8) return; // Smooth out points
-      }
-
-      currentPointsRef.current.push(latlng);
-      tempPolylineRef.current.setLatLngs(currentPointsRef.current);
-    };
-
-    const handlePointerUp = (e: PointerEvent) => {
-      if (!isDrawingGestureRef.current || !mapRef.current) return;
-
-      e.stopPropagation();
-      e.preventDefault();
-
-      isDrawingGestureRef.current = false;
-      setIsDrawingGestureActive(false);
-
-      if (tempPolylineRef.current) {
-        tempPolylineRef.current.remove();
-        tempPolylineRef.current = null;
-      }
-
-      const points = currentPointsRef.current;
-      if (points.length < 3) {
-        toastError("El área es muy pequeña. Dibuja un círculo más amplio.");
-        // Force tiles to re-render even on cancelled drawing
-        forceMapRedraw();
-        return;
-      }
-
-      const coords = points.map((p) => [p.lat, p.lng] as [number, number]);
-      
-      setLocalPolygons((prev) => [...prev, coords]);
-      setIsDrawingMode(false);
-      setShowDrawingOptions(true);
-
-      // Force map tile re-render after drawing finishes
-      forceMapRedraw();
-    };
-
-    // Helper function to force Leaflet to re-render tiles after drawing
-    // This solves the blank/white screen that occurs because pointer event
-    // interception during drawing disrupts Leaflet's tile loading pipeline.
-    const forceMapRedrawFn = () => {
-      const m = mapRef.current;
-      if (!m) return;
-
-      // Schedule multiple re-render attempts with increasing delays
-      // to ensure tiles are fully recovered
-      requestAnimationFrame(() => {
-        m.invalidateSize();
-      });
-      setTimeout(() => {
-        if (mapRef.current) {
-          // Tiny sub-pixel pan forces Leaflet to re-evaluate & reload all tiles
-          mapRef.current.panBy([1, 0], { animate: false });
-          mapRef.current.panBy([-1, 0], { animate: false });
-        }
-      }, 50);
-      setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-        }
-      }, 200);
-    };
-    forceMapRedrawRef.current = forceMapRedrawFn;
-
-    container.addEventListener("pointerdown", handlePointerDown, { passive: false });
-    container.addEventListener("pointermove", handlePointerMove, { passive: false });
-    container.addEventListener("pointerup", handlePointerUp, { passive: false });
-
     return () => {
       resizeObserver.disconnect();
-      container.removeEventListener("pointerdown", handlePointerDown);
-      container.removeEventListener("pointermove", handlePointerMove);
-      container.removeEventListener("pointerup", handlePointerUp);
-
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -215,7 +94,7 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
 
     group.clearLayers();
 
-    localPolygons.forEach((poly, index) => {
+    localPolygons.forEach((poly) => {
       const polygon = L.polygon(poly, {
         color: "#D97706", // Amber dark
         fillColor: "#FBBF24", // Golden yellow
@@ -251,7 +130,7 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     }
   }, [localPolygons]);
 
-  // Trigger leaflet map control toggle safely
+  // Disable/enable map interactions based on drawing mode
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -277,10 +156,92 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     } catch (err) {
       console.warn('[BuyerMap] Error toggling map handlers:', err);
     }
-
-    // Force map to recalculate its viewport and redraw tiles after mode change to prevent blank/white states
-    forceMapRedraw();
   }, [isDrawingMode]);
+
+  // ──────────────────────────────────────────────────────────
+  // Drawing overlay handlers
+  // These run on a SEPARATE transparent div that sits ON TOP
+  // of the map. Leaflet's container is never touched, so its
+  // tile loading pipeline is never disrupted.
+  // ──────────────────────────────────────────────────────────
+
+  const handleOverlayPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!mapRef.current) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDrawingGestureRef.current = true;
+    setIsDrawingGestureActive(true);
+    currentPointsRef.current = [];
+
+    // Capture the pointer so move/up events always go to this overlay,
+    // even if the finger/cursor drifts outside the element boundaries.
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+    const latlng = mapRef.current.mouseEventToLatLng(e.nativeEvent as any);
+    currentPointsRef.current.push(latlng);
+
+    if (tempPolylineRef.current) {
+      tempPolylineRef.current.remove();
+    }
+
+    tempPolylineRef.current = L.polyline([latlng], {
+      color: "#FBBF24", // Golden-yellow brand color
+      weight: 4,
+      dashArray: "6, 8",
+      lineCap: "round",
+      lineJoin: "round",
+    }).addTo(mapRef.current);
+  }, []);
+
+  const handleOverlayPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDrawingGestureRef.current || !mapRef.current || !tempPolylineRef.current) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const latlng = mapRef.current.mouseEventToLatLng(e.nativeEvent as any);
+    const points = currentPointsRef.current;
+    const lastPoint = points[points.length - 1];
+
+    if (lastPoint) {
+      const p1 = mapRef.current.latLngToContainerPoint(lastPoint);
+      const p2 = mapRef.current.latLngToContainerPoint(latlng);
+      const distance = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
+      if (distance < 8) return; // Smooth out points
+    }
+
+    currentPointsRef.current.push(latlng);
+    tempPolylineRef.current.setLatLngs(currentPointsRef.current);
+  }, []);
+
+  const handleOverlayPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDrawingGestureRef.current || !mapRef.current) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDrawingGestureRef.current = false;
+    setIsDrawingGestureActive(false);
+
+    if (tempPolylineRef.current) {
+      tempPolylineRef.current.remove();
+      tempPolylineRef.current = null;
+    }
+
+    const points = currentPointsRef.current;
+    if (points.length < 3) {
+      toastError("El área es muy pequeña. Dibuja un círculo más amplio.");
+      return;
+    }
+
+    const coords = points.map((p) => [p.lat, p.lng] as [number, number]);
+    
+    setLocalPolygons((prev) => [...prev, coords]);
+    setIsDrawingMode(false);
+    setShowDrawingOptions(true);
+  }, [toastError]);
 
   const handleStartDrawing = () => {
     setIsDrawingMode(true);
@@ -300,13 +261,6 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
   const handleSave = () => {
     onChange(localPolygons);
     onClose();
-  };
-
-  // Toast helper for small feedback without importing extra libraries
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const toastError = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 4000);
   };
 
   if (!isOpen) return null;
@@ -335,11 +289,27 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
 
       {/* Map Workspace */}
       <div className="relative flex-1 w-full bg-slate-100 overflow-hidden">
-        {/* Leaflet container */}
+        {/* Leaflet container — completely untouched, no event interception */}
         <div 
           ref={mapContainerRef} 
-          className={`w-full h-full z-10 ${isDrawingMode ? "cursor-crosshair touch-none" : "cursor-grab"}`} 
+          className="w-full h-full z-10 cursor-grab" 
         />
+
+        {/* 
+          Drawing overlay — a transparent layer that sits ON TOP of the map 
+          ONLY when the user is in drawing mode. This captures all pointer 
+          events for freehand drawing without interfering with Leaflet's 
+          internal tile loading pipeline.
+        */}
+        {isDrawingMode && (
+          <div
+            className="absolute inset-0 z-[15] cursor-crosshair"
+            style={{ touchAction: "none" }}
+            onPointerDown={handleOverlayPointerDown}
+            onPointerMove={handleOverlayPointerMove}
+            onPointerUp={handleOverlayPointerUp}
+          />
+        )}
 
         {/* Dynamic Toast Feedback */}
         {toastMsg && (
