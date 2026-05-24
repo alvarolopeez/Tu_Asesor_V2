@@ -66,13 +66,18 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     polygonLayerGroupRef.current = polygonGroup;
     mapRef.current = map;
 
-    // Fix map loading gray/white inside modal by invalidating size after render
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 150);
+    const container = mapContainerRef.current;
+
+    // Professional ResizeObserver to handle modal fade-in transition, resizing, and all layout shifts automatically.
+    // This solves the blank map viewport/tile-loading bug comprehensively.
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    });
+    resizeObserver.observe(container);
 
     // Pointer gesture event listeners for freehand drawing
-    const container = mapContainerRef.current;
 
     const handlePointerDown = (e: PointerEvent) => {
       if (!isDrawingModeRef.current || !mapRef.current) return;
@@ -154,6 +159,7 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     container.addEventListener("pointerup", handlePointerUp, { passive: false });
 
     return () => {
+      resizeObserver.disconnect();
       container.removeEventListener("pointerdown", handlePointerDown);
       container.removeEventListener("pointermove", handlePointerMove);
       container.removeEventListener("pointerup", handlePointerUp);
@@ -209,28 +215,39 @@ export default function BuyerMap({ polygons, onChange, isOpen, onClose }: BuyerM
     }
   }, [localPolygons]);
 
-  // Trigger leaflet map control toggle
+  // Trigger leaflet map control toggle safely
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (isDrawingMode) {
-      map.dragging.disable();
-      map.touchZoom.disable();
-      map.doubleClickZoom.disable();
-      map.scrollWheelZoom.disable();
-      if (map.boxZoom) map.boxZoom.disable();
-      if (map.keyboard) map.keyboard.disable();
-      if ((map as any).tap) (map as any).tap.disable();
-    } else {
-      map.dragging.enable();
-      map.touchZoom.enable();
-      map.doubleClickZoom.enable();
-      map.scrollWheelZoom.enable();
-      if (map.boxZoom) map.boxZoom.enable();
-      if (map.keyboard) map.keyboard.enable();
-      if ((map as any).tap) (map as any).tap.enable();
+    try {
+      if (isDrawingMode) {
+        if (map.dragging) map.dragging.disable();
+        if (map.touchZoom) map.touchZoom.disable();
+        if (map.doubleClickZoom) map.doubleClickZoom.disable();
+        if (map.scrollWheelZoom) map.scrollWheelZoom.disable();
+        if (map.boxZoom) map.boxZoom.disable();
+        if (map.keyboard) map.keyboard.disable();
+        if ((map as any).tap) (map as any).tap.disable();
+      } else {
+        if (map.dragging) map.dragging.enable();
+        if (map.touchZoom) map.touchZoom.enable();
+        if (map.doubleClickZoom) map.doubleClickZoom.enable();
+        if (map.scrollWheelZoom) map.scrollWheelZoom.enable();
+        if (map.boxZoom) map.boxZoom.enable();
+        if (map.keyboard) map.keyboard.enable();
+        if ((map as any).tap) (map as any).tap.enable();
+      }
+    } catch (err) {
+      console.warn('[BuyerMap] Error toggling map handlers:', err);
     }
+
+    // Force map to recalculate its viewport and redraw tiles after mode change to prevent blank/white states
+    setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+    }, 100);
   }, [isDrawingMode]);
 
   const handleStartDrawing = () => {

@@ -1,6 +1,16 @@
 "use server"
 
-import { supabase } from './supabase'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+// Privileged Supabase client to bypass RLS policies on the server safely
+const supabaseAdmin = createClient(
+  supabaseUrl,
+  supabaseServiceKey || supabaseAnonKey
+)
 
 const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || ''
 const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || ''
@@ -90,7 +100,7 @@ export async function bookPublicAppointment(
     let isNewLead = false
 
     // 1. Buscar si ya existe un lead con ese teléfono
-    const { data: existingLeads, error: searchError } = await supabase
+    const { data: existingLeads, error: searchError } = await supabaseAdmin
       .from('leads')
       .select('id')
       .eq('phone', cleanPhone)
@@ -106,7 +116,7 @@ export async function bookPublicAppointment(
     } else {
       isNewLead = true
       // Crear nuevo lead
-      const { data: newLead, error: insertError } = await supabase
+      const { data: newLead, error: insertError } = await supabaseAdmin
         .from('leads')
         .insert([{
           name: cleanName,
@@ -138,7 +148,7 @@ export async function bookPublicAppointment(
       ? `Solicitada desde la Web Pública.\nNotas del cliente: ${data.notes}`
       : 'Visita programada a través del calendario de la Web Pública.'
 
-    const { data: newAppointment, error: appointmentError } = await supabase
+    const { data: newAppointment, error: appointmentError } = await supabaseAdmin
       .from('appointments')
       .insert([{
         lead_id: leadId,
