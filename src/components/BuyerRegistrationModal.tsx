@@ -8,6 +8,155 @@ import { VALIDATION } from "@/lib/constants";
 
 const BuyerMap = dynamic(() => import("./BuyerMap"), { ssr: false });
 
+const SEVILLA_ZONAS_CAPITAL = [
+  'Centro', 'Triana', 'Los Remedios', 'Nervión', 'Macarena', 'Sevilla Este', 
+  'Bellavista - La Palmera', 'Bermejales', 'Viapol - Buhaira', 'San Pablo', 
+  'Alcosa - Torreblanca', 'Pino Montano', 'San Jerónimo', 'El Cerro - Amate', 
+  'Heliópolis - Reina Mercedes'
+];
+
+const SEVILLA_ZONAS_PUEBLOS = [
+  'Mairena del Aljarafe', 'Tomares', 'Bormujos', 'Gines', 'Camas', 
+  'Dos Hermanas (Centro)', 'Dos Hermanas (Montequinto)', 'Alcalá de Guadaíra', 
+  'San Juan de Aznalfarache', 'Espartinas', 'Utrera', 'Carmona', 
+  'Mairena del Alcor', 'Coria del Río', 'Gelves'
+];
+
+const ZONAS_CENTROIDES = [
+  { name: 'Centro', lat: 37.3896, lng: -5.9953 },
+  { name: 'Triana', lat: 37.3840, lng: -6.0028 },
+  { name: 'Los Remedios', lat: 37.3752, lng: -6.0016 },
+  { name: 'Nervión', lat: 37.3835, lng: -5.9750 },
+  { name: 'Macarena', lat: 37.4042, lng: -5.9863 },
+  { name: 'Sevilla Este', lat: 37.3980, lng: -5.9228 },
+  { name: 'Bellavista - La Palmera', lat: 37.3392, lng: -5.9760 },
+  { name: 'Bermejales', lat: 37.3482, lng: -5.9830 },
+  { name: 'Viapol - Buhaira', lat: 37.3801, lng: -5.9800 },
+  { name: 'San Pablo', lat: 37.3970, lng: -5.9680 },
+  { name: 'Alcosa - Torreblanca', lat: 37.4080, lng: -5.9180 },
+  { name: 'Pino Montano', lat: 37.4200, lng: -5.9690 },
+  { name: 'San Jerónimo', lat: 37.4170, lng: -5.9830 },
+  { name: 'El Cerro - Amate', lat: 37.3770, lng: -5.9520 },
+  { name: 'Heliópolis - Reina Mercedes', lat: 37.3570, lng: -5.9870 },
+  { name: 'Mairena del Aljarafe', lat: 37.3422, lng: -6.0628 },
+  { name: 'Tomares', lat: 37.3742, lng: -6.0460 },
+  { name: 'Bormujos', lat: 37.3720, lng: -6.0710 },
+  { name: 'Gines', lat: 37.3870, lng: -6.0780 },
+  { name: 'Camas', lat: 37.4020, lng: -6.0330 },
+  { name: 'Dos Hermanas (Centro)', lat: 37.2829, lng: -5.9251 },
+  { name: 'Dos Hermanas (Montequinto)', lat: 37.3390, lng: -5.9380 },
+  { name: 'Alcalá de Guadaíra', lat: 37.3340, lng: -5.8490 },
+  { name: 'San Juan de Aznalfarache', lat: 37.3620, lng: -6.0270 },
+  { name: 'Espartinas', lat: 37.3810, lng: -6.1260 },
+  { name: 'Utrera', lat: 37.1812, lng: -5.7824 },
+  { name: 'Carmona', lat: 37.4714, lng: -5.6420 },
+  { name: 'Mairena del Alcor', lat: 37.3740, lng: -5.7480 },
+  { name: 'Coria del Río', lat: 37.2870, lng: -6.0520 },
+  { name: 'Gelves', lat: 37.3400, lng: -6.0260 }
+];
+
+function isPointInPolygon(lat: number, lng: number, polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const latI = polygon[i][0];
+    const lngI = polygon[i][1];
+    const latJ = polygon[j][0];
+    const lngJ = polygon[j][1];
+    
+    const intersect = ((latI > lat) !== (latJ > lat))
+        && (lng < (lngJ - lngI) * (lat - latI) / (latJ - latI) + lngI);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getZonesFromPolygons(polygons: [number, number][][]): string[] {
+  if (polygons.length === 0) return [];
+  
+  const preferredZones: string[] = [];
+  
+  for (const zona of ZONAS_CENTROIDES) {
+    let isInside = false;
+    for (const poly of polygons) {
+      if (isPointInPolygon(zona.lat, zona.lng, poly)) {
+        isInside = true;
+        break;
+      }
+    }
+    if (isInside) {
+      preferredZones.push(zona.name);
+    }
+  }
+  
+  if (preferredZones.length === 0) {
+    let closestZona: string | null = null;
+    let minDistance = Infinity;
+    
+    for (const zona of ZONAS_CENTROIDES) {
+      for (const poly of polygons) {
+        for (const point of poly) {
+          const dist = Math.sqrt((zona.lat - point[0]) ** 2 + (zona.lng - point[1]) ** 2);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestZona = zona.name;
+          }
+        }
+      }
+    }
+    
+    if (closestZona && minDistance <= 0.05) {
+      preferredZones.push(closestZona);
+    }
+  }
+  
+  return preferredZones;
+}
+
+function normalizeText(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function getZonesFromText(text: string): string[] {
+  if (!text) return [];
+  const normalizedText = normalizeText(text);
+  const detected: string[] = [];
+  
+  for (const zona of ZONAS_CENTROIDES) {
+    const nameNormalized = normalizeText(zona.name);
+    
+    if (normalizedText.includes(nameNormalized)) {
+      detected.push(zona.name);
+      continue;
+    }
+    
+    if (zona.name.includes(' - ')) {
+      const parts = zona.name.split(' - ').map(p => normalizeText(p));
+      if (parts.some(part => normalizedText.includes(part))) {
+        detected.push(zona.name);
+        continue;
+      }
+    }
+    
+    if (zona.name === 'Dos Hermanas (Centro)') {
+      if (normalizedText.includes('dos hermanas') && !normalizedText.includes('montequinto')) {
+        detected.push(zona.name);
+        continue;
+      }
+    }
+    if (zona.name === 'Dos Hermanas (Montequinto)') {
+      if (normalizedText.includes('montequinto')) {
+        detected.push(zona.name);
+        continue;
+      }
+    }
+  }
+  
+  return detected;
+}
+
 type BuyerRegistrationModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -175,6 +324,11 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
       const cleanName = `${formData.firstName} ${formData.lastName}`.trim();
       const cleanEmail = formData.email?.trim().toLowerCase() || null;
 
+      // Calcular preferredZones según el modo de entrada
+      const preferredZones = inputMode === "draw" 
+        ? getZonesFromPolygons(polygons)
+        : getZonesFromText(formData.location);
+
       const preferences = {
         area: polygons.length > 0 ? polygons[0] : [],
         polygons: polygons,
@@ -190,9 +344,10 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         rgpd_accepted: rgpdAccepted,
         rgpd_accepted_at: new Date().toISOString(),
         additionalNotes: formData.additionalNotes || null,
+        preferredZones,
       };
 
-      // Check for existing lead by phone to prevent duplicates
+      // 1. Sincronización con leads
       const { data: existingLeads } = await supabase
         .from("leads")
         .select("id")
@@ -227,6 +382,85 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         ]);
 
         if (insertError) throw insertError;
+      }
+
+      // 2. Sincronización con buyers_demands en paralelo
+      const { data: existingBuyers, error: buyerCheckError } = await supabase
+        .from("buyers_demands")
+        .select("id")
+        .eq("phone", cleanPhone)
+        .limit(1);
+
+      if (buyerCheckError) throw buyerCheckError;
+
+      if (existingBuyers && existingBuyers.length > 0) {
+        // Si el comprador con ese teléfono ya existe en buyers_demands, actualiza su registro
+        const { error: updateBuyerError } = await supabase
+          .from("buyers_demands")
+          .update({
+            name: cleanName,
+            email: cleanEmail,
+            max_budget: Number(formData.maxPrice),
+            rooms: Number(formData.minRooms),
+            bathrooms: Number(formData.minBaths),
+            property_type: formData.propertyType,
+            preferred_zones: preferredZones,
+            funding_type: formData.paymentMethod,
+            savings_contribution: formData.paymentMethod === "Al contado" ? Number(formData.maxPrice) : 0,
+            status: "Búsqueda activa",
+            updated_at: new Date().toISOString(),
+            last_activity_at: new Date().toISOString()
+          })
+          .eq("id", existingBuyers[0].id);
+
+        if (updateBuyerError) throw updateBuyerError;
+      } else {
+        // Si no existe, insértalo con los mismos campos y añade min_budget = 0, min_sqm = 0, created_at = new Date().toISOString()
+        const { data: newBuyer, error: insertBuyerError } = await supabase
+          .from("buyers_demands")
+          .insert([
+            {
+              name: cleanName,
+              phone: cleanPhone,
+              email: cleanEmail,
+              max_budget: Number(formData.maxPrice),
+              min_budget: 0,
+              min_sqm: 0,
+              rooms: Number(formData.minRooms),
+              bathrooms: Number(formData.minBaths),
+              property_type: formData.propertyType,
+              preferred_zones: preferredZones,
+              funding_type: formData.paymentMethod,
+              savings_contribution: formData.paymentMethod === "Al contado" ? Number(formData.maxPrice) : 0,
+              status: "Búsqueda activa",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              last_activity_at: new Date().toISOString()
+            }
+          ])
+          .select("id")
+          .single();
+
+        if (insertBuyerError) throw insertBuyerError;
+
+        // Adicionalmente, si es nuevo, inyecta un hito inicial en la tabla buyer_activity_logs:
+        if (newBuyer && newBuyer.id) {
+          const { error: logError } = await supabase
+            .from("buyer_activity_logs")
+            .insert([
+              {
+                buyer_id: newBuyer.id,
+                event_type: 'IA WhatsApp',
+                title: 'Registro público online',
+                notes: 'Se ha registrado de forma autónoma desde la web pública con preferencia en zonas: ' + preferredZones.join(', '),
+                event_date: new Date().toISOString()
+              }
+            ]);
+
+          if (logError) {
+            console.error("Error creating buyer activity log:", logError);
+          }
+        }
       }
 
       setSuccess(true);

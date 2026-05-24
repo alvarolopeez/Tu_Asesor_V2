@@ -219,19 +219,19 @@ export default function BuyersManager() {
   const openFormModal = (buyer: BuyerDemand | null = null) => {
     if (buyer) {
       setEditingBuyer(buyer);
-      setFormName(buyer.name);
+      setFormName(buyer.name || "");
       setFormPhone(buyer.phone || "");
       setFormEmail(buyer.email || "");
-      setFormMinBudget(buyer.min_budget);
-      setFormMaxBudget(buyer.max_budget);
-      setFormMinSqm(buyer.min_sqm);
-      setFormRooms(buyer.rooms);
-      setFormBathrooms(buyer.bathrooms);
-      setFormPropertyType(buyer.property_type);
-      setFormPreferredZones(buyer.preferred_zones || []);
-      setFormFundingType(buyer.funding_type);
-      setFormSavingsContribution(buyer.savings_contribution);
-      setFormStatus(buyer.status);
+      setFormMinBudget(buyer.min_budget || 0);
+      setFormMaxBudget(buyer.max_budget || 0);
+      setFormMinSqm(buyer.min_sqm || 0);
+      setFormRooms(buyer.rooms || 0);
+      setFormBathrooms(buyer.bathrooms || 0);
+      setFormPropertyType(buyer.property_type || "Piso");
+      setFormPreferredZones(Array.isArray(buyer.preferred_zones) ? buyer.preferred_zones : []);
+      setFormFundingType(buyer.funding_type || "Hipoteca");
+      setFormSavingsContribution(buyer.savings_contribution || 0);
+      setFormStatus(buyer.status || "Búsqueda activa");
     } else {
       setEditingBuyer(null);
       setFormName("");
@@ -440,26 +440,28 @@ export default function BuyersManager() {
   };
 
   // Format budget currency visually
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  const formatCurrency = (val: number | null | undefined) => {
+    if (val === null || val === undefined || isNaN(Number(val))) return "0 €";
+    return Number(val).toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
   };
 
   // Filter logic
   const filteredBuyers = buyers.filter(b => {
     // 1. Text Search (Name / Phone / Email)
+    const nameStr = b.name || "";
     const matchesSearch = 
-      b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      nameStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (b.phone && b.phone.includes(searchTerm)) ||
       (b.email && b.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // 2. Zone Filter
-    const matchesZone = !filterZone || (b.preferred_zones && b.preferred_zones.includes(filterZone));
+    const matchesZone = !filterZone || (Array.isArray(b.preferred_zones) && b.preferred_zones.includes(filterZone));
 
     // 3. Status Filter
     const matchesStatus = !filterStatus || b.status === filterStatus;
 
     // 4. Max Budget Filter
-    const matchesBudget = !filterMaxBudget || b.max_budget <= Number(filterMaxBudget);
+    const matchesBudget = !filterMaxBudget || (b.max_budget || 0) <= Number(filterMaxBudget);
 
     // 5. Activity Date Filter
     let matchesActivity = true;
@@ -467,7 +469,8 @@ export default function BuyersManager() {
       const days = parseInt(filterActivityDays);
       const activityLimit = new Date();
       activityLimit.setDate(activityLimit.getDate() - days);
-      matchesActivity = new Date(b.last_activity_at) >= activityLimit;
+      const lastActivity = b.last_activity_at || b.created_at || new Date().toISOString();
+      matchesActivity = new Date(lastActivity) >= activityLimit;
     }
 
     return matchesSearch && matchesZone && matchesStatus && matchesBudget && matchesActivity;
@@ -793,18 +796,31 @@ export default function BuyersManager() {
           />
 
           {/* Drawer Container */}
-          <div className="relative w-full max-w-[620px] h-full bg-[#111827] shadow-2xl border-l border-white/10 flex flex-col z-50 animate-slide-in">
+          <div className="relative w-full max-w-[620px] h-full bg-[#111827]/95 backdrop-blur-md shadow-2xl border-l border-white/10 flex flex-col z-50 animate-slide-in">
             {/* Header */}
-            <div className="p-6 border-b border-white/10 bg-[#1E293B] flex items-center justify-between">
+            <div className="p-6 border-b border-white/10 bg-[#1E293B]/90 backdrop-blur-md flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-[#FBBF24] text-[#2C3E50] font-black text-lg flex items-center justify-center border border-white/10 shadow-inner">
-                  {selectedBuyer.name.charAt(0)}
+                  {(selectedBuyer.name || "C").charAt(0)}
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-white">{selectedBuyer.name}</h3>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                    <span className="flex items-center gap-1"><Phone size={12} className="text-[#FBBF24]" /> {selectedBuyer.phone || "Sin tel."}</span>
-                    <span className="flex items-center gap-1"><Mail size={12} className="text-[#FBBF24]" /> {selectedBuyer.email || "Sin email"}</span>
+                  <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                    <span className="flex items-center gap-1 text-xs text-slate-400"><Phone size={12} className="text-[#FBBF24]" /> {selectedBuyer.phone || "Sin tel."}</span>
+                    <span className="flex items-center gap-1 text-xs text-slate-400"><Mail size={12} className="text-[#FBBF24]" /> {selectedBuyer.email || "Sin email"}</span>
+                    
+                    <select
+                      value={selectedBuyer.status || "Búsqueda activa"}
+                      onChange={(e) => saveMatchingCriteria(selectedBuyer, { status: e.target.value as BuyerDemand['status'] })}
+                      className={`bg-[#0F172A] border border-white/10 rounded-full px-2.5 py-0.5 text-[10px] font-bold focus:outline-none focus:border-[#FBBF24] cursor-pointer transition-all ${
+                        selectedBuyer.status === 'Búsqueda activa' ? 'text-emerald-400 border-emerald-500/20' :
+                        selectedBuyer.status === 'En negociación' ? 'text-blue-400 border-blue-500/20' :
+                        selectedBuyer.status === 'Con piso reservado' ? 'text-amber-400 border-amber-500/20' :
+                        'text-slate-400 border-slate-500/20'
+                      }`}
+                    >
+                      {STATUS_OPTIONS.map(opt => <option key={opt} value={opt} className="text-white bg-[#0F172A]">{opt}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -823,31 +839,92 @@ export default function BuyersManager() {
               <div className="space-y-4">
                 <h4 className="text-xs font-black text-[#FBBF24] uppercase tracking-wider flex items-center gap-2">
                   <Compass size={14} />
-                  Sección A: Criterios de Búsqueda y Financiación
+                  Sección A: Criterios de Búsqueda y Financiación (Edición en caliente)
                 </h4>
                 
-                <div className="bg-[#1E293B] border border-white/5 rounded-2xl p-5 space-y-4">
+                <div className="bg-[#1E293B] border border-white/5 rounded-2xl p-5 space-y-4 shadow-lg">
                   {/* Criterias Grid */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Rango Presupuesto</span>
-                      <span className="text-sm font-bold text-white mt-0.5 block">
-                        {formatCurrency(selectedBuyer.min_budget)} - {formatCurrency(selectedBuyer.max_budget)}
-                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Presupuesto Máximo</span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          defaultValue={selectedBuyer.max_budget || 0}
+                          onBlur={(e) => {
+                            const val = Number(e.target.value);
+                            if (val !== selectedBuyer.max_budget) {
+                              saveMatchingCriteria(selectedBuyer, { max_budget: val });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const val = Number((e.target as HTMLInputElement).value);
+                              if (val !== selectedBuyer.max_budget) {
+                                saveMatchingCriteria(selectedBuyer, { max_budget: val });
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }
+                          }}
+                          className="w-full bg-[#0F172A] border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-[#FBBF24]"
+                        />
+                        <span className="absolute right-2.5 top-1.5 text-[10px] text-slate-500 font-bold">€</span>
+                      </div>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Tipo de Inmueble</span>
-                      <span className="text-sm font-bold text-white mt-0.5 block">{selectedBuyer.property_type}</span>
+                      <select
+                        value={selectedBuyer.property_type || "Piso"}
+                        onChange={(e) => saveMatchingCriteria(selectedBuyer, { property_type: e.target.value })}
+                        className="w-full bg-[#0F172A] border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-[#FBBF24] mt-1 block"
+                      >
+                        {PROPERTY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                     </div>
                     <div>
                       <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Dormitorios / Baños</span>
-                      <span className="text-sm font-bold text-white mt-0.5 block">
-                        Min. {selectedBuyer.rooms} Hab / {selectedBuyer.bathrooms} Baños
-                      </span>
+                      <div className="flex gap-2 mt-1">
+                        <select
+                          value={selectedBuyer.rooms || 0}
+                          onChange={(e) => saveMatchingCriteria(selectedBuyer, { rooms: Number(e.target.value) })}
+                          className="bg-[#0F172A] border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#FBBF24] w-full cursor-pointer"
+                        >
+                          {[0,1,2,3,4,5].map(n => <option key={n} value={n}>{n} hab</option>)}
+                        </select>
+                        <select
+                          value={selectedBuyer.bathrooms || 0}
+                          onChange={(e) => saveMatchingCriteria(selectedBuyer, { bathrooms: Number(e.target.value) })}
+                          className="bg-[#0F172A] border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-[#FBBF24] w-full cursor-pointer"
+                        >
+                          {[0,1,2,3,4].map(n => <option key={n} value={n}>{n} baños</option>)}
+                        </select>
+                      </div>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Metros Cuadrados</span>
-                      <span className="text-sm font-bold text-white mt-0.5 block">Min. {selectedBuyer.min_sqm} m²</span>
+                      <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide">Metros Cuadrados Mín.</span>
+                      <div className="relative mt-1">
+                        <input
+                          type="number"
+                          defaultValue={selectedBuyer.min_sqm || 0}
+                          onBlur={(e) => {
+                            const val = Number(e.target.value);
+                            if (val !== selectedBuyer.min_sqm) {
+                              saveMatchingCriteria(selectedBuyer, { min_sqm: val });
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const val = Number((e.target as HTMLInputElement).value);
+                              if (val !== selectedBuyer.min_sqm) {
+                                saveMatchingCriteria(selectedBuyer, { min_sqm: val });
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }
+                          }}
+                          className="w-full bg-[#0F172A] border border-white/10 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-[#FBBF24]"
+                        />
+                        <span className="absolute right-2.5 top-1.5 text-[10px] text-slate-500 font-bold">m²</span>
+                      </div>
                     </div>
                   </div>
 
@@ -857,23 +934,48 @@ export default function BuyersManager() {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-[#0F172A] p-2.5 rounded-xl border border-white/5">
                         <span className="text-[9px] text-slate-400 block font-semibold">Forma Pago</span>
-                        <span className={`text-xs font-black uppercase mt-1 block ${selectedBuyer.funding_type === 'Contado' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          {selectedBuyer.funding_type}
-                        </span>
+                        <select
+                          value={selectedBuyer.funding_type || "Hipoteca"}
+                          onChange={(e) => saveMatchingCriteria(selectedBuyer, { funding_type: e.target.value as 'Contado' | 'Hipoteca' })}
+                          className={`bg-transparent border-none p-0 text-xs font-black uppercase mt-1 block w-full focus:outline-none cursor-pointer ${
+                            selectedBuyer.funding_type === 'Contado' ? 'text-emerald-400' : 'text-amber-400'
+                          }`}
+                        >
+                          <option value="Hipoteca" className="text-white bg-[#0F172A]">Hipoteca</option>
+                          <option value="Contado" className="text-white bg-[#0F172A]">Contado</option>
+                        </select>
                       </div>
                       
-                      {selectedBuyer.funding_type === 'Hipoteca' ? (
+                      {(selectedBuyer.funding_type || "Hipoteca") === 'Hipoteca' ? (
                         <>
                           <div className="bg-[#0F172A] p-2.5 rounded-xl border border-white/5">
-                            <span className="text-[9px] text-slate-400 block font-semibold">Fondos Ahorro</span>
-                            <span className="text-xs font-black text-white mt-1 block">
-                              {formatCurrency(selectedBuyer.savings_contribution)}
-                            </span>
+                            <span className="text-[9px] text-slate-400 block font-semibold text-ellipsis overflow-hidden whitespace-nowrap">Aportación Ahorros</span>
+                            <input
+                              type="number"
+                              key={selectedBuyer.savings_contribution}
+                              defaultValue={selectedBuyer.savings_contribution || 0}
+                              onBlur={(e) => {
+                                const val = Number(e.target.value);
+                                if (val !== selectedBuyer.savings_contribution) {
+                                  saveMatchingCriteria(selectedBuyer, { savings_contribution: val });
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const val = Number((e.target as HTMLInputElement).value);
+                                  if (val !== selectedBuyer.savings_contribution) {
+                                    saveMatchingCriteria(selectedBuyer, { savings_contribution: val });
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }
+                              }}
+                              className="bg-transparent border-none p-0 text-xs font-black text-white mt-1 block w-full focus:outline-none"
+                            />
                           </div>
                           <div className="bg-[#0F172A] p-2.5 rounded-xl border border-white/5">
-                            <span className="text-[9px] text-slate-400 block font-semibold">Hipoteca Requerida</span>
+                            <span className="text-[9px] text-slate-400 block font-semibold text-ellipsis overflow-hidden whitespace-nowrap">Hipoteca Requerida</span>
                             <span className="text-xs font-black text-purple-300 mt-1 block">
-                              {formatCurrency(Math.max(0, selectedBuyer.max_budget - selectedBuyer.savings_contribution))}
+                              {formatCurrency(Math.max(0, (selectedBuyer.max_budget || 0) - (selectedBuyer.savings_contribution || 0)))}
                             </span>
                           </div>
                         </>
@@ -891,18 +993,50 @@ export default function BuyersManager() {
 
                   {/* Zones tags list */}
                   <div className="border-t border-white/10 pt-4">
-                    <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide mb-2">Zonas e Interés Geográfico</span>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wide mb-2">Zonas de Interés (Haz clic para quitar)</span>
                     <div className="flex flex-wrap gap-1.5">
                       {selectedBuyer.preferred_zones && selectedBuyer.preferred_zones.length > 0 ? (
                         selectedBuyer.preferred_zones.map((zone, idx) => (
-                          <span key={idx} className="bg-[#0F172A] text-slate-300 text-xs px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1">
-                            <MapPin size={10} className="text-[#FBBF24]" />
+                          <button 
+                            key={idx} 
+                            onClick={() => {
+                              const updatedZones = selectedBuyer.preferred_zones.filter(z => z !== zone);
+                              saveMatchingCriteria(selectedBuyer, { preferred_zones: updatedZones });
+                            }}
+                            className="bg-[#0F172A] hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 text-slate-300 text-xs px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1 transition-all group/zone cursor-pointer"
+                            title="Haz clic para quitar esta zona"
+                          >
+                            <MapPin size={10} className="text-[#FBBF24] group-hover/zone:text-rose-400" />
                             {zone}
-                          </span>
+                            <span className="text-[9px] text-slate-500 group-hover/zone:text-rose-400 ml-1">×</span>
+                          </button>
                         ))
                       ) : (
                         <span className="text-slate-500 text-xs">Ninguna zona seleccionada</span>
                       )}
+                    </div>
+                    
+                    {/* Add zone quick dropdown */}
+                    <div className="mt-3 flex gap-2">
+                      <select
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val && !selectedBuyer.preferred_zones?.includes(val)) {
+                            const updatedZones = [...(selectedBuyer.preferred_zones || []), val];
+                            saveMatchingCriteria(selectedBuyer, { preferred_zones: updatedZones });
+                          }
+                          e.target.value = ""; // Reset
+                        }}
+                        className="bg-[#0F172A] border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-300 focus:outline-none focus:border-[#FBBF24] max-w-[200px] cursor-pointer"
+                      >
+                        <option value="">+ Añadir zona de interés</option>
+                        <optgroup label="Sevilla Capital">
+                          {SEVILLA_ZONAS_CAPITAL.filter(z => !selectedBuyer.preferred_zones?.includes(z)).map(z => <option key={z} value={z}>{z}</option>)}
+                        </optgroup>
+                        <optgroup label="Aljarafe / Provincia">
+                          {SEVILLA_ZONAS_PUEBLOS.filter(z => !selectedBuyer.preferred_zones?.includes(z)).map(z => <option key={z} value={z}>{z}</option>)}
+                        </optgroup>
+                      </select>
                     </div>
                   </div>
                 </div>
