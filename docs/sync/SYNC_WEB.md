@@ -9,6 +9,19 @@ Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO camb
 
 ## ✅ Peticiones Completadas
 
+### 🟡 [2026-05-25] Petición del Usuario — Retoques y Optimización del CRM (Conexión de IA, Sincronización de Comentarios, Aportación con Hipoteca y Taxonomía Expandida)
+* **Completado por**: Agente Web y Agente CRM (Coordinado por Antigravity Principal)
+* **Detalles**:
+  1. **Conexión de IA Paula Copilot en CRM**:
+     - Agregamos la cabecera `Authorization: Bearer <token>` a la petición `fetch` en `ZoneSelectorPremium.tsx` recuperando la sesión activa del administrador (`supabase.auth.getSession()`), resolviendo el error 401 y conectando con éxito el Copilot IA al backend de Gemini 1.5 Flash.
+  2. **Sincronización de Comentarios de Compradores en la Ficha del CRM**:
+     - Modificamos el manejador de envío público en `BuyerRegistrationModal.tsx` para inyectar automáticamente un hito detallado de tipo "IA WhatsApp" en la tabla `buyer_activity_logs` tanto al registrar un comprador nuevo como al actualizar sus preferencias. Esto permite ver los comentarios/notas (`additionalNotes`) de manera fluida en la línea de tiempo del comprador en el CRM ("Ficha").
+  3. **Campo de Aportación de Ahorros con Hipoteca**:
+     - Agregamos el input de "Aportación de ahorros propia (€)" en el Paso 4 (Financiación) del formulario de registro público (`BuyerRegistrationModal.tsx`) si el método de pago seleccionado es "Con Hipoteca".
+     - Sincronizamos este valor para que se guarde de forma nativa en la columna `savings_contribution` en la base de datos de Supabase, habilitando cálculos financieros instantáneos dentro del CRM.
+  4. **Ampliación de Municipios y Barrios de la Provincia de Sevilla**:
+     - Expandimos la taxonomía oficial de zonas en `ZoneSelectorPremium.tsx`, en el System Prompt del backend `/api/ai/zones/route.ts` y en el detector local de palabras clave con 8 municipios adicionales y sus sub-barrios correspondientes (Gines, Castilleja de la Cuesta, San Juan de Aznalfarache, Espartinas, Alcalá de Guadaíra, La Rinconada, Utrera, Mairena/Viso del Alcor).
+
 ### 🟡 [2026-05-24] Petición del Director General — Componentes Visuales y UI de Alta Gama (Leaflet CSS, Formulario con Notas, Carrusel Fullscreen y Asistente Paula)
 * **Completado por**: Agente Web
 * **Detalles**:
