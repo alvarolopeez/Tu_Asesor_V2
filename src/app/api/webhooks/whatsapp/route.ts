@@ -418,14 +418,14 @@ function generateChatbotResponse(message: string) {
 
   if (lower.includes('hola') || lower.includes('buenas') || lower.includes('buenos')) {
     return {
-      response: '¡Hola! 👋 Soy el asistente virtual de Álvaro, tu asesor inmobiliario en Sevilla. ¿En qué puedo ayudarte?\n\n🏠 Ver propiedades\n📊 Valorar tu vivienda\n🧮 Calcular plusvalía\n📅 Agendar una visita',
+      response: '¡Hola! 👋 Soy Paula, la asesora virtual de Álvaro, tu asesor inmobiliario en Sevilla. Puedo responder tus dudas sobre inmuebles, valoraciones o impuestos, o bien ponerte en contacto con Álvaro si lo prefieres. ¿En qué puedo ayudarte hoy?\n\n🏠 Ver propiedades\n📊 Valorar tu vivienda\n🧮 Calcular plusvalía o impuestos\n📅 Agendar una visita',
       intent: 'general_inquiry',
       confidence: 0.95,
     };
   }
 
   return {
-    response: '👋 ¡Gracias por tu mensaje! Soy el asistente de Álvaro. Puedo ayudarte con:\n\n🏠 Información sobre propiedades\n📊 Valoración gratuita de tu vivienda\n🧮 Calculadora de plusvalía\n📅 Agendar visitas\n\n¿Qué te interesa?',
+    response: '👋 ¡Gracias por tu mensaje! Soy Paula, la asesora virtual de Álvaro. Puedo responder tus dudas sobre inmuebles, valoraciones o impuestos, o bien ponerte en contacto con Álvaro si lo prefieres.\n\n¿Qué te gustaría consultar hoy?\n\n🏠 Ver propiedades\n📊 Valorar tu vivienda\n🧮 Calcular plusvalía o impuestos\n📅 Agendar una visita',
     intent: 'general_inquiry',
     confidence: 0.60,
   };

@@ -27,4 +27,20 @@ Lista de mejoras premium implementadas en el front-end y la web pública para un
   - [x] Creado componente flotante `CookieConsent.tsx` en la esquina inferior izquierda con diseño dark-glassmorphic de alta gama.
   - [x] Animación de entrada fluida basada en estados y transiciones nativas de Tailwind, libre de dependencias pesadas.
   - [x] Integración de control persistente en `localStorage` para evitar que vuelva a aparecer tras ser aceptado o rechazado.
-  - [x] Importado e integrado en `LayoutWrapper.tsx` para estar disponible globalmente en toda la web pública.
+  - [x] Registrado en `LayoutWrapper.tsx` para estar disponible globalmente en toda la web pública.
+
+- [x] **4. Integración CSS de Leaflet (`layout.tsx`)**
+  - [x] Importado `'leaflet/dist/leaflet.css'` de manera global en el layout principal para corregir el bug en producción que dejaba el mapa del comprador en blanco.
+
+- [x] **5. Requisitos del Comprador y Notas Adicionales (`BuyerRegistrationModal.tsx`)**
+  - [x] Añadido un bloque de texto libre (textarea) de requisitos de búsqueda en el Paso 3 del formulario.
+  - [x] Sincronizada la información introducida por el comprador con Supabase, almacenando la nota en `preferences.additionalNotes`.
+
+- [x] **6. Galería de Fotos Inmersiva a Pantalla Completa (`/comprar/page.tsx`)**
+  - [x] Añadido un botón premium de "Expandir" sobre el carrusel de imágenes del detalle de propiedad.
+  - [x] Creado un overlay a pantalla completa (`fixed inset-0 bg-black/95 z-[100]`) con navegación mediante flechas laterales, indicador de posición e integración de teclas (flechas y Esc) para una excelente usabilidad.
+
+- [x] **7. Botón de WhatsApp Estático y Asistente Virtual Paula (`FloatingWhatsApp.tsx`)**
+  - [x] Removida la animación de rebote del botón flotante verde para dejarlo limpio, estático e impecable.
+  - [x] Diseñado e implementado un temporizador de 10 segundos para desplegar a la asesora virtual Paula de manera elegante con un avatar animado y un punto verde de "en línea" con un efecto glow.
+  - [x] Añadido un campo de texto interactivo con un botón de envío directo a WhatsApp utilizando el mensaje personalizado y una opción discreta para descartar/cerrar el bocadillo.

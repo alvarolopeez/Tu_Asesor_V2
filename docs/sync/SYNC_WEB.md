@@ -9,6 +9,24 @@ Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO camb
 
 ## ✅ Peticiones Completadas
 
+### 🟡 [2026-05-24] Petición del Director General — Componentes Visuales y UI de Alta Gama (Leaflet CSS, Formulario con Notas, Carrusel Fullscreen y Asistente Paula)
+* **Completado por**: Agente Web
+* **Detalles**:
+  1. **Importación CSS de Leaflet (`layout.tsx`)**:
+     * Importado el archivo `'leaflet/dist/leaflet.css'` en el layout principal `layout.tsx` a nivel de raíz, solucionando de manera global los bugs de rendering de cajas blancas/grises de Leaflet en producción.
+  2. **Bloque libre en Formulario de Comprador (`BuyerRegistrationModal.tsx`)**:
+     * En el Paso 3 (Características), implementamos un textarea titulado 'Notas adicionales / Requisitos específicos' (`additionalNotes`) que permite introducir información de texto libre al comprador.
+     * Integrado con el envío de datos de Supabase para guardarse de forma segura en `preferences.additionalNotes`.
+  3. **Visualización de Imágenes a Pantalla Completa (`/comprar/page.tsx`)**:
+     * Añadido botón premium flotante "Expandir" sobre el carrusel de imágenes del detalle de propiedades con el icono `Maximize`.
+     * Diseñado un overlay inmersivo a pantalla completa (`fixed inset-0 bg-black/95 z-[100] flex flex-col justify-center items-center`) que permite ver las fotos en máxima resolución, cambiar de imagen con las flechas laterales e incluye navegación por teclado nativa (flechas izquierda/derecha y Esc para salir).
+  4. **WhatsApp Estático + Asistente Virtual Paula 10s (`FloatingWhatsApp.tsx`)**:
+     * Eliminada la animación `animate-bounce` del botón flotante para otorgar un aspecto estático y limpio en la esquina inferior derecha.
+     * Creado un disparador temporal (`setTimeout`) a los 10 segundos de la entrada del usuario a la web que despliega suavemente un bocadillo premium dark-glassmorphic (`bg-[#1E293B]/95 border-white/10 backdrop-blur-xl`).
+     * Presenta la asesora virtual Paula con un avatar animado y un punto verde de "en línea", un bocadillo de bienvenida y un textarea interactivo que redirige al usuario a WhatsApp Web/Móvil enviando el mensaje personalizado. Incluye un botón discreto de cerrar `[X]`.
+  5. **Verificación del Linter y Compilación**:
+     * Ejecutada la compilación completa de Next.js (`npm run build`) con un éxito rotundo (100% libre de errores) y verificado con `gitnexus_detect_changes()`.
+
 ### 🟡 [2026-05-24] Petición del Director General — Mejoras Premium, Validación y Reestructuraciones Visuales en Catálogo y Formularios
 * **Completado por**: Agente Web
 * **Detalles**:

@@ -39,6 +39,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
     maxFloorWithoutElevator: "Indiferente",
     paymentMethod: "Hipoteca",
     mortgageStatus: "Necesito estudio",
+    additionalNotes: "",
   });
 
   if (!isOpen) return null;
@@ -188,6 +189,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         mortgageStatus: formData.paymentMethod === "Hipoteca" ? formData.mortgageStatus : null,
         rgpd_accepted: rgpdAccepted,
         rgpd_accepted_at: new Date().toISOString(),
+        additionalNotes: formData.additionalNotes || null,
       };
 
       // Check for existing lead by phone to prevent duplicates
@@ -608,6 +610,18 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
                       </select>
                     </div>
                   )}
+
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-semibold text-slate-700">Notas adicionales / Requisitos específicos</label>
+                    <textarea 
+                      name="additionalNotes"
+                      value={formData.additionalNotes}
+                      onChange={handleChange}
+                      rows={3}
+                      className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#FBBF24] focus:border-[#FBBF24] outline-none transition-all text-slate-800 bg-white resize-none text-sm placeholder:text-slate-400"
+                      placeholder="Ej: Cerca de colegios, con terraza, orientación sur, buena luz natural, garaje, etc."
+                    />
+                  </div>
                 </div>
               </div>
 

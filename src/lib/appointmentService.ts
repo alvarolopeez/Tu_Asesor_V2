@@ -1,5 +1,56 @@
 import { supabase } from './supabase'
 
+const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || ''
+const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || ''
+
+/**
+ * Envía un mensaje de WhatsApp al cliente usando la API de Meta Graph.
+ */
+async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
+  if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    console.warn('[AppointmentService][WhatsApp] ⚠️ Credenciales de WhatsApp no configuradas en el servidor. Mensaje no transmitido.');
+    return false;
+  }
+
+  // Normalizar el teléfono para la API de Meta (ej. 34600000000)
+  let waPhone = to.replace(/[+\-]/g, '')
+  if (waPhone.length === 9 && (waPhone.startsWith('6') || waPhone.startsWith('7') || waPhone.startsWith('9'))) {
+    waPhone = '34' + waPhone
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: waPhone,
+          type: 'text',
+          text: { body: text },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('[AppointmentService][WhatsApp] Error Meta:', response.status, errorBody);
+      return false;
+    }
+
+    console.log(`[AppointmentService][WhatsApp] ✅ Notificación transmitida con éxito a ${waPhone}`);
+    return true;
+  } catch (error) {
+    console.error('[AppointmentService][WhatsApp] Error de red:', error);
+    return false;
+  }
+}
+
 interface PublicAppointmentData {
   leadName: string
   leadPhone: string
@@ -34,6 +85,7 @@ export async function bookPublicAppointment(
     const cleanName = data.leadName.trim()
 
     let leadId: string | null = null
+    let isNewLead = false
 
     // 1. Buscar si ya existe un lead con ese teléfono
     const { data: existingLeads, error: searchError } = await supabase
@@ -50,6 +102,7 @@ export async function bookPublicAppointment(
       // Reutilizar lead existente
       leadId = existingLeads[0].id
     } else {
+      isNewLead = true
       // Crear nuevo lead
       const { data: newLead, error: insertError } = await supabase
         .from('leads')
@@ -105,6 +158,32 @@ export async function bookPublicAppointment(
         appointmentId: null,
         error: `No se pudo agendar la cita en nuestro sistema: ${appointmentError.message}`
       }
+    }
+
+    // 3. Notificación de Reserva por WhatsApp
+    try {
+      const dateObj = new Date(data.scheduledAt)
+      const formattedDate = dateObj.toLocaleString('es-ES', {
+        timeZone: 'Europe/Madrid',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+
+      let whatsappMessage = ''
+      if (!isNewLead) {
+        // Caso A (Cliente ya registrado previamente)
+        whatsappMessage = `¡Hola ${cleanName}! 👋 Te confirmo que has reservado con éxito tu cita para visitar el inmueble *${data.propertyTitle}* el día ${formattedDate}.\n\nÁlvaro se pondrá en contacto contigo muy pronto para confirmar los detalles. ¡Que tengas un excelente día! 😊`
+      } else {
+        // Caso B (Cliente nuevo)
+        whatsappMessage = `¡Hola ${cleanName}! 👋 Cita confirmada para visitar el inmueble *${data.propertyTitle}* el día ${formattedDate}.\n\nPara preparar mejor tu visita, Álvaro te llamará pronto para hacerte unas preguntas muy breves sobre tus condiciones de compra.\n\nSi lo prefieres, puedes ahorrar tiempo y rellenar tu perfil de comprador directamente en nuestro formulario oficial a través del siguiente enlace: https://tuasesoralvaro.com/comprar?register=true\n\n¡Muchas gracias y nos vemos pronto! 😊`
+      }
+
+      await sendWhatsAppMessage(cleanPhone, whatsappMessage)
+    } catch (wsError) {
+      console.error('[AppointmentService] Error al enviar WhatsApp:', wsError)
     }
 
     return {

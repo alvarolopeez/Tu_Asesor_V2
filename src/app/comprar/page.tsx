@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { 
   Search, Home, MapPin, Calendar, X, ChevronLeft, ChevronRight, 
   BedDouble, Bath, Ruler, DollarSign, CheckCircle2, Clock, 
-  Phone, Mail, User, Sparkles, AlertCircle
+  Phone, Mail, User, Sparkles, AlertCircle, Maximize
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Property } from "@/types";
@@ -153,6 +153,24 @@ export default function ComprarPage() {
   // Modal de Detalle
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [isFullscreenImages, setIsFullscreenImages] = useState(false);
+
+  // Keyboard navigation for fullscreen images
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isFullscreenImages || !selectedProperty?.images) return;
+      if (e.key === "ArrowLeft") {
+        setActiveImageIdx((prev) => (prev === 0 ? selectedProperty.images.length - 1 : prev - 1));
+      } else if (e.key === "ArrowRight") {
+        setActiveImageIdx((prev) => (prev === selectedProperty.images.length - 1 ? 0 : prev + 1));
+      } else if (e.key === "Escape") {
+        setIsFullscreenImages(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreenImages, selectedProperty]);
 
   // Agendamiento Cita
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
@@ -211,6 +229,7 @@ export default function ComprarPage() {
       setBookingSuccess(false);
       setBookingError(null);
       setActiveImageIdx(0);
+      setIsFullscreenImages(false);
     }
   }, [selectedProperty]);
 
@@ -540,6 +559,18 @@ export default function ComprarPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                   
+                  {/* Botón elegante de maximizar ('Expandir') */}
+                  {selectedProperty.images && selectedProperty.images.length > 0 && (
+                    <button
+                      onClick={() => setIsFullscreenImages(true)}
+                      className="absolute top-4 right-4 bg-black/60 hover:bg-[#FBBF24] hover:text-[#0f172a] px-3.5 py-1.5 rounded-lg text-white font-bold transition-all shadow-lg active:scale-95 border border-white/10 z-10 text-xs flex items-center gap-1.5 backdrop-blur-sm"
+                      aria-label="Ver a pantalla completa"
+                    >
+                      <Maximize size={14} />
+                      <span>Expandir</span>
+                    </button>
+                  )}
+                  
                   {/* Controles de Navegación si hay más de 1 imagen */}
                   {selectedProperty.images && selectedProperty.images.length > 1 && (
                     <>
@@ -831,8 +862,63 @@ export default function ComprarPage() {
 
             </div>
           </div>
-        </div>
-      )}
+
+          {/* Overlay de Pantalla Completa para Imágenes */}
+          {isFullscreenImages && selectedProperty.images && selectedProperty.images.length > 0 && (
+            <div className="fixed inset-0 bg-black/95 z-[100] flex flex-col justify-center items-center animate-fadeIn select-none">
+              {/* Botón de cerrar [X] */}
+              <button
+                onClick={() => setIsFullscreenImages(false)}
+                className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all duration-200 z-[110]"
+                aria-label="Cerrar pantalla completa"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Imagen principal */}
+              <div className="relative max-w-[90%] max-h-[80vh] flex items-center justify-center">
+                <img
+                  src={selectedProperty.images[activeImageIdx]}
+                  alt={`${selectedProperty.title} - Ampliada`}
+                  className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+                />
+              </div>
+
+              {/* Controles de navegación en pantalla completa */}
+              {selectedProperty.images.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIdx((prev) => (prev === 0 ? selectedProperty.images.length - 1 : prev - 1));
+                    }}
+                    className="absolute left-6 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-[#FBBF24] hover:text-[#0f172a] p-4 rounded-full text-white transition-all shadow-lg active:scale-95 border border-white/10 z-[110]"
+                    aria-label="Imagen anterior"
+                  >
+                    <ChevronLeft size={28} />
+                  </button>
+                  
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImageIdx((prev) => (prev === selectedProperty.images.length - 1 ? 0 : prev + 1));
+                    }}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-[#FBBF24] hover:text-[#0f172a] p-4 rounded-full text-white transition-all shadow-lg active:scale-95 border border-white/10 z-[110]"
+                    aria-label="Siguiente imagen"
+                  >
+                    <ChevronRight size={28} />
+                  </button>
+                </>
+              )}
+
+              {/* Indicador de posición inferior */}
+              <div className="absolute bottom-6 text-slate-400 text-sm font-semibold tracking-wider bg-black/40 border border-white/10 px-5 py-2 rounded-full backdrop-blur-md">
+                {activeImageIdx + 1} / {selectedProperty.images.length}
+              </div>
+            </div>
+          )}
+         </div>
+       )}
 
       {/* Modal Alerta Inmuebles */}
       <BuyerRegistrationModal 

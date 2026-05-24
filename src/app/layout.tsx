@@ -7,6 +7,8 @@ import LayoutWrapper from "@/components/LayoutWrapper";
 import ToastProvider from "@/components/ToastProvider";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
+
 
 const lato = Lato({
   variable: "--font-lato",
