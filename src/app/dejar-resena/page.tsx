@@ -4,6 +4,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import { Star, Send, CheckCircle2, User, MessageSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import toast from "react-hot-toast";
 
 export default function DejarResenaPage() {
   const [rating, setRating] = useState(5);
@@ -31,7 +32,7 @@ export default function DejarResenaPage() {
       setSubmitted(true);
     } catch (error) {
       console.error("Error submitting review:", error);
-      alert("No se pudo enviar la reseña. Por favor, inténtalo de nuevo.");
+      toast.error("No se pudo enviar la reseña. Por favor, inténtalo de nuevo.");
     } finally {
       setIsSubmitting(false);
     }

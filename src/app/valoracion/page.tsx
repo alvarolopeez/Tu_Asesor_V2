@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { Check, ChevronLeft, ChevronRight, X, Building2, Home, Building, ArrowRight } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function ValoracionPage() {
   const [step, setStep] = useState(1)
@@ -98,7 +99,7 @@ export default function ValoracionPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.privacyCheck) {
-      alert('Debes aceptar la política de privacidad para continuar.')
+      toast.error('Debes aceptar la política de privacidad para continuar.')
       return
     }
 
@@ -144,7 +145,7 @@ export default function ValoracionPage() {
       nextStep()
     } catch (error) {
       console.error("Error submitting valuation:", error)
-      alert("Hubo un error al procesar tu solicitud. Por favor, inténtalo de nuevo o contáctanos por teléfono.")
+      toast.error("Hubo un error al procesar tu solicitud. Por favor, inténtalo de nuevo o contáctanos por teléfono.")
     } finally {
       setIsSubmitting(false)
     }

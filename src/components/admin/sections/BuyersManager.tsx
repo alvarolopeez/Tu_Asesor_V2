@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatCurrency } from "@/lib/utils";
 import ZoneSelectorPremium, { SEVILLA_TAXONOMY } from "./ZoneSelectorPremium";
 import { 
   Users, 
@@ -415,10 +416,7 @@ export default function BuyersManager() {
   };
 
   // Format budget currency visually
-  const formatCurrency = (val: number | null | undefined) => {
-    if (val === null || val === undefined || isNaN(Number(val))) return "0 €";
-    return Number(val).toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-  };
+  // Helper formatting currencies — centralizado en @/lib/utils
 
   // Filter logic
   const filteredBuyers = buyers.filter(b => {

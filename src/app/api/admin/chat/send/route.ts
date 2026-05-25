@@ -3,18 +3,30 @@ import { supabase } from '@/lib/supabase';
 
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
 const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET || process.env.NEXT_PUBLIC_ADMIN_API_SECRET || '';
 
 /**
  * API para el envío de mensajes manuales del agente.
  * 
  * POST /api/admin/chat/send
+ * Headers: X-Admin-Key: <ADMIN_API_SECRET>
  * 
  * @payload { conversation_id: string, message: string }
  * @agent IA/Automatización
  * @created 2026-05-23
+ * @security Requiere cabecera X-Admin-Key válida (ADMIN_API_SECRET)
  */
 export async function POST(request: NextRequest) {
   try {
+    // ── Auth: validar API key del administrador ──
+    const adminKey = request.headers.get('X-Admin-Key') || '';
+    if (!ADMIN_API_SECRET || adminKey !== ADMIN_API_SECRET) {
+      return NextResponse.json(
+        { error: 'Unauthorized — invalid or missing X-Admin-Key' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { conversation_id, message } = body;
 

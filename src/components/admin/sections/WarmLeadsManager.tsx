@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, SellerActivityLog } from "@/types";
+import { formatCurrency } from "@/lib/utils";
 import { 
   Users, 
   Search, 
@@ -181,12 +182,12 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
   };
 
   // Hot inline saving of individual fields (both root lead columns and JSONB preferences)
-  const handleUpdateLeadField = async (leadId: string, field: string, value: any, isPreference: boolean = false) => {
+  const handleUpdateLeadField = async (leadId: string, field: string, value: string | number | boolean | null | undefined, isPreference: boolean = false) => {
     try {
       const leadToUpdate = sellerLeads.find(l => l.id === leadId);
       if (!leadToUpdate) return;
 
-      let updatedPayload: any = {};
+      let updatedPayload: Record<string, unknown> = {};
       if (isPreference) {
         updatedPayload = {
           preferences: {
@@ -386,10 +387,7 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
     return sum;
   }, 0);
 
-  // Helper formatting currencies
-  const formatCurrency = (val: number) => {
-    return Number(val).toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-  };
+  // Helper formatting currencies — centralizado en @/lib/utils
 
   // Mapping timeline icons for various activity event types
   const getTimelineIcon = (type: string) => {

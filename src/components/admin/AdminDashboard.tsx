@@ -182,7 +182,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const TABS: { id: TabType; label: string; icon: any }[] = [
+  const TABS: { id: TabType; label: string; icon: React.ElementType }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
     { id: 'properties', label: 'Inmuebles', icon: Home },

@@ -193,6 +193,7 @@ export default function ChatManager() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Admin-Key": process.env.NEXT_PUBLIC_ADMIN_API_SECRET || "",
         },
         body: JSON.stringify({
           conversation_id: selectedConv.id,
