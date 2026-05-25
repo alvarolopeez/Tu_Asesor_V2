@@ -13,12 +13,41 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     return { title: 'Post no encontrado' };
   }
 
+  const seoTitle = post.seo_title || `${post.title} | Tu Asesor Álvaro`;
+  const seoDesc = post.seo_description || post.excerpt || 'Noticias y consejos del sector inmobiliario en Sevilla.';
+  const canonicalUrl = `https://tuasesoralvaro.es/blog/${post.slug}`;
+
+  // Extract keywords based on title or content for SEO targeting
+  const defaultKeywords = ['inmobiliaria sevilla', 'tu asesor alvaro', 'vender piso sevilla', 'comprar casa sevilla', 'noticias inmobiliarias sevilla'];
+  if (post.title.toLowerCase().includes('sevilla')) defaultKeywords.push('vivienda sevilla', 'precio piso sevilla');
+
   return {
-    title: post.seo_title || `${post.title} | Tu Asesor Álvaro`,
-    description: post.seo_description || post.excerpt,
+    title: seoTitle,
+    description: seoDesc,
+    keywords: defaultKeywords.join(', '),
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
-      title: post.seo_title || post.title,
-      description: post.seo_description || post.excerpt,
+      title: seoTitle,
+      description: seoDesc,
+      url: canonicalUrl,
+      siteName: 'Tu Asesor Álvaro',
+      type: 'article',
+      publishedTime: post.created_at,
+      modifiedTime: post.updated_at || post.created_at,
+      authors: ['Álvaro Tu Asesor'],
+      images: post.cover_image ? [{
+        url: post.cover_image,
+        width: 1200,
+        height: 630,
+        alt: post.title,
+      }] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seoTitle,
+      description: seoDesc,
       images: post.cover_image ? [post.cover_image] : [],
     },
   };
@@ -32,8 +61,44 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     notFound();
   }
 
+  // Create JSON-LD schema payload to tell search engines and AI chatbots exactly what the post is about
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": `https://tuasesoralvaro.es/blog/${post.slug}`
+    },
+    "headline": post.title,
+    "description": post.seo_description || post.excerpt || post.title,
+    "image": post.cover_image ? [post.cover_image] : ["https://tuasesoralvaro.es/assets/images/logo.png"],
+    "datePublished": post.created_at,
+    "dateModified": post.updated_at || post.created_at,
+    "author": {
+      "@type": "Person",
+      "name": "Álvaro López",
+      "jobTitle": "Asesor Inmobiliario",
+      "url": "https://tuasesoralvaro.es"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Tu Asesor Álvaro",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://tuasesoralvaro.es/assets/images/logo.png"
+      }
+    },
+    "articleBody": post.content
+  };
+
   return (
     <div className="min-h-screen bg-[#0f172a] pt-32 pb-24 text-white relative overflow-hidden">
+      {/* Dynamic JSON-LD Structured Data Injection */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Decorative Background */}
       <div className="absolute inset-0 bg-[url('/assets/images/pattern.svg')] opacity-5 z-0 pointer-events-none"></div>
       <div className="absolute top-1/4 right-1/4 w-[500px] h-[500px] bg-[#FBBF24]/5 rounded-full mix-blend-screen filter blur-[100px] opacity-50 z-0"></div>
