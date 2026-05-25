@@ -70,3 +70,10 @@ Lista de mejoras premium implementadas en el front-end y la web pública para un
   - [x] Optimizado el script DDL SQL eliminando la duplicidad sintáctica de `SECURITY DEFINER` para evitar el error de redundancia de Postgres.
   - [x] Desplegado con éxito el algoritmo de matchmaking del servidor en Supabase (Haversine, Ray Casting para polígonos simples y múltiples, y consulta principal).
   - [x] Configurado control estricto de seguridad RLS bloqueando acceso público y permitiendo únicamente a roles autenticados (`authenticated`) y `service_role`.
+
+- [x] **9. Expansión de Zonas y Registro Dinámico de Sevilla (Comarcas y Provincia)**
+  - [x] **Tarea 1: Ampliación Exhaustiva de SEVILLA_TAXONOMY**: Modificado `ZoneSelectorPremium.tsx` para inyectar todas las comarcas, pueblos y pedanías de la provincia de Sevilla según el PDF, corrigiendo "Nervión Centro" por "Nervión" y "Los Remedios Centro" por "Los Remedios", y desglosando Mairena del Alcor y El Viso del Alcor.
+  - [x] **Tarea 2: Sincronización de Filtros en `BuyersManager.tsx`**: Eliminadas las constantes estáticas de zonas y generadas de forma dinámica en base a `SEVILLA_TAXONOMY` filtrando por `isCapital`. Además, se actualizó la lógica del filtro `matchesZone` para permitir búsquedas jerárquicas e inteligentes de subzonas.
+  - [x] **Tarea 3: Actualización de la Inteligencia Artificial (Copilot)**: Actualizado `TAXONOMY_PROMPT` en `src/app/api/ai/zones/route.ts` inyectando exhaustivamente toda la nueva lista en formato `"{Distrito} - {Barrio}"` para asegurar una detección semántica y el comando de añadir zonas al AI Copilot libre de fallos, y corregidos problemas de sintaxis.
+  - [x] **Tarea 4: Verificación**: Ejecutado exitosamente `npm run build` con 0 errores de TypeScript y compilación de Next.js. Analizados los cambios con GitNexus confirmando riesgo "bajo" con 0 procesos afectados.
+

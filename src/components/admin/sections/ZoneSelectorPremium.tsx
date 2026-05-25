@@ -25,205 +25,716 @@ export interface SevillaTaxonomyData {
 }
 
 export const SEVILLA_TAXONOMY: Record<string, SevillaTaxonomyData> = {
-  // Sevilla Capital
+  // Sevilla Capital (11 Distritos Oficiales completos)
   "Centro": {
     label: "Sevilla Capital - Centro",
     isCapital: true,
     barrios: [
-      "Santa Cruz / Alfalfa",
-      "Casco Antiguo / Arenal",
-      "San Vicente / San Lorenzo",
-      "Regina / Encarnación",
-      "Puerta de Jerez / Prado"
-    ]
-  },
-  "Triana": {
-    label: "Sevilla Capital - Triana",
-    isCapital: true,
-    barrios: [
-      "Triana Casco Antiguo / Calle Betis",
-      "Barrio León",
-      "El Tardón",
-      "Voluntad / Pagés del Corro",
-      "Ronda de Triana"
-    ]
-  },
-  "Los Remedios": {
-    label: "Sevilla Capital - Los Remedios",
-    isCapital: true,
-    barrios: [
-      "Los Remedios Centro / Asunción",
-      "Tablada",
-      "Parque de los Príncipes"
-    ]
-  },
-  "Nervión": {
-    label: "Sevilla Capital - Nervión",
-    isCapital: true,
-    barrios: [
-      "Nervión Centro / Buhaira",
-      "Viapol / San Bernardo",
-      "Ramón y Cajal / Ciudad Jardín",
-      "La Calzada / Luis Montoto"
+      "Alfalfa",
+      "El Arenal",
+      "Encarnación-Regina",
+      "Feria",
+      "Museo",
+      "San Bartolomé",
+      "San Gil",
+      "San Julián",
+      "San Lorenzo",
+      "San Vicente",
+      "Santa Catalina",
+      "Santa Cruz"
     ]
   },
   "Macarena": {
     label: "Sevilla Capital - Macarena",
     isCapital: true,
     barrios: [
-      "La Macarena / Parlamento",
-      "Doctor Barraquer / León XIII",
+      "Begoña-Santa Catalina",
+      "Campos de Soria",
+      "Cisneo Alto-Santa María de Gracia",
+      "Cruz Roja-Capuchinos",
+      "Doctor Barraquer-Grupo Renfe-Policlínico",
+      "El Carmen",
       "El Cerezo",
-      "Pio XII / Miraflores"
+      "El Rocío",
+      "El Torrejón",
+      "Hermandades-La Carrasca",
+      "La Barzola",
+      "La Palmilla-Doctor Marañón",
+      "La Paz-Las Golondrinas",
+      "Las Avenidas",
+      "León XIII-Los Naranjos",
+      "Los Príncipes-La Fontanilla",
+      "Macarena Tres Huertas-Macarena Cinco",
+      "Pino Flores",
+      "Pío XII",
+      "Retiro Obrero",
+      "Santas Justa y Rufina-Parque Miraflores",
+      "Santa María de Ordas-San Nicolás",
+      "Villegas",
+      "Polígono Norte"
     ]
   },
-  "Sevilla Este": {
-    label: "Sevilla Capital - Sevilla Este",
+  "Nervión": {
+    label: "Sevilla Capital - Nervión",
     isCapital: true,
     barrios: [
-      "Avenida de las Ciencias",
-      "Las Gondolas / Entrepuentes",
-      "Polígono Aeropuerto / Puerta Este",
-      "Emilio Lemos / Alcosa"
+      "Ciudad Jardín",
+      "Huerta del Pilar",
+      "La Buhaira",
+      "La Calzada",
+      "La Florida",
+      "Nervión",
+      "San Bernardo",
+      "San Roque"
     ]
   },
-  "Bellavista - La Palmera": {
-    label: "Sevilla Capital - Bellavista - La Palmera",
+  "Cerro-Amate": {
+    label: "Sevilla Capital - Cerro-Amate",
     isCapital: true,
     barrios: [
-      "Reina Mercedes / Heliópolis",
-      "Los Bermejales",
-      "Bellavista Centro",
-      "Jardines de Hércules"
+      "Amate",
+      "El Cerro",
+      "Juan XXIII",
+      "La Plata",
+      "Los Pájaros",
+      "Palmete",
+      "Rochelambert",
+      "Santa Aurelia-Cantábrico-Atlántico-La Romería"
+    ]
+  },
+  "Sur": {
+    label: "Sevilla Capital - Sur",
+    isCapital: true,
+    barrios: [
+      "Avenida de la Paz",
+      "Felipe II-Los Diez Mandamientos",
+      "Giralda Sur",
+      "Huerta de la Salud",
+      "La Oliva",
+      "Las Letanías",
+      "Polígono Sur",
+      "Tabladilla-La Estrella",
+      "Tiro de Línea-Santa Genoveva"
+    ]
+  },
+  "Triana": {
+    label: "Sevilla Capital - Triana",
+    isCapital: true,
+    barrios: [
+      "Barrio León",
+      "El Tardón-El Carmen",
+      "Triana Casco Antiguo",
+      "Triana Este",
+      "Triana Oeste"
+    ]
+  },
+  "Norte": {
+    label: "Sevilla Capital - Norte",
+    isCapital: true,
+    barrios: [
+      "Barriada Pino Montano",
+      "Consolación",
+      "El Gordillo",
+      "Las Almenas",
+      "San Jerónimo",
+      "La Bachillera",
+      "Los Carteros",
+      "San Diego",
+      "Los Arcos",
+      "Las Naciones-Parque Atlántico-Las Dalias",
+      "San Matías",
+      "Aeropuerto Viejo",
+      "Valdezorras"
     ]
   },
   "San Pablo - Santa Justa": {
     label: "Sevilla Capital - San Pablo - Santa Justa",
     isCapital: true,
     barrios: [
-      "Santa Justa / Kansas City",
-      "San Pablo A, B, C, D",
-      "Huerta de Santa Teresa"
+      "Árbol Gordo",
+      "El Fontanal-María Auxiliadora-Carretera de Carmona",
+      "Huerta de Santa Teresa",
+      "La Corza",
+      "Las Huertas",
+      "San Carlos-Tartessos",
+      "San José Obrero",
+      "San Pablo A y B",
+      "San Pablo C",
+      "San Pablo D y E",
+      "Santa Clara",
+      "Zodiaco"
     ]
   },
-  // Aljarafe / Pueblos
-  "Mairena del Aljarafe": {
-    label: "Mairena del Aljarafe",
-    isCapital: false,
+  "Este-Alcosa-Torreblanca": {
+    label: "Sevilla Capital - Este-Alcosa-Torreblanca",
+    isCapital: true,
     barrios: [
-      "Mairena Centro / Casco Antiguo",
-      "Ciudad Expo / Metromar",
-      "Cavaleri",
-      "Simón Verde",
-      "Lepanto / El Jardinillo",
-      "Nuevo Bulevar"
+      "Colores-Entreparques",
+      "Palacio de Congresos-Urbadiez-Entrepuentes",
+      "Parque Alcosa-Jardines del Edén",
+      "Torreblanca"
     ]
   },
-  "Tomares": {
-    label: "Tomares",
-    isCapital: false,
+  "Palmera-Bellavista": {
+    label: "Sevilla Capital - Palmera-Bellavista",
+    isCapital: true,
     barrios: [
-      "Tomares Centro",
-      "Santa Eufemia",
-      "Villares Altos",
-      "Las Almenas",
-      "La Cartuja"
+      "Barriada de Pineda",
+      "Bellavista",
+      "Elcano-Los Bermejales",
+      "Heliópolis",
+      "Pedro Salvador-Las Palmeritas-Guadaíra",
+      "Sector Sur-La Palmera-Reina Mercedes"
     ]
   },
-  "Bormujos": {
-    label: "Bormujos",
-    isCapital: false,
+  "Los Remedios": {
+    label: "Sevilla Capital - Los Remedios",
+    isCapital: true,
     barrios: [
-      "Bormujos Centro",
-      "La Florida",
-      "Zaudín (Urbanización)",
-      "El Almendral"
+      "Tablada",
+      "Los Remedios"
     ]
   },
+  // Dos Hermanas
   "Dos Hermanas": {
     label: "Dos Hermanas",
     isCapital: false,
     barrios: [
       "Dos Hermanas Centro",
-      "Montequinto / Arco Norte",
-      "Condequinto (Urbanización)",
-      "Entrenúcleos"
+      "Quinto (Montequinto)",
+      "Condequinto",
+      "Olivar de Quintos",
+      "Fuente del Rey",
+      "Marisma y Puntales Adriano",
+      "Entrenúcleos",
+      "Barrio de Los Remedios",
+      "La Motilla"
     ]
   },
-  "Gines": {
-    label: "Gines",
+  // Comarca Metropolitana y Aljarafe
+  "Albaida del Aljarafe": {
+    label: "Albaida del Aljarafe",
     isCapital: false,
-    barrios: [
-      "Gines Centro / Casco Antiguo",
-      "Las Brisas",
-      "Urbanización El Prado",
-      "Europa / La Florida"
-    ]
+    barrios: ["Casco urbano de Albaida", "Urbanización San Sebastián", "Diseminados rurales"]
+  },
+  "Almensilla": {
+    label: "Almensilla",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Urbanización Santa Marina", "El Romeral", "Los Rosales", "Diseminados"]
+  },
+  "Benacazón": {
+    label: "Benacazón",
+    isCapital: false,
+    barrios: ["Casco urbano de Benacazón", "Urbanización El Mirador", "Urbanización Portaceli", "Diseminados"]
+  },
+  "Bollullos de la Mitación": {
+    label: "Bollullos de la Mitación",
+    isCapital: false,
+    barrios: ["Casco urbano", "Urbanización Cuatrovitas", "Urbanización La Juliana", "Urbanización Entrepinares", "Monasterio"]
+  },
+  "Bormujos": {
+    label: "Bormujos",
+    isCapital: false,
+    barrios: ["Casco urbano (Centro)", "Zona Avenida Juan Diego", "Aljamar", "Polígono Almargen", "Sector Metropol", "La Florida Sur", "Valencinilla del Hoyo"]
+  },
+  "Camas": {
+    label: "Camas",
+    isCapital: false,
+    barrios: ["Camas Centro", "Barriada de la Pañoleta", "El Carambolo", "Caño Ronco", "Coca de la Piñera", "Hato Verde"]
+  },
+  "Carrión de los Céspedes": {
+    label: "Carrión de los Céspedes",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Diseminados rústicos"]
+  },
+  "Castilleja de Guzmán": {
+    label: "Castilleja de Guzmán",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Urbanización Señorío de Guzmán", "Urbanización El Mirador"]
   },
   "Castilleja de la Cuesta": {
     label: "Castilleja de la Cuesta",
     isCapital: false,
-    barrios: [
-      "Castilleja Centro",
-      "Nueva Sevilla",
-      "El Faro / Real de la Alhambra"
-    ]
+    barrios: ["Casco urbano tradicional", "Barriada de la Nueva Sevilla", "Sector El Faro", "Diseminados"]
   },
-  "San Juan de Aznalfarache": {
-    label: "San Juan de Aznalfarache",
+  "Castilleja del Campo": {
+    label: "Castilleja del Campo",
     isCapital: false,
-    barrios: [
-      "Barrio Bajo / Parada de Metro",
-      "Barrio Alto",
-      "Valparaíso / Real Club de Golf"
-    ]
+    barrios: ["Casco urbano consolidado", "Diseminados agrarios"]
   },
   "Espartinas": {
     label: "Espartinas",
     isCapital: false,
-    barrios: [
-      "Espartinas Centro",
-      "Cerro del Viento",
-      "Urbanización El Retiro",
-      "Las Solanas"
-    ]
+    barrios: ["Espartinas Pueblo", "Loreto", "Zona Colegio Europa", "Ramal de Espartinas", "El Majuelo", "El Señorío", "Azahares", "Los Ciruelos", "El Martillo", "Paraíso del Jardín", "Paternilla", "Puerta de Hierro"]
   },
+  "Gelves": {
+    label: "Gelves",
+    isCapital: false,
+    barrios: ["Casco urbano bajo", "Marina de Gelves", "Simón Verde (compartido)", "Urbanización Gelves Club"]
+  },
+  "Gines": {
+    label: "Gines",
+    isCapital: false,
+    barrios: ["Casco urbano", "Barriada del Carmen", "El Manantial", "Gines Plaza", "Diseminados residenciales"]
+  },
+  "Huévar del Aljarafe": {
+    label: "Huévar del Aljarafe",
+    isCapital: false,
+    barrios: ["Casco urbano de Huévar", "Urbanización Guadial", "Diseminados industriales"]
+  },
+  "Mairena del Aljarafe": {
+    label: "Mairena del Aljarafe",
+    isCapital: false,
+    barrios: ["Mairena Centro", "Nuevo Bulevar", "Simón Verde", "Ciudad Aljarafe", "El Almendral", "La Prusiana", "Las Brisas I y II", "Hacienda Los Olivos", "Estacada del Marqués", "Ensanche Centro Histórico"]
+  },
+  "Olivares": {
+    label: "Olivares",
+    isCapital: false,
+    barrios: ["Casco urbano señorial", "Barriada de las Nieves", "Diseminados agrícolas"]
+  },
+  "Palomares del Río": {
+    label: "Palomares del Río",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Urbanización La Estrella", "Urbanización El Ramal", "Diseminados"]
+  },
+  "Pilas": {
+    label: "Pilas",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Barriada de San José", "Diseminados de olivar"]
+  },
+  "Salteras": {
+    label: "Salteras",
+    isCapital: false,
+    barrios: ["Casco urbano", "Urbanización Alero de Sevilla", "Diseminados residenciales"]
+  },
+  "San Juan de Aznalfarache": {
+    label: "San Juan de Aznalfarache",
+    isCapital: false,
+    barrios: ["Barrio Bajo", "Barriada de Guadalajara", "Monumento", "Camarón", "Andalucía", "Montelar", "Cornisa Azul", "Valparaíso", "Barrio Alto", "Santa Isabel", "Loreto"]
+  },
+  "Sanlúcar la Mayor": {
+    label: "Sanlúcar la Mayor",
+    isCapital: false,
+    barrios: ["Casco urbano de Sanlúcar", "Urbanización Los Soles", "Las Torres", "Diseminados"]
+  },
+  "Santiponce": {
+    label: "Santiponce",
+    isCapital: false,
+    barrios: ["Casco urbano", "Barriada de Itálica", "Sector monumental", "Diseminados"]
+  },
+  "Tomares": {
+    label: "Tomares",
+    isCapital: false,
+    barrios: ["Tomares Centro", "Montefuerte", "Valdovina", "Santa Eufemia", "Las Siete Alanzadas", "Sillero", "La Venta Blanca", "Esteban de Arones", "Duchuelas", "Zaudín Bajo", "Zaudín Alto"]
+  },
+  "Umbrete": {
+    label: "Umbrete",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Urbanización Las Palmeras", "Diseminados de viñas"]
+  },
+  "Valencina de la Concepción": {
+    label: "Valencina de la Concepción",
+    isCapital: false,
+    barrios: ["Casco urbano", "Urbanización La Gloria", "Torrijos", "Diseminados rústicos"]
+  },
+  "Villanueva del Ariscal": {
+    label: "Villanueva del Ariscal",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Urbanización El Almendral", "Diseminados"]
+  },
+  // Eje Fluvial de la Vega y las Marismas
+  "Alcalá del Río": {
+    label: "Alcalá del Río",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "El Viar", "San Ignacio del Viar", "Esquivel"]
+  },
+  "Alcolea del Río": {
+    label: "Alcolea del Río",
+    isCapital: false,
+    barrios: ["Casco urbano de Alcolea", "Diseminados rústicos"]
+  },
+  "Brenes": {
+    label: "Brenes",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Barriada de la Estación", "Diseminados de regadío"]
+  },
+  "Burguillos": {
+    label: "Burguillos",
+    isCapital: false,
+    barrios: ["Casco urbano", "Urbanización Señorío de Burguillos", "Diseminados de dehesa baja"]
+  },
+  "Cantillana": {
+    label: "Cantillana",
+    isCapital: false,
+    barrios: ["Casco urbano", "La Montaña", "Los Pajares", "Diseminados de la Vega alta"]
+  },
+  "Coria del Río": {
+    label: "Coria del Río",
+    isCapital: false,
+    barrios: ["Casco urbano", "La Hermandad y Tixe", "El Limonar", "El Lucero", "El Pozo", "Plaza Mazaco", "Barriada de las Alegrías"]
+  },
+  "La Algaba": {
+    label: "La Algaba",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Barriada del Aral", "El rincón de la Algaba", "Diseminados"]
+  },
+  "La Rinconada": {
+    label: "La Rinconada",
+    isCapital: false,
+    barrios: ["La Rinconada (Pueblo)", "San José de la Rinconada", "Tarazona", "La Jarilla", "El Gordillo", "Casavacas", "El Majuelo", "Tarazonilla", "Los Abetos", "El Castellón", "Los Labrados", "El Toril"]
+  },
+  "Lora del Río": {
+    label: "Lora del Río",
+    isCapital: false,
+    barrios: ["Casco urbano de Lora", "El Priorato", "Setefilla", "El Álamo", "Diseminados rústicos de gran escala"]
+  },
+  "Peñaflor": {
+    label: "Peñaflor",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Vegas de Almenara", "La Vereda (núcleo rústico de ocio)", "Diseminados"]
+  },
+  "Tocina": {
+    label: "Tocina",
+    isCapital: false,
+    barrios: ["Tocina (Pueblo)", "Los Rosales (núcleo ferroviario)", "La Playita"]
+  },
+  "Villaverde del Río": {
+    label: "Villaverde del Río",
+    isCapital: false,
+    barrios: ["Casco urbano de Villaverde", "Diseminados frutícolas de la Vega media"]
+  },
+  "Villanueva del Río y Minas": {
+    label: "Villanueva del Río y Minas",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Minas de la Reunión (historico enclave minero)", "Diseminados"]
+  },
+  "Aznalcázar": {
+    label: "Aznalcázar",
+    isCapital: false,
+    barrios: ["Casco urbano señorial", "Las Minas Golf", "Diseminados forestales de Doñana"]
+  },
+  "El Cuervo de Sevilla": {
+    label: "El Cuervo de Sevilla",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Diseminados"]
+  },
+  "Isla Mayor": {
+    label: "Isla Mayor",
+    isCapital: false,
+    barrios: ["Isla Mayor (Villafranco)", "Poblado de Alfonso XIII"]
+  },
+  "La Puebla del Río": {
+    label: "La Puebla del Río",
+    isCapital: false,
+    barrios: ["Casco urbano", "Dehesa de Abajo", "El Pintado", "Diseminados marismeños"]
+  },
+  "Las Cabezas de San Juan": {
+    label: "Las Cabezas de San Juan",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "San Leandro", "Vetaherrada", "Sacramento", "Diseminados"]
+  },
+  "Lebrija": {
+    label: "Lebrija",
+    isCapital: false,
+    barrios: ["Casco urbano señorial", "El Viñazo", "Marismas de Lebrija", "Diseminados agrícolas de regadío"]
+  },
+  "Villamanrique de la Condesa": {
+    label: "Villamanrique de la Condesa",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados forestales y rocieros"]
+  },
+  // La Campiña de Sevilla
   "Alcalá de Guadaíra": {
     label: "Alcalá de Guadaíra",
     isCapital: false,
-    barrios: [
-      "Alcalá Centro",
-      "Campo de las Beatas",
-      "Silos / La Rinconada",
-      "La Nogalera"
-    ]
+    barrios: ["Centro", "La Paz-Montecarmelo", "Nueva Alcalá", "Oromana", "Torrequinto", "Campoalegre", "Zacatín", "Altos de Oromana", "Nueva Europa", "Mirador del Guadaíra", "Gandul", "La Juncosa", "Pinos del Nevero", "La Galbana", "Virgen del Águila", "El Eucaliptal"]
   },
-  "La Rinconada": {
-    label: "La Rinconada / San José",
+  "Arahal": {
+    label: "Arahal",
     isCapital: false,
-    barrios: [
-      "San José de la Rinconada Centro",
-      "La Rinconada Centro",
-      "El Mirador / La Paz"
-    ]
+    barrios: ["Casco urbano señorial", "Barriada de la Palmera", "Diseminados rústicos"]
+  },
+  "Carmona": {
+    label: "Carmona",
+    isCapital: false,
+    barrios: ["Casco histórico amurallado", "Guadajoz", "Urbanización Pino Grande", "Las Monjas", "Diseminados de gran escala"]
+  },
+  "Cañada Rosal": {
+    label: "Cañada Rosal",
+    isCapital: false,
+    barrios: ["Casco urbano regular", "Diseminados"]
+  },
+  "Écija": {
+    label: "Écija",
+    isCapital: false,
+    barrios: ["Casco monumental", "Villanueva del Rey", "El Villar", "Cerro Perea", "Diseminados de la campiña alta"]
+  },
+  "El Coronil": {
+    label: "El Coronil",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados agrarios"]
+  },
+  "El Palmar de Troya": {
+    label: "El Palmar de Troya",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "sector del Palmar de Troya"]
+  },
+  "El Rubio": {
+    label: "El Rubio",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados agrarios"]
+  },
+  "El Viso del Alcor": {
+    label: "El Viso del Alcor",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "El Huerto de la Alunada", "Diseminados"]
+  },
+  "Fuentes de Andalucía": {
+    label: "Fuentes de Andalucía",
+    isCapital: false,
+    barrios: ["Casco urbano barroco", "Diseminados de campiña"]
+  },
+  "Herrera": {
+    label: "Herrera",
+    isCapital: false,
+    barrios: ["Casco urbano de Herrera", "Las Lagunillas", "Diseminados agrícolas"]
+  },
+  "La Campana": {
+    label: "La Campana",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Diseminados agrarios"]
+  },
+  "La Luisiana": {
+    label: "La Luisiana",
+    isCapital: false,
+    barrios: ["La Luisiana (Centro)", "El Campillo"]
+  },
+  "La Puebla de Cazalla": {
+    label: "La Puebla de Cazalla",
+    isCapital: false,
+    barrios: ["Casco urbano", "Barriada de la Fuenlonguilla", "Diseminados de campiña baja"]
+  },
+  "Lantejuela": {
+    label: "Lantejuela",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados agrarios"]
+  },
+  "Los Molares": {
+    label: "Los Molares",
+    isCapital: false,
+    barrios: ["Casco urbano", "El Castillo", "Diseminados de campiña media"]
+  },
+  "Los Palacios y Villafranca": {
+    label: "Los Palacios y Villafranca",
+    isCapital: false,
+    barrios: ["Casco urbano denso", "El Trobal", "Maribáñez", "Chapatales"]
+  },
+  "Mairena del Alcor": {
+    label: "Mairena del Alcor",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "El Torreón", "Alconchel", "Diseminados residenciales"]
+  },
+  "Marchena": {
+    label: "Marchena",
+    isCapital: false,
+    barrios: ["Casco histórico señorial", "sector de la Alcazaba", "Diseminados de campiña baja"]
+  },
+  "Marinaleda": {
+    label: "Marinaleda",
+    isCapital: false,
+    barrios: ["Casco urbano", "Matarredonda", "Diseminados cooperativos"]
+  },
+  "Morón de la Frontera": {
+    label: "Morón de la Frontera",
+    isCapital: false,
+    barrios: ["Casco monumental", "Barriada del Pantano", "El Rancho", "Diseminados rústicos"]
+  },
+  "Osuna": {
+    label: "Osuna",
+    isCapital: false,
+    barrios: ["Casco histórico monumental", "El Puerto de la Encina", "Diseminados agrarios"]
+  },
+  "Paradas": {
+    label: "Paradas",
+    isCapital: false,
+    barrios: ["Casco urbano regular", "Diseminados agrarios"]
   },
   "Utrera": {
     label: "Utrera",
     isCapital: false,
-    barrios: [
-      "Utrera Centro",
-      "Consolación",
-      "La Mulata / Naranjal de Castillo"
-    ]
+    barrios: ["Utrera Centro", "Trajano", "Pinzón", "Guadalema de los Quintero", "El Torbiscal", "La Herradera", "Casablanca", "Casas Cerros", "El Comodoro", "La Aguardientera", "Los Adrianes", "El Recuero", "La Juncosa"]
   },
-  "Mairena del Alcor / El Viso": {
-    label: "Mairena del Alcor / El Viso",
+  // Territorios de Frontera - Sierra Morena
+  "Alanís": {
+    label: "Alanís",
     isCapital: false,
-    barrios: [
-      "Mairena del Alcor Centro",
-      "El Viso del Alcor Centro",
-      "Urbanizaciones / Los Alcores"
-    ]
+    barrios: ["Casco urbano medieval", "Diseminados rústicos y forestales"]
+  },
+  "Almadén de la Plata": {
+    label: "Almadén de la Plata",
+    isCapital: false,
+    barrios: ["Casco urbano de Almadén", "Diseminados de dehesa"]
+  },
+  "Aznalcóllar": {
+    label: "Aznalcóllar",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "zona minera", "Diseminados forestales"]
+  },
+  "Castilblanco de los Arroyos": {
+    label: "Castilblanco de los Arroyos",
+    isCapital: false,
+    barrios: ["Casco urbano", "San Benito", "Diseminados del Camino de Santiago"]
+  },
+  "Cazalla de la Sierra": {
+    label: "Cazalla de la Sierra",
+    isCapital: false,
+    barrios: ["Casco urbano monumental", "Diseminados forestales de dehesa"]
+  },
+  "Constantina": {
+    label: "Constantina",
+    isCapital: false,
+    barrios: ["Casco urbano señorial", "Barriada de la Morería", "Diseminados rústicos"]
+  },
+  "El Castillo de las Guardas": {
+    label: "El Castillo (Pueblo)",
+    isCapital: false,
+    barrios: ["Arroyo de la Plata (Venta Abajo)", "Valdeflores", "Minas del Castillo (Fuente Pinar, Vistahermosa, La Mina)", "La Aulaga", "Archidona", "La Alcornocosa (Los Humeros)", "El Cañuelo", "El Peralejo (Peralejo Alto, Peralejo Bajo)", "Las Cañadillas", "Peroamigo", "Las Cortecillas"]
+  },
+  "El Garrobo": {
+    label: "El Garrobo",
+    isCapital: false,
+    barrios: ["Casco urbano serrano", "Diseminados cinegéticos"]
+  },
+  "El Madroño": {
+    label: "El Madroño",
+    isCapital: false,
+    barrios: ["Casco urbano de El Madroño", "El Pintado", "Villaguzmán", "El Alamo", "Diseminados"]
+  },
+  "El Pedroso": {
+    label: "El Pedroso",
+    isCapital: false,
+    barrios: ["Casco urbano", "Diseminados forestales de Sierra Morena central"]
+  },
+  "El Real de la Jara": {
+    label: "El Real de la Jara",
+    isCapital: false,
+    barrios: ["Casco urbano serrano consolidado", "Diseminados forestales"]
+  },
+  "El Ronquillo": {
+    label: "El Ronquillo",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "El Romeral", "Diseminados rústicos de dehesa"]
+  },
+  "Gerena": {
+    label: "Gerena",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados residenciales"]
+  },
+  "Guadalcanal": {
+    label: "Guadalcanal",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional serrano", "Diseminados rústicos de olivar"]
+  },
+  "Guillena": {
+    label: "Guillena",
+    isCapital: false,
+    barrios: ["Casco urbano de Guillena", "Las Pajanosas", "Torre de la Reina"]
+  },
+  "La Puebla de los Infantes": {
+    label: "La Puebla de los Infantes",
+    isCapital: false,
+    barrios: ["Casco urbano de La Puebla", "Diseminados forestales del embalse de José Torán"]
+  },
+  "Las Navas de la Concepción": {
+    label: "Las Navas de la Concepción",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados de dehesa alta"]
+  },
+  "San Nicolás del Puerto": {
+    label: "San Nicolás del Puerto",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Cascadas del Huéznar", "Diseminados turísticos"]
+  },
+  // Territorios de Frontera - Sierra Sur
+  "Aguadulce": {
+    label: "Aguadulce",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional serrano", "Diseminados rústicos"]
+  },
+  "Algámitas": {
+    label: "Algámitas",
+    isCapital: false,
+    barrios: ["Casco urbano de Algámitas", "Peñón de Algámitas", "Diseminados turísticos"]
+  },
+  "Badolatosa": {
+    label: "Badolatosa",
+    isCapital: false,
+    barrios: ["Casco urbano de Badolatosa", "Corcoya", "Diseminados"]
+  },
+  "Casariche": {
+    label: "Casariche",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "El Rigüelo", "Diseminados agrarios"]
+  },
+  "Coripe": {
+    label: "Coripe",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional serrano", "Diseminados forestales and de olivar"]
+  },
+  "El Saucejo": {
+    label: "El Saucejo",
+    isCapital: false,
+    barrios: ["Casco urbano de El Saucejo", "La Mezquitilla", "Navarredonda", "Diseminados agrícolas"]
+  },
+  "Estepa": {
+    label: "Estepa",
+    isCapital: false,
+    barrios: ["Casco histórico", "Barriada de los Remedios", "Polígono industrial de mantecados"]
+  },
+  "Gilena": {
+    label: "Gilena",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados agrícolas"]
+  },
+  "La Roda de Andalucía": {
+    label: "La Roda de Andalucía",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Barriada de la Estación", "Diseminados rústicos"]
+  },
+  "Lora de Estepa": {
+    label: "Lora de Estepa",
+    isCapital: false,
+    barrios: ["Casco urbano de Lora de Estepa", "Diseminados rústicos de olivar"]
+  },
+  "Los Corrales": {
+    label: "Los Corrales",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional serrano", "Diseminados agrícolas"]
+  },
+  "Martín de la Jara": {
+    label: "Martín de la Jara",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "sector de la Laguna del Gobierno", "Diseminados"]
+  },
+  "Montellano": {
+    label: "Montellano",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional", "Diseminados forestales"]
+  },
+  "Pedrera": {
+    label: "Pedrera",
+    isCapital: false,
+    barrios: ["Casco urbano de Pedrera", "Diseminados industriales y de olivar"]
+  },
+  "Pruna": {
+    label: "Pruna",
+    isCapital: false,
+    barrios: ["Casco urbano consolidado", "Castillo de Hierro", "El Pilar Lejos", "Diseminados"]
+  },
+  "Villanueva de San Juan": {
+    label: "Villanueva de San Juan",
+    isCapital: false,
+    barrios: ["Casco urbano tradicional serrano", "Diseminados agrícolas de campiña de sierra"]
   }
 };
 
@@ -236,9 +747,9 @@ export interface FlatZone {
 }
 
 // Helper utility to flatten the taxonomy into a single searchable array
-export const getFlatZones = (): FlatZone[] => {
+export const getFlatZones = (taxonomy: Record<string, SevillaTaxonomyData>): FlatZone[] => {
   const list: FlatZone[] = [];
-  Object.entries(SEVILLA_TAXONOMY).forEach(([dist, data]) => {
+  Object.entries(taxonomy).forEach(([dist, data]) => {
     data.barrios.forEach((b) => {
       list.push({
         key: `${dist} - ${b}`,
@@ -258,15 +769,43 @@ interface ZoneSelectorPremiumProps {
 }
 
 export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSelectorPremiumProps) {
+  // Load initial taxonomy, merging with local storage custom zones
+  const [customTaxonomy, setCustomTaxonomy] = useState<Record<string, SevillaTaxonomyData>>(() => {
+    const tax = { ...SEVILLA_TAXONOMY };
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("crm_custom_zones");
+        if (stored) {
+          const parsed = JSON.parse(stored) as Record<string, string[]>;
+          Object.entries(parsed).forEach(([dist, barrios]) => {
+            if (tax[dist]) {
+              const merged = Array.from(new Set([...tax[dist].barrios, ...barrios]));
+              tax[dist] = { ...tax[dist], barrios: merged };
+            } else {
+              tax[dist] = {
+                label: dist.toLowerCase().includes("sevilla") ? `Sevilla Capital - ${dist}` : dist,
+                isCapital: dist.toLowerCase().includes("sevilla"),
+                barrios: barrios
+              };
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Error loading custom zones:", e);
+      }
+    }
+    return tax;
+  });
+
   const [activeTab, setActiveTab] = useState<"tree" | "search" | "ai">("tree");
   const [searchTerm, setSearchTerm] = useState("");
   
   // Tree collapse state tracking by district key
   const [collapsedDistricts, setCollapsedDistricts] = useState<Record<string, boolean>>(() => {
     const states: Record<string, boolean> = {};
-    Object.keys(SEVILLA_TAXONOMY).forEach(k => {
+    Object.keys(customTaxonomy).forEach(k => {
       // Keep Sevilla Capital districts expanded by default, collapse pueblos
-      states[k] = !SEVILLA_TAXONOMY[k].isCapital;
+      states[k] = !customTaxonomy[k].isCapital;
     });
     return states;
   });
@@ -276,7 +815,7 @@ export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSel
   const [chatHistory, setChatHistory] = useState<Array<{ sender: "user" | "paula", text: string, zones?: string[] }>>([
     {
       sender: "paula",
-      text: "¡Hola Álvaro! Escribe en lenguaje natural qué zonas, calles o hitos de Sevilla busca tu comprador (ej: 'Busca algo cerca de Metromar en Mairena o en Triana cerca del río') y las marcaré automáticamente por ti."
+      text: "¡Hola Álvaro! Escribe en lenguaje natural qué zonas, calles o hitos de Sevilla busca tu comprador (ej: 'Busca algo cerca de Metromar en Mairena o en Triana cerca del río') y las marcaré automáticamente por ti.\n\n💡 ¡NUEVO! También puedes pedirme registrar una nueva zona directamente diciendo por ejemplo: 'Añade la zona Camas - Nuevo Barrio' y la incorporaré al instante a tu catálogo."
     }
   ]);
   const [aiLoading, setAiLoading] = useState(false);
@@ -284,7 +823,7 @@ export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSel
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
   // Flattened zones dictionary for search and AI comparison
-  const flatZones = useMemo(() => getFlatZones(), []);
+  const flatZones = useMemo(() => getFlatZones(customTaxonomy), [customTaxonomy]);
 
   const toggleDistrictCollapse = (district: string) => {
     setCollapsedDistricts(prev => ({
@@ -371,6 +910,51 @@ export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSel
 
       setAiProposedZones(detected);
       setAiFeedback(reasoning);
+
+      // Si la respuesta nos indica registrar una nueva zona de forma dinámica
+      if (result.add_custom_zone) {
+        const { district, barrio } = result.add_custom_zone;
+        if (district && barrio) {
+          setCustomTaxonomy(prev => {
+            const next = { ...prev };
+            if (next[district]) {
+              if (!next[district].barrios.includes(barrio)) {
+                next[district] = {
+                  ...next[district],
+                  barrios: [...next[district].barrios, barrio]
+                };
+              }
+            } else {
+              next[district] = {
+                label: district.toLowerCase().includes("sevilla") ? `Sevilla Capital - ${district}` : district,
+                isCapital: district.toLowerCase().includes("sevilla"),
+                barrios: [barrio]
+              };
+            }
+            
+            // Guardar en localStorage para persistencia local en el CRM
+            if (typeof window !== "undefined") {
+              const localParsed: Record<string, string[]> = {};
+              Object.entries(next).forEach(([k, d]) => {
+                const originalBarrios = SEVILLA_TAXONOMY[k]?.barrios || [];
+                const custom = d.barrios.filter(b => !originalBarrios.includes(b));
+                if (custom.length > 0 || !SEVILLA_TAXONOMY[k]) {
+                  localParsed[k] = custom.length > 0 ? custom : d.barrios;
+                }
+              });
+              localStorage.setItem("crm_custom_zones", JSON.stringify(localParsed));
+            }
+            
+            return next;
+          });
+
+          // Registrar selección automática de la nueva zona creada
+          const newZoneKey = `${district} - ${barrio}`;
+          if (!selectedZones.includes(newZoneKey)) {
+            onChange([...selectedZones, newZoneKey]);
+          }
+        }
+      }
       
       setChatHistory(prev => [
         ...prev, 
@@ -494,7 +1078,7 @@ export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSel
                 Sevilla Capital
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.entries(SEVILLA_TAXONOMY)
+                {Object.entries(customTaxonomy)
                   .filter(([_, data]) => data.isCapital)
                   .map(([distKey, data]) => (
                     <div key={distKey} className="bg-slate-950/20 border border-white/5 rounded-xl overflow-hidden transition-all">
@@ -555,7 +1139,7 @@ export default function ZoneSelectorPremium({ selectedZones, onChange }: ZoneSel
                 Aljarafe / Provincia
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Object.entries(SEVILLA_TAXONOMY)
+                {Object.entries(customTaxonomy)
                   .filter(([_, data]) => !data.isCapital)
                   .map(([distKey, data]) => (
                     <div key={distKey} className="bg-slate-950/20 border border-white/5 rounded-xl overflow-hidden transition-all">

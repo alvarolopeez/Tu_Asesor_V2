@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import ZoneSelectorPremium from "./ZoneSelectorPremium";
+import ZoneSelectorPremium, { SEVILLA_TAXONOMY } from "./ZoneSelectorPremium";
 import { 
   Users, 
   Search, 
@@ -64,41 +64,15 @@ interface BuyerActivityLog {
 }
 
 // ─── CONSTANTS ──────────────────────────────────────────────────────────
-const SEVILLA_ZONAS_CAPITAL = [
-  "Centro", 
-  "Triana", 
-  "Los Remedios", 
-  "Nervión", 
-  "Macarena", 
-  "Sevilla Este", 
-  "Bellavista - La Palmera", 
-  "Bermejales", 
-  "Viapol - Buhaira", 
-  "San Pablo", 
-  "Alcosa - Torreblanca", 
-  "Pino Montano", 
-  "San Jerónimo", 
-  "El Cerro - Amate", 
-  "Heliópolis - Reina Mercedes"
-];
+const SEVILLA_ZONAS_CAPITAL = Object.entries(SEVILLA_TAXONOMY)
+  .filter(([_, data]) => data.isCapital)
+  .map(([key]) => key)
+  .sort((a, b) => a.localeCompare(b, 'es'));
 
-const SEVILLA_ZONAS_PUEBLOS = [
-  "Mairena del Aljarafe", 
-  "Tomares", 
-  "Bormujos", 
-  "Gines", 
-  "Camas",
-  "Dos Hermanas (Centro)", 
-  "Dos Hermanas (Montequinto)", 
-  "Alcalá de Guadaíra",
-  "San Juan de Aznalfarache", 
-  "Espartinas", 
-  "Utrera", 
-  "Carmona", 
-  "Mairena del Alcor", 
-  "Coria del Río", 
-  "Gelves"
-];
+const SEVILLA_ZONAS_PUEBLOS = Object.entries(SEVILLA_TAXONOMY)
+  .filter(([_, data]) => !data.isCapital)
+  .map(([key]) => key)
+  .sort((a, b) => a.localeCompare(b, 'es'));
 
 const PROPERTY_TYPES = ["Piso", "Casa", "Ático", "Dúplex", "Chalet", "Local", "Oficina", "Cualquiera"];
 const STATUS_OPTIONS = ['Búsqueda activa', 'En negociación', 'Con piso reservado', 'Inactivo'] as const;
@@ -456,7 +430,11 @@ export default function BuyersManager() {
       (b.email && b.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // 2. Zone Filter
-    const matchesZone = !filterZone || (Array.isArray(b.preferred_zones) && b.preferred_zones.includes(filterZone));
+    const matchesZone = !filterZone || (Array.isArray(b.preferred_zones) && b.preferred_zones.some(z => {
+      if (z === filterZone) return true;
+      if (z.startsWith(`${filterZone} - `)) return true;
+      return false;
+    }));
 
     // 3. Status Filter
     const matchesStatus = !filterStatus || b.status === filterStatus;

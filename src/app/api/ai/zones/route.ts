@@ -14,86 +14,526 @@ const TAXONOMY_PROMPT = `
 TAXONOMÍA OFICIAL DISPONIBLE (Distrito/Municipio - Barrio/Subzona):
 
 Sevilla Capital:
-- "Centro - Santa Cruz / Alfalfa"
-- "Centro - Casco Antiguo / Arenal"
-- "Centro - San Vicente / San Lorenzo"
-- "Centro - Regina / Encarnación"
-- "Centro - Puerta de Jerez / Prado"
-- "Triana - Triana Casco Antiguo / Calle Betis"
-- "Triana - Barrio León"
-- "Triana - El Tardón"
-- "Triana - Voluntad / Pagés del Corro"
-- "Triana - Ronda de Triana"
-- "Los Remedios - Los Remedios Centro / Asunción"
-- "Los Remedios - Tablada"
-- "Los Remedios - Parque de los Príncipes"
-- "Nervión - Nervión Centro / Buhaira"
-- "Nervión - Viapol / San Bernardo"
-- "Nervión - Ramón y Cajal / Ciudad Jardín"
-- "Nervión - La Calzada / Luis Montoto"
-- "Macarena - La Macarena / Parlamento"
-- "Macarena - Doctor Barraquer / León XIII"
+- "Centro - Alfalfa"
+- "Centro - El Arenal"
+- "Centro - Encarnación-Regina"
+- "Centro - Feria"
+- "Centro - Museo"
+- "Centro - San Bartolomé"
+- "Centro - San Gil"
+- "Centro - San Julián"
+- "Centro - San Lorenzo"
+- "Centro - San Vicente"
+- "Centro - Santa Catalina"
+- "Centro - Santa Cruz"
+- "Macarena - Begoña-Santa Catalina"
+- "Macarena - Campos de Soria"
+- "Macarena - Cisneo Alto-Santa María de Gracia"
+- "Macarena - Cruz Roja-Capuchinos"
+- "Macarena - Doctor Barraquer-Grupo Renfe-Policlínico"
+- "Macarena - El Carmen"
 - "Macarena - El Cerezo"
-- "Macarena - Pio XII / Miraflores"
-- "Sevilla Este - Avenida de las Ciencias"
-- "Sevilla Este - Las Gondolas / Entrepuentes"
-- "Sevilla Este - Polígono Aeropuerto / Puerta Este"
-- "Sevilla Este - Emilio Lemos / Alcosa"
-- "Bellavista - La Palmera - Reina Mercedes / Heliópolis"
-- "Bellavista - La Palmera - Los Bermejales"
-- "Bellavista - La Palmera - Bellavista Centro"
-- "Bellavista - La Palmera - Jardines de Hércules"
-- "San Pablo - Santa Justa - Santa Justa / Kansas City"
-- "San Pablo - Santa Justa - San Pablo A, B, C, D"
+- "Macarena - El Rocío"
+- "Macarena - El Torrejón"
+- "Macarena - Hermandades-La Carrasca"
+- "Macarena - La Barzola"
+- "Macarena - La Palmilla-Doctor Marañón"
+- "Macarena - La Paz-Las Golondrinas"
+- "Macarena - Las Avenidas"
+- "Macarena - León XIII-Los Naranjos"
+- "Macarena - Los Príncipes-La Fontanilla"
+- "Macarena - Macarena Tres Huertas-Macarena Cinco"
+- "Macarena - Pino Flores"
+- "Macarena - Pío XII"
+- "Macarena - Retiro Obrero"
+- "Macarena - Santas Justa y Rufina-Parque Miraflores"
+- "Macarena - Santa María de Ordas-San Nicolás"
+- "Macarena - Villegas"
+- "Macarena - Polígono Norte"
+- "Nervión - Ciudad Jardín"
+- "Nervión - Huerta del Pilar"
+- "Nervión - La Buhaira"
+- "Nervión - La Calzada"
+- "Nervión - La Florida"
+- "Nervión - Nervión"
+- "Nervión - San Bernardo"
+- "Nervión - San Roque"
+- "Cerro-Amate - Amate"
+- "Cerro-Amate - El Cerro"
+- "Cerro-Amate - Juan XXIII"
+- "Cerro-Amate - La Plata"
+- "Cerro-Amate - Los Pájaros"
+- "Cerro-Amate - Palmete"
+- "Cerro-Amate - Rochelambert"
+- "Cerro-Amate - Santa Aurelia-Cantábrico-Atlántico-La Romería"
+- "Sur - Avenida de la Paz"
+- "Sur - Felipe II-Los Diez Mandamientos"
+- "Sur - Giralda Sur"
+- "Sur - Huerta de la Salud"
+- "Sur - La Oliva"
+- "Sur - Las Letanías"
+- "Sur - Polígono Sur"
+- "Sur - Tabladilla-La Estrella"
+- "Sur - Tiro de Línea-Santa Genoveva"
+- "Triana - Barrio León"
+- "Triana - El Tardón-El Carmen"
+- "Triana - Triana Casco Antiguo"
+- "Triana - Triana Este"
+- "Triana - Triana Oeste"
+- "Norte - Barriada Pino Montano"
+- "Norte - Consolación"
+- "Norte - El Gordillo"
+- "Norte - Las Almenas"
+- "Norte - San Jerónimo"
+- "Norte - La Bachillera"
+- "Norte - Los Carteros"
+- "Norte - San Diego"
+- "Norte - Los Arcos"
+- "Norte - Las Naciones-Parque Atlántico-Las Dalias"
+- "Norte - San Matías"
+- "Norte - Aeropuerto Viejo"
+- "Norte - Valdezorras"
+- "San Pablo - Santa Justa - Árbol Gordo"
+- "San Pablo - Santa Justa - El Fontanal-María Auxiliadora-Carretera de Carmona"
 - "San Pablo - Santa Justa - Huerta de Santa Teresa"
+- "San Pablo - Santa Justa - La Corza"
+- "San Pablo - Santa Justa - Las Huertas"
+- "San Pablo - Santa Justa - San Carlos-Tartessos"
+- "San Pablo - Santa Justa - San José Obrero"
+- "San Pablo - Santa Justa - San Pablo A y B"
+- "San Pablo - Santa Justa - San Pablo C"
+- "San Pablo - Santa Justa - San Pablo D y E"
+- "San Pablo - Santa Justa - Santa Clara"
+- "San Pablo - Santa Justa - Zodiaco"
+- "Este-Alcosa-Torreblanca - Colores-Entreparques"
+- "Este-Alcosa-Torreblanca - Palacio de Congresos-Urbadiez-Entrepuentes"
+- "Este-Alcosa-Torreblanca - Parque Alcosa-Jardines del Edén"
+- "Este-Alcosa-Torreblanca - Torreblanca"
+- "Palmera-Bellavista - Barriada de Pineda"
+- "Palmera-Bellavista - Bellavista"
+- "Palmera-Bellavista - Elcano-Los Bermejales"
+- "Palmera-Bellavista - Heliópolis"
+- "Palmera-Bellavista - Pedro Salvador-Las Palmeritas-Guadaíra"
+- "Palmera-Bellavista - Sector Sur-La Palmera-Reina Mercedes"
+- "Los Remedios - Tablada"
+- "Los Remedios - Los Remedios"
 
-Pueblos del Aljarafe / Provincia:
-- "Mairena del Aljarafe - Mairena Centro / Casco Antiguo"
-- "Mairena del Aljarafe - Ciudad Expo / Metromar"
-- "Mairena del Aljarafe - Cavaleri"
-- "Mairena del Aljarafe - Simón Verde"
-- "Mairena del Aljarafe - Lepanto / El Jardinillo"
-- "Mairena del Aljarafe - Nuevo Bulevar"
-- "Tomares - Tomares Centro"
-- "Tomares - Santa Eufemia"
-- "Tomares - Villares Altos"
-- "Tomares - Las Almenas"
-- "Tomares - La Cartuja"
-- "Bormujos - Bormujos Centro"
-- "Bormujos - La Florida"
-- "Bormujos - Zaudín (Urbanización)"
-- "Bormujos - El Almendral"
+Dos Hermanas:
 - "Dos Hermanas - Dos Hermanas Centro"
-- "Dos Hermanas - Montequinto / Arco Norte"
-- "Dos Hermanas - Condequinto (Urbanización)"
+- "Dos Hermanas - Quinto (Montequinto)"
+- "Dos Hermanas - Condequinto"
+- "Dos Hermanas - Olivar de Quintos"
+- "Dos Hermanas - Fuente del Rey"
+- "Dos Hermanas - Marisma y Puntales Adriano"
 - "Dos Hermanas - Entrenúcleos"
-- "Gines - Gines Centro / Casco Antiguo"
-- "Gines - Las Brisas"
-- "Gines - Urbanización El Prado"
-- "Gines - Europa / La Florida"
-- "Castilleja de la Cuesta - Castilleja Centro"
-- "Castilleja de la Cuesta - Nueva Sevilla"
-- "Castilleja de la Cuesta - El Faro / Real de la Alhambra"
-- "San Juan de Aznalfarache - Barrio Bajo / Parada de Metro"
+- "Dos Hermanas - Barrio de Los Remedios"
+- "Dos Hermanas - La Motilla"
+
+Comarca Metropolitana y Aljarafe:
+- "Albaida del Aljarafe - Casco urbano de Albaida"
+- "Albaida del Aljarafe - Urbanización San Sebastián"
+- "Albaida del Aljarafe - Diseminados rurales"
+- "Almensilla - Casco urbano consolidado"
+- "Almensilla - Urbanización Santa Marina"
+- "Almensilla - El Romeral"
+- "Almensilla - Los Rosales"
+- "Almensilla - Diseminados"
+- "Benacazón - Casco urbano de Benacazón"
+- "Benacazón - Urbanización El Mirador"
+- "Benacazón - Urbanización Portaceli"
+- "Benacazón - Diseminados"
+- "Bollullos de la Mitación - Casco urbano"
+- "Bollullos de la Mitación - Urbanización Cuatrovitas"
+- "Bollullos de la Mitación - Urbanización La Juliana"
+- "Bollullos de la Mitación - Urbanización Entrepinares"
+- "Bollullos de la Mitación - Monasterio"
+- "Bormujos - Casco urbano (Centro)"
+- "Bormujos - Zona Avenida Juan Diego"
+- "Bormujos - Aljamar"
+- "Bormujos - Polígono Almargen"
+- "Bormujos - Sector Metropol"
+- "Bormujos - La Florida Sur"
+- "Bormujos - Valencinilla del Hoyo"
+- "Camas - Camas Centro"
+- "Camas - Barriada de la Pañoleta"
+- "Camas - El Carambolo"
+- "Camas - Caño Ronco"
+- "Camas - Coca de la Piñera"
+- "Camas - Hato Verde"
+- "Carrión de los Céspedes - Casco urbano consolidado"
+- "Carrión de los Céspedes - Diseminados rústicos"
+- "Castilleja de Guzmán - Casco urbano tradicional"
+- "Castilleja de Guzmán - Urbanización Señorío de Guzmán"
+- "Castilleja de Guzmán - Urbanización El Mirador"
+- "Castilleja de la Cuesta - Casco urbano tradicional"
+- "Castilleja de la Cuesta - Barriada de la Nueva Sevilla"
+- "Castilleja de la Cuesta - Sector El Faro"
+- "Castilleja de la Cuesta - Diseminados"
+- "Castilleja del Campo - Casco urbano consolidado"
+- "Castilleja del Campo - Diseminados agrarios"
+- "Espartinas - Espartinas Pueblo"
+- "Espartinas - Loreto"
+- "Espartinas - Zona Colegio Europa"
+- "Espartinas - Ramal de Espartinas"
+- "Espartinas - El Majuelo"
+- "Espartinas - El Señorío"
+- "Espartinas - Azahares"
+- "Espartinas - Los Ciruelos"
+- "Espartinas - El Martillo"
+- "Espartinas - Paraíso del Jardín"
+- "Espartinas - Paternilla"
+- "Espartinas - Puerta de Hierro"
+- "Gelves - Casco urbano bajo"
+- "Gelves - Marina de Gelves"
+- "Gelves - Simón Verde (compartido)"
+- "Gelves - Urbanización Gelves Club"
+- "Gines - Casco urbano"
+- "Gines - Barriada del Carmen"
+- "Gines - El Manantial"
+- "Gines - Gines Plaza"
+- "Gines - Diseminados residenciales"
+- "Huévar del Aljarafe - Casco urbano de Huévar"
+- "Huévar del Aljarafe - Urbanización Guadial"
+- "Huévar del Aljarafe - Diseminados industriales"
+- "Mairena del Aljarafe - Mairena Centro"
+- "Mairena del Aljarafe - Nuevo Bulevar"
+- "Mairena del Aljarafe - Simón Verde"
+- "Mairena del Aljarafe - Ciudad Aljarafe"
+- "Mairena del Aljarafe - El Almendral"
+- "Mairena del Aljarafe - La Prusiana"
+- "Mairena del Aljarafe - Las Brisas I y II"
+- "Mairena del Aljarafe - Hacienda Los Olivos"
+- "Mairena del Aljarafe - Estacada del Marqués"
+- "Mairena del Aljarafe - Ensanche Centro Histórico"
+- "Olivares - Casco urbano señorial"
+- "Olivares - Barriada de las Nieves"
+- "Olivares - Diseminados agrícolas"
+- "Palomares del Río - Casco urbano tradicional"
+- "Palomares del Río - Urbanización La Estrella"
+- "Palomares del Río - Urbanización El Ramal"
+- "Palomares del Río - Diseminados"
+- "Pilas - Casco urbano consolidado"
+- "Pilas - Barriada de San José"
+- "Pilas - Diseminados de olivar"
+- "Salteras - Casco urbano"
+- "Salteras - Urbanización Alero de Sevilla"
+- "Salteras - Diseminados residenciales"
+- "San Juan de Aznalfarache - Barrio Bajo"
+- "San Juan de Aznalfarache - Barriada de Guadalajara"
+- "San Juan de Aznalfarache - Monumento"
+- "San Juan de Aznalfarache - Camarón"
+- "San Juan de Aznalfarache - Andalucía"
+- "San Juan de Aznalfarache - Montelar"
+- "San Juan de Aznalfarache - Cornisa Azul"
+- "San Juan de Aznalfarache - Valparaíso"
 - "San Juan de Aznalfarache - Barrio Alto"
-- "San Juan de Aznalfarache - Valparaíso / Real Club de Golf"
-- "Espartinas - Espartinas Centro"
-- "Espartinas - Cerro del Viento"
-- "Espartinas - Urbanización El Retiro"
-- "Espartinas - Las Solanas"
-- "Alcalá de Guadaíra - Alcalá Centro"
-- "Alcalá de Guadaíra - Campo de las Beatas"
-- "Alcalá de Guadaíra - Silos / La Rinconada"
-- "Alcalá de Guadaíra - La Nogalera"
-- "La Rinconada - San José de la Rinconada Centro"
-- "La Rinconada - La Rinconada Centro"
-- "La Rinconada - El Mirador / La Paz"
+- "San Juan de Aznalfarache - Santa Isabel"
+- "San Juan de Aznalfarache - Loreto"
+- "Sanlúcar la Mayor - Casco urbano de Sanlúcar"
+- "Sanlúcar la Mayor - Urbanización Los Soles"
+- "Sanlúcar la Mayor - Las Torres"
+- "Sanlúcar la Mayor - Diseminados"
+- "Santiponce - Casco urbano"
+- "Santiponce - Barriada de Itálica"
+- "Santiponce - Sector monumental"
+- "Santiponce - Diseminados"
+- "Tomares - Tomares Centro"
+- "Tomares - Montefuerte"
+- "Tomares - Valdovina"
+- "Tomares - Santa Eufemia"
+- "Tomares - Las Siete Alanzadas"
+- "Tomares - Sillero"
+- "Tomares - La Venta Blanca"
+- "Tomares - Esteban de Arones"
+- "Tomares - Duchuelas"
+- "Tomares - Zaudín Bajo"
+- "Tomares - Zaudín Alto"
+- "Umbrete - Casco urbano tradicional"
+- "Umbrete - Urbanización Las Palmeras"
+- "Umbrete - Diseminados de viñas"
+- "Valencina de la Concepción - Casco urbano"
+- "Valencina de la Concepción - Urbanización La Gloria"
+- "Valencina de la Concepción - Torrijos"
+- "Valencina de la Concepción - Diseminados rústicos"
+- "Villanueva del Ariscal - Casco urbano tradicional"
+- "Villanueva del Ariscal - Urbanización El Almendral"
+- "Villanueva del Ariscal - Diseminados"
+
+Eje Fluvial de la Vega y las Marismas:
+- "Alcalá del Río - Casco urbano consolidado"
+- "Alcalá del Río - El Viar"
+- "Alcalá del Río - San Ignacio del Viar"
+- "Alcalá del Río - Esquivel"
+- "Alcolea del Río - Casco urbano de Alcolea"
+- "Alcolea del Río - Diseminados rústicos"
+- "Brenes - Casco urbano consolidado"
+- "Brenes - Barriada de la Estación"
+- "Brenes - Diseminados de regadío"
+- "Burguillos - Casco urbano"
+- "Burguillos - Urbanización Señorío de Burguillos"
+- "Burguillos - Diseminados de dehesa baja"
+- "Cantillana - Casco urbano"
+- "Cantillana - La Montaña"
+- "Cantillana - Los Pajares"
+- "Cantillana - Diseminados de la Vega alta"
+- "Coria del Río - Casco urbano"
+- "Coria del Río - La Hermandad y Tixe"
+- "Coria del Río - El Limonar"
+- "Coria del Río - El Lucero"
+- "Coria del Río - El Pozo"
+- "Coria del Río - Plaza Mazaco"
+- "Coria del Río - Barriada de las Alegrías"
+- "La Algaba - Casco urbano tradicional"
+- "La Algaba - Barriada del Aral"
+- "La Algaba - El rincón de la Algaba"
+- "La Algaba - Diseminados"
+- "La Rinconada - La Rinconada (Pueblo)"
+- "La Rinconada - San José de la Rinconada"
+- "La Rinconada - Tarazona"
+- "La Rinconada - La Jarilla"
+- "La Rinconada - El Gordillo"
+- "La Rinconada - Casavacas"
+- "La Rinconada - El Majuelo"
+- "La Rinconada - Tarazonilla"
+- "La Rinconada - Los Abetos"
+- "La Rinconada - El Castellón"
+- "La Rinconada - Los Labrados"
+- "La Rinconada - El Toril"
+- "Lora del Río - Casco urbano de Lora"
+- "Lora del Río - El Priorato"
+- "Lora del Río - Setefilla"
+- "Lora del Río - El Álamo"
+- "Lora del Río - Diseminados rústicos de gran escala"
+- "Peñaflor - Casco urbano tradicional"
+- "Peñaflor - Vegas de Almenara"
+- "Peñaflor - La Vereda (núcleo rústico de ocio)"
+- "Peñaflor - Diseminados"
+- "Tocina - Tocina (Pueblo)"
+- "Tocina - Los Rosales (núcleo ferroviario)"
+- "Tocina - La Playita"
+- "Villaverde del Río - Casco urbano de Villaverde"
+- "Villaverde del Río - Diseminados frutícolas de la Vega media"
+- "Villanueva del Río y Minas - Casco urbano tradicional"
+- "Villanueva del Río y Minas - Minas de la Reunión (historico enclave minero)"
+- "Villanueva del Río y Minas - Diseminados"
+- "Aznalcázar - Casco urbano señorial"
+- "Aznalcázar - Las Minas Golf"
+- "Aznalcázar - Diseminados forestales de Doñana"
+- "El Cuervo de Sevilla - Casco urbano consolidado"
+- "El Cuervo de Sevilla - Diseminados"
+- "Isla Mayor - Isla Mayor (Villafranco)"
+- "Isla Mayor - Poblado de Alfonso XIII"
+- "La Puebla del Río - Casco urbano"
+- "La Puebla del Río - Dehesa de Abajo"
+- "La Puebla del Río - El Pintado"
+- "La Puebla del Río - Diseminados marismeños"
+- "Las Cabezas de San Juan - Casco urbano consolidado"
+- "Las Cabezas de San Juan - San Leandro"
+- "Las Cabezas de San Juan - Vetaherrada"
+- "Las Cabezas de San Juan - Sacramento"
+- "Las Cabezas de San Juan - Diseminados"
+- "Lebrija - Casco urbano señorial"
+- "Lebrija - El Viñazo"
+- "Lebrija - Marismas de Lebrija"
+- "Lebrija - Diseminados agrícolas de regadío"
+- "Villamanrique de la Condesa - Casco urbano tradicional"
+- "Villamanrique de la Condesa - Diseminados forestales y rocieros"
+
+La Campiña de Sevilla:
+- "Alcalá de Guadaíra - Centro"
+- "Alcalá de Guadaíra - La Paz-Montecarmelo"
+- "Alcalá de Guadaíra - Nueva Alcalá"
+- "Alcalá de Guadaíra - Oromana"
+- "Alcalá de Guadaíra - Torrequinto"
+- "Alcalá de Guadaíra - Campoalegre"
+- "Alcalá de Guadaíra - Zacatín"
+- "Alcalá de Guadaíra - Altos de Oromana"
+- "Alcalá de Guadaíra - Nueva Europa"
+- "Alcalá de Guadaíra - Mirador del Guadaíra"
+- "Alcalá de Guadaíra - Gandul"
+- "Alcalá de Guadaíra - La Juncosa"
+- "Alcalá de Guadaíra - Pinos del Nevero"
+- "Alcalá de Guadaíra - La Galbana"
+- "Alcalá de Guadaíra - Virgen del Águila"
+- "Alcalá de Guadaíra - El Eucaliptal"
+- "Arahal - Casco urbano señorial"
+- "Arahal - Barriada de la Palmera"
+- "Arahal - Diseminados rústicos"
+- "Carmona - Casco histórico amurallado"
+- "Carmona - Guadajoz"
+- "Carmona - Urbanización Pino Grande"
+- "Carmona - Las Monjas"
+- "Carmona - Diseminados de gran escala"
+- "Cañada Rosal - Casco urbano regular"
+- "Cañada Rosal - Diseminados"
+- "Écija - Casco monumental"
+- "Écija - Villanueva del Rey"
+- "Écija - El Villar"
+- "Écija - Cerro Perea"
+- "Écija - Diseminados de la campiña alta"
+- "El Coronil - Casco urbano tradicional"
+- "El Coronil - Diseminados agrarios"
+- "El Palmar de Troya - Casco urbano consolidado"
+- "El Palmar de Troya - sector del Palmar de Troya"
+- "El Rubio - Casco urbano tradicional"
+- "El Rubio - Diseminados agrarios"
+- "El Viso del Alcor - Casco urbano consolidado"
+- "El Viso del Alcor - El Huerto de la Alunada"
+- "El Viso del Alcor - Diseminados"
+- "Fuentes de Andalucía - Casco urbano barroco"
+- "Fuentes de Andalucía - Diseminados de campiña"
+- "Herrera - Casco urbano de Herrera"
+- "Herrera - Las Lagunillas"
+- "Herrera - Diseminados agrícolas"
+- "La Campana - Casco urbano consolidado"
+- "La Campana - Diseminados agrarios"
+- "La Luisiana - La Luisiana (Centro)"
+- "La Luisiana - El Campillo"
+- "La Puebla de Cazalla - Casco urbano"
+- "La Puebla de Cazalla - Barriada de la Fuenlonguilla"
+- "La Puebla de Cazalla - Diseminados de campiña baja"
+- "Lantejuela - Casco urbano tradicional"
+- "Lantejuela - Diseminados agrarios"
+- "Los Molares - Casco urbano"
+- "Los Molares - El Castillo"
+- "Los Molares - Diseminados de campiña media"
+- "Los Palacios y Villafranca - Casco urbano denso"
+- "Los Palacios y Villafranca - El Trobal"
+- "Los Palacios y Villafranca - Maribáñez"
+- "Los Palacios y Villafranca - Chapatales"
+- "Mairena del Alcor - Casco urbano consolidado"
+- "Mairena del Alcor - El Torreón"
+- "Mairena del Alcor - Alconchel"
+- "Mairena del Alcor - Diseminados residenciales"
+- "Marchena - Casco histórico señorial"
+- "Marchena - sector de la Alcazaba"
+- "Marchena - Diseminados de campiña baja"
+- "Marinaleda - Casco urbano"
+- "Marinaleda - Matarredonda"
+- "Marinaleda - Diseminados cooperativos"
+- "Morón de la Frontera - Casco monumental"
+- "Morón de la Frontera - Barriada del Pantano"
+- "Morón de la Frontera - El Rancho"
+- "Morón de la Frontera - Diseminados rústicos"
+- "Osuna - Casco histórico monumental"
+- "Osuna - El Puerto de la Encina"
+- "Osuna - Diseminados agrarios"
+- "Paradas - Casco urbano regular"
+- "Paradas - Diseminados agrarios"
 - "Utrera - Utrera Centro"
-- "Utrera - Consolación"
-- "Utrera - La Mulata / Naranjal de Castillo"
-- "Mairena del Alcor / El Viso - Mairena del Alcor Centro"
-- "Mairena del Alcor / El Viso - El Viso del Alcor Centro"
-- "Mairena del Alcor / El Viso - Urbanizaciones / Los Alcores"
+- "Utrera - Trajano"
+- "Utrera - Pinzón"
+- "Utrera - Guadalema de los Quintero"
+- "Utrera - El Torbiscal"
+- "Utrera - La Herradera"
+- "Utrera - Casablanca"
+- "Utrera - Casas Cerros"
+- "Utrera - El Comodoro"
+- "Utrera - La Aguardientera"
+- "Utrera - Los Adrianes"
+- "Utrera - El Recuero"
+- "Utrera - La Juncosa"
+
+Territorios de Frontera - Sierra Morena:
+- "Alanís - Casco urbano medieval"
+- "Alanís - Diseminados rústicos y forestales"
+- "Almadén de la Plata - Casco urbano de Almadén"
+- "Almadén de la Plata - Diseminados de dehesa"
+- "Aznalcóllar - Casco urbano consolidado"
+- "Aznalcóllar - zona minera"
+- "Aznalcóllar - Diseminados forestales"
+- "Castilblanco de los Arroyos - Casco urbano"
+- "Castilblanco de los Arroyos - San Benito"
+- "Castilblanco de los Arroyos - Diseminados del Camino de Santiago"
+- "Cazalla de la Sierra - Casco urbano monumental"
+- "Cazalla de la Sierra - Diseminados forestales de dehesa"
+- "Constantina - Casco urbano señorial"
+- "Constantina - Barriada de la Morería"
+- "Constantina - Diseminados rústicos"
+- "El Castillo de las Guardas - El Castillo (Pueblo)"
+- "El Castillo de las Guardas - Arroyo de la Plata (Venta Abajo)"
+- "El Castillo de las Guardas - Valdeflores"
+- "El Castillo de las Guardas - Minas del Castillo (Fuente Pinar, Vistahermosa, La Mina)"
+- "El Castillo de las Guardas - La Aulaga"
+- "El Castillo de las Guardas - Archidona"
+- "El Castillo de las Guardas - La Alcornocosa (Los Humeros)"
+- "El Castillo de las Guardas - El Cañuelo"
+- "El Castillo de las Guardas - El Peralejo (Peralejo Alto, Peralejo Bajo)"
+- "El Castillo de las Guardas - Las Cañadillas"
+- "El Castillo de las Guardas - Peroamigo"
+- "El Castillo de las Guardas - Las Cortecillas"
+- "El Garrobo - Casco urbano serrano"
+- "El Garrobo - Diseminados cinegéticos"
+- "El Madroño - Casco urbano de El Madroño"
+- "El Madroño - El Pintado"
+- "El Madroño - Villaguzmán"
+- "El Madroño - El Alamo"
+- "El Madroño - Diseminados"
+- "El Pedroso - Casco urbano"
+- "El Pedroso - Diseminados forestales de Sierra Morena central"
+- "El Real de la Jara - Casco urbano serrano consolidado"
+- "El Real de la Jara - Diseminados forestales"
+- "El Ronquillo - Casco urbano consolidado"
+- "El Ronquillo - El Romeral"
+- "El Ronquillo - Diseminados rústicos de dehesa"
+- "Gerena - Casco urbano tradicional"
+- "Gerena - Diseminados residenciales"
+- "Guadalcanal - Casco urbano tradicional serrano"
+- "Guadalcanal - Diseminados rústicos de olivar"
+- "Guillena - Casco urbano de Guillena"
+- "Guillena - Las Pajanosas"
+- "Guillena - Torre de la Reina"
+- "La Puebla de los Infantes - Casco urbano de La Puebla"
+- "La Puebla de los Infantes - Diseminados forestales del embalse de José Torán"
+- "Las Navas de la Concepción - Casco urbano tradicional"
+- "Las Navas de la Concepción - Diseminados de dehesa alta"
+- "San Nicolás del Puerto - Casco urbano consolidado"
+- "San Nicolás del Puerto - Cascadas del Huéznar"
+- "San Nicolás del Puerto - Diseminados turísticos"
+
+Territorios de Frontera - Sierra Sur:
+- "Aguadulce - Casco urbano tradicional serrano"
+- "Aguadulce - Diseminados rústicos"
+- "Algámitas - Casco urbano de Algámitas"
+- "Algámitas - Peñón de Algámitas"
+- "Algámitas - Diseminados turísticos"
+- "Badolatosa - Casco urbano de Badolatosa"
+- "Badolatosa - Corcoya"
+- "Badolatosa - Diseminados"
+- "Casariche - Casco urbano consolidado"
+- "Casariche - El Rigüelo"
+- "Casariche - Diseminados agrarios"
+- "Coripe - Casco urbano tradicional serrano"
+- "Coripe - Diseminados forestales and de olivar"
+- "El Saucejo - Casco urbano de El Saucejo"
+- "El Saucejo - La Mezquitilla"
+- "El Saucejo - Navarredonda"
+- "El Saucejo - Diseminados agrícolas"
+- "Estepa - Casco histórico"
+- "Estepa - Barriada de los Remedios"
+- "Estepa - Polígono industrial de mantecados"
+- "Gilena - Casco urbano tradicional"
+- "Gilena - Diseminados agrícolas"
+- "La Roda de Andalucía - Casco urbano tradicional"
+- "La Roda de Andalucía - Barriada de la Estación"
+- "La Roda de Andalucía - Diseminados rústicos"
+- "Lora de Estepa - Casco urbano de Lora de Estepa"
+- "Lora de Estepa - Diseminados rústicos de olivar"
+- "Los Corrales - Casco urbano tradicional serrano"
+- "Los Corrales - Diseminados agrícolas"
+- "Martín de la Jara - Casco urbano consolidado"
+- "Martín de la Jara - sector de la Laguna del Gobierno"
+- "Martín de la Jara - Diseminados"
+- "Montellano - Casco urbano tradicional"
+- "Montellano - Diseminados forestales"
+- "Pedrera - Casco urbano de Pedrera"
+- "Pedrera - Diseminados industriales y de olivar"
+- "Pruna - Casco urbano consolidado"
+- "Pruna - Castillo de Hierro"
+- "Pruna - El Pilar Lejos"
+- "Pruna - Diseminados"
+- "Villanueva de San Juan - Casco urbano tradicional serrano"
+- "Villanueva de San Juan - Diseminados agrícolas de campiña de sierra"
 `;
 
 const SYSTEM_INSTRUCTION = `
@@ -104,15 +544,16 @@ ${TAXONOMY_PROMPT}
 
 INSTRUCCIONES DE RAZONAMIENTO SEMÁNTICO:
 1. Si el usuario menciona una calle, monumento o punto emblemático, asócialo al barrio/subzona correspondiente. Ejemplos de mapeo semántico:
-   - "calle Betis", "calle Pages del Corro" -> "Triana - Triana Casco Antiguo / Calle Betis" o "Triana - Voluntad / Pagés del Corro".
+   - "calle Betis", "calle Pages del Corro" -> "Triana - Triana Casco Antiguo" o "Triana - El Tardón-El Carmen".
    - "Metromar", "Ciudad Expo", "parada de metro Ciudad Expo" -> "Mairena del Aljarafe - Ciudad Expo / Metromar".
-   - "Ramón y Cajal", "facultades Viapol", "San Bernardo" -> "Nervión - Viapol / San Bernardo" o "Nervión - Ramón y Cajal / Ciudad Jardín".
-   - "Asunción", "feria", "Parque de los Príncipes" -> "Los Remedios - Los Remedios Centro / Asunción" o "Los Remedios - Parque de los Príncipes".
-   - "Avenida de las Ciencias", "Las Góndolas", "Alcosa" -> "Sevilla Este - Avenida de las Ciencias", "Sevilla Este - Las Gondolas / Entrepuentes" o "Sevilla Este - Emilio Lemos / Alcosa".
-   - "Zaudín" -> "Bormujos - Zaudín (Urbanización)".
-   - "Entrenúcleos", "Montequinto", "Condequinto" -> "Dos Hermanas - Entrenúcleos", "Dos Hermanas - Montequinto / Arco Norte" o "Dos Hermanas - Condequinto (Urbanización)".
+   - "Ramón y Cajal", "facultades Viapol", "San Bernardo" -> "Nervión - Viapol / San Bernardo" o "Nervión - Ciudad Jardín".
+   - "Asunción", "feria", "Parque de los Príncipes" -> "Los Remedios - Los Remedios Centro".
+   - "Avenida de las Ciencias", "Las Góndolas", "Alcosa" -> "Este-Alcosa-Torreblanca - Parque Alcosa-Jardines del Edén" o "Este-Alcosa-Torreblanca - Colores-Entreparques".
+   - "Zaudín" -> "Tomares - Zaudín Bajo" o "Tomares - Zaudín Alto".
+   - "Entrenúcleos", "Montequinto", "Condequinto" -> "Dos Hermanas - Entrenúcleos", "Dos Hermanas - Quinto (Montequinto)" o "Dos Hermanas - Condequinto".
 2. Asocia múltiples barrios si la descripción abarca diferentes puntos.
-3. Si no hay suficiente información o la zona queda totalmente fuera de Sevilla y Aljarafe, devuelve un array vacío.
+3. Si el usuario te pide explícitamente agregar o añadir una nueva zona o barrio al catálogo (ej. "añade la zona Gines - La Florida" o "agrega el barrio Camas - El Chorrillo"), debes retornar la zona propuesta en la propiedad "add_custom_zone" con el distrito y barrio bien separados.
+4. Si no hay suficiente información o la zona queda totalmente fuera de Sevilla y Aljarafe, devuelve un array vacío en "detected_zones".
 
 DEBES DEVOLVER EXCLUSIVAMENTE UN OBJETO JSON CON LA SIGUIENTE ESTRUCTURA:
 {
@@ -120,8 +561,13 @@ DEBES DEVOLVER EXCLUSIVAMENTE UN OBJETO JSON CON LA SIGUIENTE ESTRUCTURA:
     "Nombre Exacto de la Zona 1 (debe coincidir con la lista de Taxonomía)",
     "Nombre Exacto de la Zona 2"
   ],
-  "reasoning": "Breve explicación de un párrafo en español de por qué has seleccionado estas zonas según las calles/hitos mencionados."
+  "reasoning": "Breve explicación de un párrafo en español de por qué has seleccionado estas zonas según las calles/hitos mencionados u orden recibida.",
+  "add_custom_zone": {
+    "district": "Nombre del Municipio/Distrito a agregar (ej: Gines)",
+    "barrio": "Nombre del Barrio/Subzona a agregar (ej: Nuevo Barrio)"
+  }
 }
+Note: "add_custom_zone" es opcional y solo debe incluirse si el usuario explícitamente te ordenó crear, añadir o registrar una zona que no existía.
 `;
 
 export async function POST(req: Request) {
@@ -217,31 +663,47 @@ function localKeywordDetector(text: string) {
   const detected: string[] = [];
   const reasons: string[] = [];
 
+  // A. Interceptar orden de agregar zona
+  const addRegex = /(?:añade|agrega|crea|registrar|registra)\s+(?:la\s+zona|el\s+barrio|la\s+localidad)?\s*([A-Za-zÀ-ÿ\s]+)\s*-\s*([A-Za-zÀ-ÿ\s\/\(\)\-\.\,]+)/i;
+  const match = text.match(addRegex);
+  if (match) {
+    const district = match[1].trim();
+    const barrio = match[2].trim();
+    return {
+      detected_zones: [`${district} - ${barrio}`],
+      reasoning: `¡Por supuesto, Álvaro! He detectado tu orden de agregar una nueva zona. Se ha registrado la zona "${district} - ${barrio}" en la taxonomía local de forma dinámica para este comprador.`,
+      add_custom_zone: {
+        district,
+        barrio
+      }
+    };
+  }
+
   // Mapeos rápidos de keywords a subzonas oficiales
   const mapping: { keywords: string[]; zoneId: string; reason: string }[] = [
     {
       keywords: ['santa cruz', 'alfalfa', 'judería', 'giralda'],
-      zoneId: 'Centro - Santa Cruz / Alfalfa',
+      zoneId: 'Centro - Santa Cruz',
       reason: 'barrio histórico de Santa Cruz o la Alfalfa'
     },
     {
       keywords: ['arenal', 'casco antiguo', 'museo', 'plaza de armas'],
-      zoneId: 'Centro - Casco Antiguo / Arenal',
+      zoneId: 'Centro - El Arenal',
       reason: 'entorno del Casco Antiguo / Arenal'
     },
     {
       keywords: ['san vicente', 'san lorenzo', 'alameda', 'hercules'],
-      zoneId: 'Centro - San Vicente / San Lorenzo',
+      zoneId: 'Centro - San Vicente',
       reason: 'zonas de San Vicente y San Lorenzo'
     },
     {
       keywords: ['regina', 'encarnacion', 'setas', 'feria'],
-      zoneId: 'Centro - Regina / Encarnación',
+      zoneId: 'Centro - Encarnación-Regina',
       reason: 'barrios colindantes a las Setas de la Encarnación o Regina'
     },
     {
       keywords: ['betis', 'triana casco', 'altozano', 'pureza'],
-      zoneId: 'Triana - Triana Casco Antiguo / Calle Betis',
+      zoneId: 'Triana - Triana Casco Antiguo',
       reason: 'corazón de Triana o la calle Betis'
     },
     {
@@ -250,63 +712,53 @@ function localKeywordDetector(text: string) {
       reason: 'el emblemático Barrio León'
     },
     {
-      keywords: ['ronda triana', 'ronda de triana'],
-      zoneId: 'Triana - Ronda de Triana',
-      reason: 'Avenida Ronda de Triana'
-    },
-    {
-      keywords: ['asuncion', 'asunción', 'remedios centro', 'república argentina'],
-      zoneId: 'Los Remedios - Los Remedios Centro / Asunción',
+      keywords: ['remedios centro', 'república argentina', 'asuncion', 'asunción'],
+      zoneId: 'Los Remedios - Los Remedios Centro',
       reason: 'eje comercial de la calle Asunción en Los Remedios'
     },
     {
-      keywords: ['parque de los principes', 'parque de los príncipes'],
-      zoneId: 'Los Remedios - Parque de los Príncipes',
-      reason: 'inmediaciones del Parque de los Príncipes'
-    },
-    {
       keywords: ['buhaira', 'nervion centro', 'nervión centro', 'eduardo dato'],
-      zoneId: 'Nervión - Nervión Centro / Buhaira',
+      zoneId: 'Nervión - Nervión Centro',
       reason: 'zona residencial de la Buhaira y Nervión Centro'
     },
     {
       keywords: ['viapol', 'san bernardo', 'ramon y cajal'],
-      zoneId: 'Nervión - Viapol / San Bernardo',
+      zoneId: 'Nervión - San Bernardo',
       reason: 'entorno universitario de Viapol o el barrio de San Bernardo'
     },
     {
       keywords: ['luis montoto', 'calzada', 'cruz campo'],
-      zoneId: 'Nervión - La Calzada / Luis Montoto',
+      zoneId: 'Nervión - La Calzada',
       reason: 'Avenida Luis Montoto o La Calzada'
     },
     {
       keywords: ['macarena parlament', 'parlamento', 'resolana'],
-      zoneId: 'Macarena - La Macarena / Parlamento',
+      zoneId: 'Macarena - Begoña-Santa Catalina',
       reason: 'zona histórica de la Macarena / Parlamento'
     },
     {
       keywords: ['ciencias', 'avenida de las ciencias', 'sevilla este'],
-      zoneId: 'Sevilla Este - Avenida de las Ciencias',
+      zoneId: 'Este-Alcosa-Torreblanca - Colores-Entreparques',
       reason: 'eje principal de la Avenida de las Ciencias en Sevilla Este'
     },
     {
       keywords: ['las gondolas', 'las góndolas', 'entrepuentes'],
-      zoneId: 'Sevilla Este - Las Gondolas / Entrepuentes',
+      zoneId: 'Este-Alcosa-Torreblanca - Palacio de Congresos-Urbadiez-Entrepuentes',
       reason: 'urbanizaciones Las Góndolas / Entrepuentes'
     },
     {
       keywords: ['alcosa', 'emilio lemos'],
-      zoneId: 'Sevilla Este - Emilio Lemos / Alcosa',
+      zoneId: 'Este-Alcosa-Torreblanca - Parque Alcosa-Jardines del Edén',
       reason: 'Avenida Emilio Lemos o Parque Alcosa'
     },
     {
       keywords: ['bermejales'],
-      zoneId: 'Bellavista - La Palmera - Los Bermejales',
+      zoneId: 'Palmera-Bellavista - Elcano-Los Bermejales',
       reason: 'los Bermejales'
     },
     {
       keywords: ['reina mercedes', 'heliopolis', 'heliópolis'],
-      zoneId: 'Bellavista - La Palmera - Reina Mercedes / Heliópolis',
+      zoneId: 'Palmera-Bellavista - Sector Sur-La Palmera-Reina Mercedes',
       reason: 'campus de Reina Mercedes o el barrio de Heliópolis'
     },
     {
@@ -314,7 +766,7 @@ function localKeywordDetector(text: string) {
       zoneId: 'San Pablo - Santa Justa - Santa Justa / Kansas City',
       reason: 'entorno de la Estación de Santa Justa o la Avenida Kansas City'
     },
-    // Aljarafe
+    // Aljarafe / Provincia
     {
       keywords: ['ciudad expo', 'metromar', 'metro mairena'],
       zoneId: 'Mairena del Aljarafe - Ciudad Expo / Metromar',
@@ -347,12 +799,12 @@ function localKeywordDetector(text: string) {
     },
     {
       keywords: ['zaudin', 'zaudín'],
-      zoneId: 'Bormujos - Zaudín (Urbanización)',
+      zoneId: 'Tomares - Zaudín Bajo',
       reason: 'exclusiva urbanización de golf Zaudín'
     },
     {
       keywords: ['montequinto', 'monte quinto'],
-      zoneId: 'Dos Hermanas - Montequinto / Arco Norte',
+      zoneId: 'Dos Hermanas - Quinto (Montequinto)',
       reason: 'distrito de Montequinto'
     },
     {
@@ -362,12 +814,12 @@ function localKeywordDetector(text: string) {
     },
     {
       keywords: ['gines', 'casco antiguo gines', 'el prado gines', 'las brisas gines'],
-      zoneId: 'Gines - Gines Centro / Casco Antiguo',
+      zoneId: 'Gines - Casco urbano',
       reason: 'municipio de Gines o sus urbanizaciones'
     },
     {
       keywords: ['castilleja', 'nueva sevilla', 'el faro castilleja'],
-      zoneId: 'Castilleja de la Cuesta - Castilleja Centro',
+      zoneId: 'Castilleja de la Cuesta - Casco urbano tradicional',
       reason: 'municipio de Castilleja de la Cuesta'
     },
     {
@@ -377,17 +829,17 @@ function localKeywordDetector(text: string) {
     },
     {
       keywords: ['espartinas', 'cerro del viento espartinas', 'el retiro espartinas'],
-      zoneId: 'Espartinas - Espartinas Centro',
+      zoneId: 'Espartinas - Espartinas Pueblo',
       reason: 'municipio de Espartinas'
     },
     {
       keywords: ['alcala de guadaira', 'alcalá de guadaira', 'alcala de guadaíra', 'alcalá de guadaíra', 'silos alcala', 'campo de las beatas'],
-      zoneId: 'Alcalá de Guadaíra - Alcalá Centro',
+      zoneId: 'Alcalá de Guadaíra - Centro',
       reason: 'municipio de Alcalá de Guadaíra'
     },
     {
       keywords: ['rinconada', 'san jose de la rinconada', 'san josé de la rinconada'],
-      zoneId: 'La Rinconada - San José de la Rinconada Centro',
+      zoneId: 'La Rinconada - San José de la Rinconada',
       reason: 'municipio de La Rinconada'
     },
     {
@@ -399,6 +851,66 @@ function localKeywordDetector(text: string) {
       keywords: ['mairena del alcor', 'el viso del alcor', 'los alcores'],
       zoneId: 'Mairena del Alcor / El Viso - Mairena del Alcor Centro',
       reason: 'zona de Los Alcores (Mairena o El Viso)'
+    },
+    {
+      keywords: ['camas', 'pañoleta', 'carambolo'],
+      zoneId: 'Camas - Camas Centro',
+      reason: 'municipio de Camas'
+    },
+    {
+      keywords: ['gelves', 'simon verde gelves'],
+      zoneId: 'Gelves - Casco urbano bajo',
+      reason: 'municipio de Gelves'
+    },
+    {
+      keywords: ['sanlucar la mayor', 'sanlúcar la mayor'],
+      zoneId: 'Sanlúcar la Mayor - Casco urbano de Sanlúcar',
+      reason: 'municipio de Sanlúcar la Mayor'
+    },
+    {
+      keywords: ['santiponce', 'italica', 'itálica'],
+      zoneId: 'Santiponce - Casco urbano',
+      reason: 'municipio de Santiponce e Itálica'
+    },
+    {
+      keywords: ['valencina'],
+      zoneId: 'Valencina de la Concepción - Casco urbano',
+      reason: 'municipio de Valencina de la Concepción'
+    },
+    {
+      keywords: ['coria del rio', 'coria del río', 'hermandad coria'],
+      zoneId: 'Coria del Río - Casco urbano',
+      reason: 'municipio de Coria del Río'
+    },
+    {
+      keywords: ['algaba', 'aral algaba'],
+      zoneId: 'La Algaba - Casco urbano tradicional',
+      reason: 'municipio de La Algaba'
+    },
+    {
+      keywords: ['carmona', 'monjas carmona'],
+      zoneId: 'Carmona - Casco histórico amurallado',
+      reason: 'municipio de Carmona'
+    },
+    {
+      keywords: ['ecija', 'écija'],
+      zoneId: 'Écija - Casco monumental',
+      reason: 'municipio de Écija'
+    },
+    {
+      keywords: ['los palacios', 'villafranca', 'palacios y villafranca'],
+      zoneId: 'Los Palacios y Villafranca - Casco urbano denso',
+      reason: 'municipio de Los Palacios y Villafranca'
+    },
+    {
+      keywords: ['moron', 'morón'],
+      zoneId: 'Morón de la Frontera - Casco monumental',
+      reason: 'municipio de Morón de la Frontera'
+    },
+    {
+      keywords: ['osuna'],
+      zoneId: 'Osuna - Casco histórico monumental',
+      reason: 'municipio de Osuna'
     }
   ];
 
