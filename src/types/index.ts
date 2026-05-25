@@ -31,6 +31,16 @@ export interface LeadInsert {
   preferences?: Record<string, unknown>;
 }
 
+export interface SellerActivityLog {
+  id: string;
+  lead_id: string;
+  event_type: string;
+  title: string;
+  notes: string | null;
+  event_date: string;
+  created_at: string;
+}
+
 // ─── PROPERTIES ───────────────────────────────────────
 export type PropertyStatus = 'active' | 'sold' | 'rented' | 'draft';
 

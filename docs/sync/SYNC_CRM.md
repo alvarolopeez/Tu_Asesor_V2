@@ -4,7 +4,14 @@
 Si otro agente añade funcionalidades que requieren gestión desde el panel (por ejemplo, el Agente IA necesita una pantalla para ver los logs del chatbot), debe solicitarlo aquí.
 
 ## 📥 Peticiones Pendientes
-*(No hay tareas pendientes en este momento)*
+
+### 🔴 [2026-05-25] Petición del Director General — Desarrollo Completo del Módulo Premium de "Vendedores CRM"
+* **Descripción**: Evolucionar la sección básica de leads comerciales (`WarmLeadsManager.tsx`) para crear una experiencia de administración inmersiva de propietarios vendedores (`SellersCRMManager.tsx` / `WarmSellersManager.tsx`).
+* **Requisitos**:
+  1. Cargar datos de `leads` filtrando estrictamente por `type = 'seller'`.
+  2. Implementar Drawer lateral completo ("SellersDrawer") con edición en caliente interactiva (`onBlur`/`Enter`) para datos personales, datos físicos del inmueble a valorar y consola de tasación/comisión.
+  3. Integrar la tabla de timeline cronológico de hitos consultando y guardando en la nueva tabla de Supabase `public.seller_activity_logs`.
+* **Instrucciones**: Consulta y sigue al detalle el plan arquitectónico completo en [docs/sync/estudio_crm_vendedores.md](file:///Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2/docs/sync/estudio_crm_vendedores.md).
 
 ---
 

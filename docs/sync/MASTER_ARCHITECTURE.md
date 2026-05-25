@@ -48,17 +48,17 @@ Zonas de Sevilla Capital (15) y Aljarafe/Pueblos (15)
 ```
 
 ### 📐 A. Algoritmo de Mapeo por Polígonos (Ray-Casting & Euclidean Fallback)
-1. **Centroides de Zonas:** Declaramos un set de 30 coordenadas fijas que representan el centro de gravedad (centroide) de cada barrio oficial de Sevilla Capital (ej. Triana, Nervión, Los Remedios) y localidades del Aljarafe/Provincia (ej. Tomares, Mairena del Aljarafe, Dos Hermanas).
+1. **Centroides de Zonas:** Declaramos un set robusto de coordenadas fijas que representan el centro de gravedad (centroide) de cada barrio oficial de Sevilla Capital (ej. Triana, Nervión, Los Remedios) y localidades del Aljarafe/Provincia (ej. Tomares, Mairena del Aljarafe, Dos Hermanas, Gines, Castilleja de la Cuesta, San Juan de Aznalfarache, Espartinas, Alcalá de Guadaíra, La Rinconada, Utrera, Mairena/Viso del Alcor).
 2. **Ray Casting Point-in-Polygon:** Al recibir el array de vértices de los polígonos dibujados en la interfaz de Leaflet por el usuario, el algoritmo comprueba qué centroides de barrios caen físicamente dentro del polígono.
    - Si la prueba es afirmativa, el barrio es añadido automáticamente al array `preferred_zones`.
 3. **Proximidad Euclidiana (Fallback):** En caso de que el usuario dibuje un polígono muy pequeño o entre zonas y ningún centroide caiga estrictamente dentro de él:
    - Se calcula la distancia euclidiana mínima entre el centroide del polígono dibujado y todos los centroides oficiales.
    - Se asocia el barrio más cercano con un umbral máximo de seguridad de `0.05` grados (aproximadamente **5 km**).
 
-### 📝 B. Algoritmo de Mapeo por Texto
+### 📝 B. Algoritmo de Mapeo por Texto e Inteligencia Artificial
 1. Se toma el texto escrito por el usuario en el campo de ubicación.
 2. Se somete a una función de normalización que elimina tildes y diéresis, convierte el texto a minúsculas y elimina espacios extras.
-3. Se realiza una comparación de inclusión parcial contra los nombres de las 30 zonas oficiales de Sevilla y el Aljarafe, mapeando con precisión los aciertos a la base de datos de manera normalizada.
+3. Se realiza una comparación de inclusión parcial contra los nombres de la taxonomía expandida (más de 100 zonas geográficas de Sevilla Metropolitana y Provincia), mapeando con precisión los aciertos a la base de datos de manera normalizada. Además, a través de **AI Zone Copilot (Gemini)** en el CRM, el texto se analiza de forma semántica para mapear calles, plazas o hitos con sus correspondientes subzonas oficiales.
 
 ---
 

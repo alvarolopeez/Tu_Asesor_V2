@@ -4,7 +4,15 @@
 Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO cambie debido a una actualización técnica, debe anotarlo aquí debajo.
 
 ## 📥 Peticiones Pendientes
-*(No hay tareas pendientes en este momento)*
+
+### 🔴 [2026-05-25] Petición del Director General — Diseño Visual e Interfaz Premium del Módulo de "Vendedores CRM"
+* **Descripción**: Diseñar el maquetado visual de la interfaz de administración de propietarios vendedores (`SellersCRMManager.tsx` / `WarmSellersManager.tsx`) y el Drawer lateral interactivo (`SellersDrawer.tsx`) bajo la estética Premium Dark Glassmorphism.
+* **Requisitos**:
+  1. Diseño glassmórfico de la tabla translúcida y KPI cards superiores con efectos hover ámbar `#FBBF24`.
+  2. Implementación de transiciones de apertura/cierre del Drawer con `framer-motion`.
+  3. Diseño de la pestaña de características físicas y "Consola de Tasación" en color ámbar.
+  4. Diseño del timeline de hitos del vendedor con hilo conductor decorativo vertical, burbujas transparentes de chat e iconos Lucide de colores.
+* **Instrucciones**: Consulta y sigue al detalle las directrices visuales completas en [docs/sync/estudio_crm_vendedores.md](file:///Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2/docs/sync/estudio_crm_vendedores.md).
 
 
 ## ✅ Peticiones Completadas
