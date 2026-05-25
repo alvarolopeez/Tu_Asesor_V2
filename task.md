@@ -24,6 +24,24 @@ Lista de mejoras premium implementadas en el front-end y la web pública para un
     - **Izquierda (65%)**: Carrusel fotográfico con hover e indicador de fotos, ficha de especificaciones con tarjetas de cristal templado, descripción limpia y gran botón verde interactivo para contacto directo por WhatsApp.
     - **Derecha (35%)**: Panel glassmorphic exclusivo para agendamiento online de visitas en tiempo real.
 
+- [x] Component Area 4: Potential Sellers CRM Module (SellersCRMManager / WarmSellersManager)
+  - [x] Executed SQL migration script to create `seller_activity_logs` table with RLS and index optimizations
+  - [x] Programmed `WarmLeadsManager.tsx` with Dark Glassmorphism, superior KPI Cards and search filters
+  - [x] Implemented in-place hot-editing Drawer (`SellersDrawer.tsx`) supporting Blur/Enter saving of preferences
+  - [x] Integrated auto-injection of logs in `seller_activity_logs` when funnel status changes
+  - [x] Verified full Next.js/TypeScript project compilation (`npm run build`)
+  - [x] Staged and committed changes successfully to the local repository
+
+- [x] Component Area 5: Multimedia & Blueprints/Plans Integration (Agente Web)
+  - [x] Added optional `video_url` and `plan_url` to `PropertyFeatures` in `src/app/comprar/page.tsx`
+  - [x] Implemented `activeMediaTab` and `isFullscreenPlan` states in `ComprarPage`
+  - [x] Reset tab states upon selected property change, starting with video if available or plan otherwise
+  - [x] Designed beautiful dark glassmorphic layout "Multimedia y Distribución" under description
+  - [x] Enabled multi-platform video integration (YouTube, Vimeo, direct MP4 `<video>`)
+  - [x] Implemented plan viewer (interactive fullscreen image viewer + secure PDF download card)
+  - [x] Added Escape keyboard handler to easily close the fullscreen blueprint view
+  - [x] Verified zero TypeScript compilation errors via `npm run build`
+
 - [x] **3. Banner de Cookies (`CookieConsent.tsx` y `LayoutWrapper.tsx`)**
   - [x] Creado componente flotante `CookieConsent.tsx` en la esquina inferior izquierda con diseño dark-glassmorphic de alta gama.
   - [x] Animación de entrada fluida basada en estados y transiciones nativas de Tailwind, libre de dependencias pesadas.

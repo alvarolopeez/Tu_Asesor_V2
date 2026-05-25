@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { 
   Search, Home, MapPin, Calendar, X, ChevronLeft, ChevronRight, 
   BedDouble, Bath, Ruler, DollarSign, CheckCircle2, Clock, 
-  Phone, Mail, User, Sparkles, AlertCircle, Maximize
+  Phone, Mail, User, Sparkles, AlertCircle, Maximize, FileText, Download
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Property } from "@/types";
+import type { Property, Appointment } from "@/types";
 import { bookPublicAppointment } from "@/lib/appointmentService";
 import { BUSINESS, VALIDATION } from "@/lib/constants";
 import BuyerRegistrationModal from "@/components/BuyerRegistrationModal";
@@ -29,6 +29,8 @@ interface PropertyFeatures {
     days?: string[]
     slots?: string[]
   }
+  video_url?: string
+  plan_url?: string
 }
 
 interface CalendarDay {
@@ -78,7 +80,7 @@ const getPropertyDetails = (property: Property) => {
   };
 };
 
-const getNext14Days = (features: any): CalendarDay[] => {
+const getNext14Days = (features: PropertyFeatures | null | undefined, existingAppointments: Partial<Appointment>[] = []): CalendarDay[] => {
   const days: CalendarDay[] = [];
   const DAYS_OF_WEEK_SPANISH = [
     'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
@@ -124,13 +126,36 @@ const getNext14Days = (features: any): CalendarDay[] => {
       }
     }
 
+    // Filtrar slots colisionados con citas de Álvaro en hora local
+    const filteredDaySlots = daySlots.filter((slotStr) => {
+      const [slotHour, slotMinute] = slotStr.split(':').map(Number);
+      
+      const isBlocked = existingAppointments.some((appt) => {
+        if (!appt.scheduled_at) return false;
+        const apptDate = new Date(appt.scheduled_at);
+        
+        // Comparar año, mes y día en hora local
+        const matchesDate = 
+          apptDate.getFullYear() === d.getFullYear() &&
+          apptDate.getMonth() === d.getMonth() &&
+          apptDate.getDate() === d.getDate();
+          
+        if (!matchesDate) return false;
+        
+        // Comparar horas y minutos
+        return apptDate.getHours() === slotHour && apptDate.getMinutes() === slotMinute;
+      });
+      
+      return !isBlocked;
+    });
+
     days.push({
       date: d,
       formattedDate,
       dayName,
       isoString,
-      isAvailable: daySlots.length > 0,
-      slots: daySlots
+      isAvailable: filteredDaySlots.length > 0,
+      slots: filteredDaySlots
     });
   }
 
@@ -155,25 +180,36 @@ export default function ComprarPage() {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [isFullscreenImages, setIsFullscreenImages] = useState(false);
 
-  // Keyboard navigation for fullscreen images
+  // Multimedia & Planos
+  const [activeMediaTab, setActiveMediaTab] = useState<'video' | 'plan'>('video');
+  const [isFullscreenPlan, setIsFullscreenPlan] = useState(false);
+
+  // Keyboard navigation for fullscreen images and plan
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isFullscreenImages || !selectedProperty?.images) return;
-      if (e.key === "ArrowLeft") {
-        setActiveImageIdx((prev) => (prev === 0 ? selectedProperty.images.length - 1 : prev - 1));
-      } else if (e.key === "ArrowRight") {
-        setActiveImageIdx((prev) => (prev === selectedProperty.images.length - 1 ? 0 : prev + 1));
-      } else if (e.key === "Escape") {
-        setIsFullscreenImages(false);
+      if (isFullscreenImages && selectedProperty?.images) {
+        if (e.key === "ArrowLeft") {
+          setActiveImageIdx((prev) => (prev === 0 ? selectedProperty.images.length - 1 : prev - 1));
+        } else if (e.key === "ArrowRight") {
+          setActiveImageIdx((prev) => (prev === selectedProperty.images.length - 1 ? 0 : prev + 1));
+        } else if (e.key === "Escape") {
+          setIsFullscreenImages(false);
+        }
+      }
+      if (isFullscreenPlan) {
+        if (e.key === "Escape") {
+          setIsFullscreenPlan(false);
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreenImages, selectedProperty]);
+  }, [isFullscreenImages, isFullscreenPlan, selectedProperty]);
 
   // Agendamiento Cita
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  const [appointments, setAppointments] = useState<Partial<Appointment>[]>([]);
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [bookingName, setBookingName] = useState("");
@@ -205,8 +241,8 @@ export default function ComprarPage() {
 
         if (fetchError) throw fetchError;
         setProperties(data || []);
-      } catch (err: any) {
-        console.error("Error al cargar propiedades de Supabase:", err);
+      } catch (err: unknown) {
+        console.error("Error al cargar propiedades de Supabase:", err instanceof Error ? err.message : String(err));
         setError("No se pudieron cargar las propiedades en este momento.");
       } finally {
         setLoading(false);
@@ -217,9 +253,39 @@ export default function ComprarPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedProperty) {
-      const days = getNext14Days(selectedProperty.features);
-      setCalendarDays(days);
+    async function loadAppointmentsAndSetCalendar() {
+      if (!selectedProperty) return;
+      
+      try {
+        const now = new Date();
+        const future = new Date();
+        future.setDate(now.getDate() + 14);
+
+        const { data, error } = await supabase
+          .from("appointments")
+          .select("scheduled_at, status")
+          .gte("scheduled_at", now.toISOString())
+          .lte("scheduled_at", future.toISOString())
+          .neq("status", "cancelled");
+
+        if (error) {
+          console.warn("Could not fetch appointments, calendar might show all slots:", error.message);
+          const days = getNext14Days(selectedProperty.features, []);
+          setCalendarDays(days);
+          setAppointments([]);
+        } else {
+          const apps = data || [];
+          setAppointments(apps);
+          const days = getNext14Days(selectedProperty.features, apps);
+          setCalendarDays(days);
+        }
+      } catch (err: unknown) {
+        console.warn("Unexpected error fetching appointments:", err instanceof Error ? err.message : String(err));
+        const days = getNext14Days(selectedProperty.features, []);
+        setCalendarDays(days);
+        setAppointments([]);
+      }
+      
       setSelectedDay(null);
       setSelectedSlot(null);
       setBookingName("");
@@ -230,7 +296,17 @@ export default function ComprarPage() {
       setBookingError(null);
       setActiveImageIdx(0);
       setIsFullscreenImages(false);
+
+      const f = (selectedProperty.features || {}) as PropertyFeatures;
+      if (f.video_url) {
+        setActiveMediaTab('video');
+      } else if (f.plan_url) {
+        setActiveMediaTab('plan');
+      }
+      setIsFullscreenPlan(false);
     }
+
+    loadAppointmentsAndSetCalendar();
   }, [selectedProperty]);
 
   const filteredProperties = properties.filter((p) => {
@@ -296,7 +372,8 @@ export default function ComprarPage() {
       } else {
         setBookingError(result.error || "No se pudo reservar la cita.");
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      console.error("Unexpected error in booking:", err instanceof Error ? err.message : String(err));
       setBookingError("Ocurrió un error inesperado al procesar tu reserva.");
     } finally {
       setBookingLoading(false);
@@ -648,6 +725,158 @@ export default function ComprarPage() {
                   </p>
                 </div>
 
+                {/* Sección Multimedia & Distribución */}
+                {(() => {
+                  const f = (selectedProperty.features || {}) as PropertyFeatures;
+                  const videoUrl = f.video_url;
+                  const planUrl = f.plan_url;
+
+                  if (!videoUrl && !planUrl) return null;
+
+                  const isYoutube = videoUrl?.includes("youtube.com") || videoUrl?.includes("youtu.be");
+                  const isVimeo = videoUrl?.includes("vimeo.com");
+
+                  const getYoutubeEmbedUrl = (url: string) => {
+                    let videoId = "";
+                    if (url.includes("youtube.com/watch")) {
+                      const urlParams = new URLSearchParams(url.split("?")[1]);
+                      videoId = urlParams.get("v") || "";
+                    } else if (url.includes("youtu.be/")) {
+                      videoId = url.split("youtu.be/")[1]?.split("?")[0] || "";
+                    } else if (url.includes("youtube.com/embed/")) {
+                      videoId = url.split("youtube.com/embed/")[1]?.split("?")[0] || "";
+                    }
+                    return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+                  };
+
+                  const getVimeoEmbedUrl = (url: string) => {
+                    let videoId = "";
+                    const regExp = /vimeo\.com\/(?:video\/)?([0-9]+)/;
+                    const match = url.match(regExp);
+                    if (match) {
+                      videoId = match[1];
+                    }
+                    return videoId ? `https://player.vimeo.com/video/${videoId}` : url;
+                  };
+
+                  const isPdfPlan = planUrl?.toLowerCase().endsWith(".pdf");
+
+                  return (
+                    <div className="bg-[#1E293B]/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                        <h3 className="text-lg font-bold text-[#FBBF24]">Multimedia y Distribución</h3>
+                        
+                        {/* Pestañas de navegación si existen ambos */}
+                        {videoUrl && planUrl && (
+                          <div className="bg-white/5 border border-white/10 rounded-xl p-1 flex gap-1 self-start sm:self-auto">
+                            <button
+                              type="button"
+                              onClick={() => setActiveMediaTab('video')}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                activeMediaTab === 'video'
+                                  ? "bg-[#FBBF24] text-[#0f172a] shadow-md shadow-yellow-500/10"
+                                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                              }`}
+                            >
+                              🎥 Recorrido en Vídeo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveMediaTab('plan')}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                activeMediaTab === 'plan'
+                                  ? "bg-[#FBBF24] text-[#0f172a] shadow-md shadow-yellow-500/10"
+                                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                              }`}
+                            >
+                              🗺️ Plano de la Casa
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Contenido según pestaña activa o recurso disponible */}
+                      {((videoUrl && planUrl && activeMediaTab === 'video') || (videoUrl && !planUrl)) && (
+                        <div className="space-y-3 animate-fadeIn">
+                          <p className="text-xs text-slate-400">Visualiza un recorrido completo y realista de la vivienda sin salir de casa.</p>
+                          <div className="relative aspect-video rounded-xl overflow-hidden border border-white/10 bg-black/40 shadow-inner group">
+                            {isYoutube ? (
+                              <iframe
+                                src={getYoutubeEmbedUrl(videoUrl!)}
+                                title="Recorrido virtual Youtube"
+                                className="w-full h-full border-none rounded-xl"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              ></iframe>
+                            ) : isVimeo ? (
+                              <iframe
+                                src={getVimeoEmbedUrl(videoUrl!)}
+                                title="Recorrido virtual Vimeo"
+                                className="w-full h-full border-none rounded-xl"
+                                allow="autoplay; fullscreen; picture-in-picture"
+                                allowFullScreen
+                              ></iframe>
+                            ) : (
+                              <video
+                                src={videoUrl}
+                                controls
+                                preload="metadata"
+                                playsInline
+                                className="w-full h-full rounded-xl object-cover"
+                              />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {((videoUrl && planUrl && activeMediaTab === 'plan') || (!videoUrl && planUrl)) && (
+                        <div className="space-y-3 animate-fadeIn">
+                          <p className="text-xs text-slate-400">Analiza con detalle las dimensiones, distribución y cotas técnicas del inmueble.</p>
+                          
+                          {isPdfPlan ? (
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-6 text-center flex flex-col items-center justify-center gap-4">
+                              <div className="w-16 h-16 rounded-full bg-[#FBBF24]/10 border border-[#FBBF24]/20 flex items-center justify-center">
+                                <FileText className="w-8 h-8 text-[#FBBF24]" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-white mb-1">Plano Técnico de Distribución</h4>
+                                <p className="text-xs text-slate-400">Este plano está en formato PDF de alta resolución, ideal para impresión o revisión detallada.</p>
+                              </div>
+                              <a
+                                href={planUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-[#FBBF24] hover:bg-yellow-400 text-[#0f172a] font-bold px-6 py-3 rounded-xl transition-all shadow-lg text-xs flex items-center gap-2 hover:scale-[1.02] active:scale-95"
+                              >
+                                <Download className="w-4 h-4" />
+                                <span>Descargar Plano PDF</span>
+                              </a>
+                            </div>
+                          ) : (
+                            <div 
+                              onClick={() => setIsFullscreenPlan(true)}
+                              className="relative rounded-xl overflow-hidden border border-white/10 bg-black/20 cursor-pointer group shadow-lg"
+                            >
+                              <img
+                                src={planUrl}
+                                alt="Plano de distribución de la vivienda"
+                                className="w-full max-h-80 object-contain mx-auto transition-transform duration-500 group-hover:scale-105"
+                              />
+                              
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                                <span className="bg-black/60 text-white border border-white/15 px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg">
+                                  <Maximize size={14} />
+                                  <span>Ampliar Plano</span>
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* WhatsApp Directo con Álvaro */}
                 <div className="bg-[#1E293B]/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="text-center sm:text-left">
@@ -723,6 +952,7 @@ export default function ComprarPage() {
                       {/* 1. Selección de Día */}
                       <div className="mb-4">
                         <label className="block text-xs font-semibold uppercase text-slate-400 mb-2">1. Selecciona el día</label>
+                        <div className="hidden" aria-hidden="true">{appointments.length}</div>
                         <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
                           {calendarDays.map((d) => (
                             <button
@@ -914,6 +1144,34 @@ export default function ComprarPage() {
               {/* Indicador de posición inferior */}
               <div className="absolute bottom-6 text-slate-400 text-sm font-semibold tracking-wider bg-black/40 border border-white/10 px-5 py-2 rounded-full backdrop-blur-md">
                 {activeImageIdx + 1} / {selectedProperty.images.length}
+              </div>
+            </div>
+          )}
+
+          {/* Overlay de Pantalla Completa para Plano */}
+          {isFullscreenPlan && (selectedProperty.features as PropertyFeatures)?.plan_url && (
+            <div className="fixed inset-0 bg-black/95 z-[100] flex flex-col justify-center items-center animate-fadeIn select-none">
+              {/* Botón de cerrar [X] */}
+              <button
+                onClick={() => setIsFullscreenPlan(false)}
+                className="absolute top-6 right-6 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-3 rounded-full transition-all duration-200 z-[110]"
+                aria-label="Cerrar plano ampliado"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Imagen del plano */}
+              <div className="relative max-w-[90%] max-h-[85vh] flex items-center justify-center">
+                <img
+                  src={(selectedProperty.features as PropertyFeatures).plan_url}
+                  alt="Plano ampliado"
+                  className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                />
+              </div>
+
+              {/* Título de ayuda */}
+              <div className="absolute bottom-6 text-slate-400 text-sm font-semibold tracking-wider bg-black/40 border border-white/10 px-5 py-2 rounded-full backdrop-blur-md">
+                Plano de Distribución
               </div>
             </div>
           )}

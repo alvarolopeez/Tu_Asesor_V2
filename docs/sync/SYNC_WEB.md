@@ -14,8 +14,35 @@ Si otro agente (CRM, IA o Supervisor) necesita que la parte visual o el SEO camb
   4. Diseño del timeline de hitos del vendedor con hilo conductor decorativo vertical, burbujas transparentes de chat e iconos Lucide de colores.
 * **Instrucciones**: Consulta y sigue al detalle las directrices visuales completas en [docs/sync/estudio_crm_vendedores.md](file:///Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2/docs/sync/estudio_crm_vendedores.md).
 
+### 🔴 [2026-05-25] Petición del Director General — Integración Premium de Vídeos y Planos Técnicos en Catálogo
+* **Descripción**: Habilitar y estructurar la visualización de los vídeos (`video_url`) y los planos técnicos (`plan_url`) cargados en los anuncios de las viviendas para los usuarios en la web pública (`comprar/page.tsx`).
+* **Requisitos**:
+  1. Declaración e integración de los campos opcionales en la interfaz `PropertyFeatures`.
+  2. Diseño de una sección glassmorphic interactiva de cristal templado autocontenida ("Multimedia y Planos") debajo de la descripción.
+  3. Integración de un sistema de pestañas de navegación fluida si ambos recursos existen.
+  4. Reproductor HTML5 responsivo y visor PDF/Imagen dedicado de alta gama con lightbox.
+* **Instrucciones**: Consulta y sigue al detalle las directrices técnicas completas en [docs/sync/estudio_multimedia_web.md](file:///Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2/docs/sync/estudio_multimedia_web.md).
+
+
+
 
 ## ✅ Peticiones Completadas
+
+### 🟡 [2026-05-25] Petición del Director General — Sincronización en Tiempo Real del Calendario de Visitas en Web Pública para Evitar Colisiones de Citas (Double Booking)
+* **Completado por**: Agente Web
+* **Detalles**:
+  1. **Consulta de Citas Activas de Supabase (`/comprar/page.tsx`)**:
+     * Implementamos una consulta en tiempo real a la tabla `appointments` de Supabase al seleccionar una propiedad. Filtramos las citas activas (`status != 'cancelled'`) que tengan lugar entre el momento actual (`now`) y los próximos 14 días.
+     * Guardamos las citas recuperadas en el nuevo estado reactivo tipado de manera estricta: `appointments` (`useState<Partial<Appointment>[]>([])`).
+  2. **Refactorización de `getNext14Days` para Filtrado Local Inmediato**:
+     * Modificamos la firma de `getNext14Days(features: PropertyFeatures | null, existingAppointments: Partial<Appointment>[])` para recibir la lista de citas existentes activas de la propiedad.
+     * Implementamos lógica de comparación de fecha y hora local basada en la zona horaria del navegador del cliente (Europa/Madrid), comparando el año, mes, día y horas/minutos exactos de cada slot contra las citas existentes para filtrar automáticamente cualquier horario colisionado.
+  3. **Higiene Total de Tipos en TypeScript**:
+     * Eliminamos todos los tipos laxos `any` de los bloques `catch` de `loadProperties` y `handleBookAppointment` reemplazándolos por `catch (err: unknown)`, e integrando formateo y logueo de errores seguro (`err instanceof Error ? err.message : String(err)`).
+     * Aseguramos un tipado estricto en todas las interacciones con `PropertyFeatures` y `Appointment`, resolviendo advertencias de variables sin usar y logrando un linter 100% libre de errores.
+  4. **Verificación de Compilación y Calidad**:
+     * Compilación de producción de Next.js ejecutada con éxito absoluto (`npm run build`), certificando cero errores de compilación y optimización estática perfecta de la ruta `/comprar`.
+     * Ejecutada la auditoría de cambios `gitnexus_detect_changes()`, validando que las modificaciones y flujos de ejecución afectados (`ComprarPage → getNext14Days`) estén localizados de forma segura.
 
 ### 🟡 [2026-05-25] Petición del Usuario — Retoques y Optimización del CRM (Conexión de IA, Sincronización de Comentarios, Aportación con Hipoteca y Taxonomía Expandida)
 * **Completado por**: Agente Web y Agente CRM (Coordinado por Antigravity Principal)
