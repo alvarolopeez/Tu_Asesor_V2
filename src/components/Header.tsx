@@ -52,6 +52,10 @@ export default function Header() {
                 </div>
               </div>
 
+              <Link href="/blog" className="nav-link">
+                Blog
+              </Link>
+
               <Link href="/contacto" className="nav-link">
                 Contacto
               </Link>
@@ -106,6 +110,9 @@ export default function Header() {
                 </Link>
               </div>
             </div>
+            <Link href="/blog" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
+              Blog
+            </Link>
             <Link href="/contacto" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
               Contacto
             </Link>
