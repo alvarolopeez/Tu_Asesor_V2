@@ -64,3 +64,9 @@ Lista de mejoras premium implementadas en el front-end y la web pública para un
   - [x] Diseñado e implementado un temporizador de 10 segundos para desplegar a la asesora virtual Paula de manera elegante con un avatar animado y un punto verde de "en línea" con un efecto glow.
   - [x] Añadido un campo de texto interactivo con un botón de envío directo a WhatsApp utilizando el mensaje personalizado y una opción discreta para descartar/cerrar el bocadillo.
   - [x] Añadido un puntero triangular a la derecha del bocadillo de chat mediante pseudo-elementos Tailwind (`after:content-[''] after:absolute after:bottom-[24px]...`) para emular perfectamente un globo de diálogo flotante.
+
+- [x] **8. Corrección de Error de Matchmaking al Guardar Inmueble (RPC `get_matching_leads_for_property`)**
+  - [x] Identificado el origen del error toast en `PropertiesManager.tsx` provocado por la ausencia de la función RPC y funciones auxiliares en Supabase.
+  - [x] Optimizado el script DDL SQL eliminando la duplicidad sintáctica de `SECURITY DEFINER` para evitar el error de redundancia de Postgres.
+  - [x] Desplegado con éxito el algoritmo de matchmaking del servidor en Supabase (Haversine, Ray Casting para polígonos simples y múltiples, y consulta principal).
+  - [x] Configurado control estricto de seguridad RLS bloqueando acceso público y permitiendo únicamente a roles autenticados (`authenticated`) y `service_role`.
