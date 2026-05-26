@@ -4,24 +4,31 @@
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
 ## 📥 Peticiones Pendientes
-- ⏳ **`SUPABASE_SERVICE_ROLE_KEY` falta en `.env.local` Y en Netlify**. El código en `src/lib/appointmentService.ts` y `/api/n8n/diffusion/route.ts` cae a `anon` si no existe, lo que rompe operaciones server-side bajo RLS. Pegar la clave desde Supabase Dashboard → Project Settings → API → service_role secret.
-- ⏳ **Tokens de Meta hardcodeados** en 3 workflows n8n (`Difusion Inteligente`, `Notificacion Nuevo Lead`, `Seguimiento Leads Diario`). Mover a credencial reutilizable en n8n para no exponer el token en exports/backups del workflow.
-- ⏳ **3 workflows funcionales pero inactivos** desde 2026-05-22: Difusión Inteligente, Notificación Nuevo Lead, Seguimiento Leads Diario. Decidir si activar.
+- ⏳ **Refactor manual de tokens Meta** en los 3 workflows. Credencial `httpBearerAuth` `Meta WhatsApp Cloud Token` ya creada (id `s3YA5o57rEEdFw1W`). Solo queda cablearla en los 3 nodos HTTP Request — ver instrucciones en el commit / chat de la sesión 2026-05-26.
 
 ## ✅ Peticiones Completadas
 
-### ✅ [2026-05-26] Bootstrap + saneamiento técnico + auditoría n8n
+### ✅ [2026-05-26] Bootstrap + saneamiento técnico + auditoría n8n + consolidación WhatsApp
 
-**Sesión de mantenimiento ejecutada por agente Claude:**
+**Sesión de mantenimiento ejecutada por agente Claude. Commits: `1770cca`, `bf8b80d`. Deploy Netlify `6a16042177` ✅ ready.**
 
-- ✅ **GitNexus reindexado** sobre path canónico `C:\dev\tu-asesor\next-app` (2213 symbols, 2872 edges, 38 flows). Antes apuntaba a la copia legacy de OneDrive con índice 6 commits atrasado.
+- ✅ **GitNexus reindexado** sobre path canónico `C:\dev\tu-asesor\next-app` (2218 symbols, 2885 edges, 39 flows). Antes apuntaba a la copia legacy de OneDrive con índice 6 commits atrasado.
 - ✅ **`middleware.ts` → `proxy.ts`** (deprecación Next 16). Impact analysis LOW, 0 callers, 0 procesos. Build pasa (Next lo identifica como "Proxy (Middleware)").
-- ✅ **Env vars sincronizadas Netlify ↔ `.env.local`**:
-  - `ADVISOR_WHATSAPP_PHONE=34697223944` confirmado en ambos.
+- ✅ **`sendWhatsAppMessage` consolidado** de 3 copias (`appointmentService`, webhook whatsapp, admin chat send) a 1 lib canónica `src/lib/whatsapp.ts`. -39 LOC neto, log tags y normalización E.164 opcionales.
+- ✅ **Env vars Netlify ↔ `.env.local` sincronizadas**:
+  - `ADVISOR_WHATSAPP_PHONE=34697223944` en ambos.
   - `GEMINI_API_KEY` añadido a `.env.local` (estaba solo en Netlify).
+  - `SUPABASE_SERVICE_ROLE_KEY` añadido a ambos (faltaba en los dos; `appointmentService` y `/api/n8n/diffusion` lo necesitan para bypassar RLS server-side).
   - Diferencias intencionales respetadas: `LLM_PROVIDER` (prod=gemini, dev=keywords), `LLM_MODEL` (prod=gemini-flash-latest, dev=gpt-4o-mini).
-- ✅ **Workflow n8n `Whatsapp_Business_Api (Crude)` (`ydq4mOuK3McNc3IF`) desactivado**. Era un sandbox de otro proyecto ("velas aromáticas", `clinik-ia.com`, código `AUTOMATIONS10`) que tenía un nodo HTTP "2FA" con el Phone ID real de Tu Asesor (`1072204902649747`) + access token real + PIN `123456`. Peligroso si se disparaba el webhook. Desactivado (reversible).
-- 🔍 **`WhatsApp Bot - Tu Asesor` (`SCHdZGrCyWVvBsMZ`) identificado como código muerto** post-Fase 3 (el bot ahora vive entero en `src/lib/chatbot/engine.ts`, invocado desde `/api/webhooks/whatsapp/route.ts`). Mantenido por seguridad; candidato a archivar tras confirmación.
+- ✅ **Workflows n8n**:
+  - `Whatsapp_Business_Api (Crude)` (`ydq4mOuK3McNc3IF`) **desactivado** — era sandbox de otro proyecto ("velas aromáticas", `clinik-ia.com`) con un nodo HTTP "2FA" que tenía el Phone ID real de Tu Asesor + access token + PIN `123456`. Riesgo neutralizado.
+  - `WhatsApp Bot - Tu Asesor` (`SCHdZGrCyWVvBsMZ`) **archivado** — código muerto post-Fase 3 (el bot vive entero en `engine.ts`).
+  - `Difusion Inteligente`, `Notificacion Nuevo Lead`, `Seguimiento Leads Diario` **activados** (estaban inactivos desde 2026-05-22).
+  - Credencial `httpBearerAuth` "Meta WhatsApp Cloud Token" creada (id `s3YA5o57rEEdFw1W`); pendiente cablearla en los 3 nodos HTTP Request para retirar el token literal (manual).
+- 🔍 **Hallazgos de auditoría general (GitNexus, sin tocar):**
+  - `public/assets/js/*.js` (2.481 LOC en 11 ficheros) es código legacy pre-Next sin referencias. Candidato a eliminar tras revisar imágenes/CSS.
+  - Componentes monolíticos: `PropertiesManager.tsx` (1.313), `CalendarManager.tsx` (1.290), `OperacionesTab.tsx` (1.054). Hot candidates a split.
+  - `engine.ts` (432 LOC) bien estructurado: keywords/openai/anthropic/gemini en handlers separados.
 - 🔍 **`npm audit`**: 2 moderate (`postcss` < 8.5.10 vía Next). El "fix" propuesto baja Next a 9.3.3 (catastrófico). Se mantiene; el fix real depende de bump upstream en Next 16.x.
 
 
