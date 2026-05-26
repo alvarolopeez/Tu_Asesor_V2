@@ -5,6 +5,8 @@ import ReactMarkdown from 'react-markdown';
 import Link from 'next/link';
 import { Calendar, ArrowLeft } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const resolvedParams = await params;
   const post = await getPostBySlug(resolvedParams.slug);

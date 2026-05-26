@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getPublishedPosts } from "@/lib/blogService";
 import { Calendar } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Blog de Noticias Inmobiliarias | Tu Asesor Álvaro",
   description: "Últimas noticias, consejos y tendencias del mercado inmobiliario en Sevilla y Andalucía.",
