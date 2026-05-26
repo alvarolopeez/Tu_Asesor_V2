@@ -4,7 +4,7 @@
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
 ## 📥 Peticiones Pendientes
-- ⏳ **Refactor manual de tokens Meta** en los 3 workflows. Credencial `httpBearerAuth` `Meta WhatsApp Cloud Token` ya creada (id `s3YA5o57rEEdFw1W`). Solo queda cablearla en los 3 nodos HTTP Request — ver instrucciones en el commit / chat de la sesión 2026-05-26.
+*(ninguna abierta al cierre del 2026-05-26)*
 
 ## ✅ Peticiones Completadas
 
@@ -24,7 +24,7 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
   - `Whatsapp_Business_Api (Crude)` (`ydq4mOuK3McNc3IF`) **desactivado** — era sandbox de otro proyecto ("velas aromáticas", `clinik-ia.com`) con un nodo HTTP "2FA" que tenía el Phone ID real de Tu Asesor + access token + PIN `123456`. Riesgo neutralizado.
   - `WhatsApp Bot - Tu Asesor` (`SCHdZGrCyWVvBsMZ`) **archivado** — código muerto post-Fase 3 (el bot vive entero en `engine.ts`).
   - `Difusion Inteligente`, `Notificacion Nuevo Lead`, `Seguimiento Leads Diario` **activados** (estaban inactivos desde 2026-05-22).
-  - Credencial `httpBearerAuth` "Meta WhatsApp Cloud Token" creada (id `s3YA5o57rEEdFw1W`); pendiente cablearla en los 3 nodos HTTP Request para retirar el token literal (manual).
+  - Credencial `httpBearerAuth` "Meta WhatsApp Cloud Token" creada (id `s3YA5o57rEEdFw1W`) y **cableada en los 3 nodos HTTP Request** (`Enviar WhatsApp Meta`, `WhatsApp Bienvenida`, `WhatsApp Seguimiento`). Token literal eliminado de headers. Verificado via MCP: los 3 publicados con `authentication: genericCredentialType` + `genericAuthType: httpBearerAuth`.
 - 🔍 **Hallazgos de auditoría general (GitNexus, sin tocar):**
   - `public/assets/js/*.js` (2.481 LOC en 11 ficheros) es código legacy pre-Next sin referencias. Candidato a eliminar tras revisar imágenes/CSS.
   - Componentes monolíticos: `PropertiesManager.tsx` (1.313), `CalendarManager.tsx` (1.290), `OperacionesTab.tsx` (1.054). Hot candidates a split.
