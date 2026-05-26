@@ -4,10 +4,27 @@
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
 ## 📥 Peticiones Pendientes
-- ⏳ **Álvaro debe configurar** `ADVISOR_WHATSAPP_PHONE=34XXXXXXXXX` en `.env.local` con su número personal para recibir notificaciones de escalación del bot.
-- ⏳ **Producción**: Configurar las mismas variables de entorno en Netlify (panel > Site settings > Environment variables).
+- ⏳ **`SUPABASE_SERVICE_ROLE_KEY` falta en `.env.local` Y en Netlify**. El código en `src/lib/appointmentService.ts` y `/api/n8n/diffusion/route.ts` cae a `anon` si no existe, lo que rompe operaciones server-side bajo RLS. Pegar la clave desde Supabase Dashboard → Project Settings → API → service_role secret.
+- ⏳ **Tokens de Meta hardcodeados** en 3 workflows n8n (`Difusion Inteligente`, `Notificacion Nuevo Lead`, `Seguimiento Leads Diario`). Mover a credencial reutilizable en n8n para no exponer el token en exports/backups del workflow.
+- ⏳ **3 workflows funcionales pero inactivos** desde 2026-05-22: Difusión Inteligente, Notificación Nuevo Lead, Seguimiento Leads Diario. Decidir si activar.
 
 ## ✅ Peticiones Completadas
+
+### ✅ [2026-05-26] Bootstrap + saneamiento técnico + auditoría n8n
+
+**Sesión de mantenimiento ejecutada por agente Claude:**
+
+- ✅ **GitNexus reindexado** sobre path canónico `C:\dev\tu-asesor\next-app` (2213 symbols, 2872 edges, 38 flows). Antes apuntaba a la copia legacy de OneDrive con índice 6 commits atrasado.
+- ✅ **`middleware.ts` → `proxy.ts`** (deprecación Next 16). Impact analysis LOW, 0 callers, 0 procesos. Build pasa (Next lo identifica como "Proxy (Middleware)").
+- ✅ **Env vars sincronizadas Netlify ↔ `.env.local`**:
+  - `ADVISOR_WHATSAPP_PHONE=34697223944` confirmado en ambos.
+  - `GEMINI_API_KEY` añadido a `.env.local` (estaba solo en Netlify).
+  - Diferencias intencionales respetadas: `LLM_PROVIDER` (prod=gemini, dev=keywords), `LLM_MODEL` (prod=gemini-flash-latest, dev=gpt-4o-mini).
+- ✅ **Workflow n8n `Whatsapp_Business_Api (Crude)` (`ydq4mOuK3McNc3IF`) desactivado**. Era un sandbox de otro proyecto ("velas aromáticas", `clinik-ia.com`, código `AUTOMATIONS10`) que tenía un nodo HTTP "2FA" con el Phone ID real de Tu Asesor (`1072204902649747`) + access token real + PIN `123456`. Peligroso si se disparaba el webhook. Desactivado (reversible).
+- 🔍 **`WhatsApp Bot - Tu Asesor` (`SCHdZGrCyWVvBsMZ`) identificado como código muerto** post-Fase 3 (el bot ahora vive entero en `src/lib/chatbot/engine.ts`, invocado desde `/api/webhooks/whatsapp/route.ts`). Mantenido por seguridad; candidato a archivar tras confirmación.
+- 🔍 **`npm audit`**: 2 moderate (`postcss` < 8.5.10 vía Next). El "fix" propuesto baja Next a 9.3.3 (catastrófico). Se mantiene; el fix real depende de bump upstream en Next 16.x.
+
+
 
 ### ✅ [2026-05-22] Fase 4 — Configuración Completa N8N + Difusión Inteligente + Escalación
 
