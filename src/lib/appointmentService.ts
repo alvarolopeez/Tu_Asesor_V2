@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from '@supabase/supabase-js'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -11,57 +12,6 @@ const supabaseAdmin = createClient(
   supabaseUrl,
   supabaseServiceKey || supabaseAnonKey
 )
-
-const WHATSAPP_ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || ''
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || ''
-
-/**
- * Envía un mensaje de WhatsApp al cliente usando la API de Meta Graph.
- */
-async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
-  if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
-    console.warn('[AppointmentService][WhatsApp] ⚠️ Credenciales de WhatsApp no configuradas en el servidor. Mensaje no transmitido.');
-    return false;
-  }
-
-  // Normalizar el teléfono para la API de Meta (ej. 34600000000)
-  let waPhone = to.replace(/[+\-]/g, '')
-  if (waPhone.length === 9 && (waPhone.startsWith('6') || waPhone.startsWith('7') || waPhone.startsWith('9'))) {
-    waPhone = '34' + waPhone
-  }
-
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v21.0/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: waPhone,
-          type: 'text',
-          text: { body: text },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error('[AppointmentService][WhatsApp] Error Meta:', response.status, errorBody);
-      return false;
-    }
-
-    console.log(`[AppointmentService][WhatsApp] ✅ Notificación transmitida con éxito a ${waPhone}`);
-    return true;
-  } catch (error) {
-    console.error('[AppointmentService][WhatsApp] Error de red:', error);
-    return false;
-  }
-}
 
 interface PublicAppointmentData {
   leadName: string
@@ -193,7 +143,7 @@ export async function bookPublicAppointment(
         whatsappMessage = `¡Hola ${cleanName}! 👋 Cita confirmada para visitar el inmueble *${data.propertyTitle}* el día ${formattedDate}.\n\nPara preparar mejor tu visita, Álvaro te llamará pronto para hacerte unas preguntas muy breves sobre tus condiciones de compra.\n\nSi lo prefieres, puedes ahorrar tiempo y rellenar tu perfil de comprador directamente en nuestro formulario oficial a través del siguiente enlace: https://tuasesoralvaro.com/comprar?register=true\n\n¡Muchas gracias y nos vemos pronto! 😊`
       }
 
-      await sendWhatsAppMessage(cleanPhone, whatsappMessage)
+      await sendWhatsAppMessage(cleanPhone, whatsappMessage, { normalize: true, logTag: '[AppointmentService][WhatsApp]' })
     } catch (wsError) {
       console.error('[AppointmentService] Error al enviar WhatsApp:', wsError)
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { processMessage } from '@/lib/chatbot/engine';
+import { sendWhatsAppMessage } from '@/lib/whatsapp';
 
 /**
  * Webhook receptor de WhatsApp Cloud API (Meta Business).
@@ -22,8 +23,6 @@ import { processMessage } from '@/lib/chatbot/engine';
  */
 
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const ADVISOR_PHONE = process.env.ADVISOR_WHATSAPP_PHONE || ''; // Teléfono de Álvaro para escalaciones
 
 // ─── GET: Verificación del Webhook por Meta ──────────
@@ -143,7 +142,7 @@ export async function POST(request: NextRequest) {
           .eq('id', conversationId);
 
         // 🔔 Notificación de escalación al asesor vía WhatsApp
-        if (ADVISOR_PHONE && ACCESS_TOKEN && PHONE_NUMBER_ID) {
+        if (ADVISOR_PHONE) {
           const escalationMessage =
             `🚨 *Escalación de Chat*\n\n` +
             `👤 *Lead:* ${parsed.contactName}\n` +
@@ -153,14 +152,14 @@ export async function POST(request: NextRequest) {
             `⏰ *Hora:* ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}\n\n` +
             `El cliente ha solicitado hablar con un asesor. Respóndele directamente al ${parsed.phoneNumber}.`;
 
-          await sendWhatsAppMessage(ADVISOR_PHONE, escalationMessage);
+          await sendWhatsAppMessage(ADVISOR_PHONE, escalationMessage, { logTag: '[WhatsApp Escalation]' });
           console.log(`[WhatsApp] 🔔 Escalación enviada a Álvaro por lead ${parsed.contactName}`);
         }
       }
     }
 
     // 6. Enviar respuesta por WhatsApp Cloud API
-    if (ACCESS_TOKEN && PHONE_NUMBER_ID && chatbotResponseText) {
+    if (chatbotResponseText) {
       await sendWhatsAppMessage(parsed.phoneNumber, chatbotResponseText);
     }
 
@@ -274,44 +273,6 @@ function parseMetaPayload(body: Record<string, unknown>): ParsedMessage | null {
     messageId: String(message.id || ''),
     messageType,
   };
-}
-
-/**
- * Envía un mensaje de texto por WhatsApp Cloud API.
- * Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/messages
- */
-async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to,
-          type: 'text',
-          text: { body: text },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error('[WhatsApp Cloud API] Error enviando:', response.status, errorBody);
-      return false;
-    }
-
-    console.log(`[WhatsApp Cloud API] ✅ Mensaje enviado a ${to}`);
-    return true;
-  } catch (error) {
-    console.error('[WhatsApp Cloud API] Error de red:', error);
-    return false;
-  }
 }
 
 /**

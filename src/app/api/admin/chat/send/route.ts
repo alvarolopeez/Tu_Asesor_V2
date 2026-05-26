@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sendWhatsAppMessage } from '@/lib/whatsapp';
 
-const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN || '';
-const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET || process.env.NEXT_PUBLIC_ADMIN_API_SECRET || '';
 
 /**
@@ -80,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Si el canal es WhatsApp, enviar mensaje real usando la API de Meta
     if (conv.channel === 'whatsapp' && conv.wa_phone_number) {
-      if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+      if (!process.env.WHATSAPP_ACCESS_TOKEN || !process.env.WHATSAPP_PHONE_NUMBER_ID) {
         console.warn('[Agent Send API] ⚠️ Credenciales de WhatsApp no configuradas en servidor local. Mensaje guardado en BD, pero no transmitido.');
         return NextResponse.json({
           success: true,
@@ -90,7 +89,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const success = await sendWhatsAppMessage(conv.wa_phone_number, message.trim());
+      const success = await sendWhatsAppMessage(conv.wa_phone_number, message.trim(), { logTag: '[Agent Send API][WhatsApp]' });
       if (!success) {
         return NextResponse.json({ error: 'Failed to send message via WhatsApp Cloud API' }, { status: 502 });
       }
@@ -105,42 +104,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Agent Send API] Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-/**
- * Llama a la API oficial de Meta Cloud para enviar el mensaje por WhatsApp.
- */
-async function sendWhatsAppMessage(to: string, text: string): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to,
-          type: 'text',
-          text: { body: text },
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error('[Agent Send API][WhatsApp] Error Meta:', response.status, errorBody);
-      return false;
-    }
-
-    console.log(`[Agent Send API][WhatsApp] ✅ Mensaje manual transmitido con éxito a ${to}`);
-    return true;
-  } catch (error) {
-    console.error('[Agent Send API][WhatsApp] Error de red:', error);
-    return false;
   }
 }
