@@ -9,6 +9,24 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-27] Sesión extendida — fixes en producción + refactor PropertiesManager
+
+**Commits pusheados:** `47de718`, `6783a09`, `295cf85`, `3b2cd87`, `8f773bd`, `ab7766e`, `b463857`, `850968b`, `da32ef5`.
+
+- ✅ **Bug crítico del chatbot resuelto.** La conversación WhatsApp `60dc847c-8f70-4d37-a519-150cb995d6e1` llevaba 2 días en `escalated` desde que un cliente pidió "hablar con un humano" — el webhook hacía return temprano sin avisar. Reactivada manualmente; abierto pendiente UX para evitar el problema futuro.
+- ✅ **Bug del parser LLM resuelto.** El engine devolvía JSON crudo truncado como `response` al usuario (`{"response": "¡Hola! Soy Paula...` sin cerrar) cuando Gemini se quedaba sin tokens. Fix doble: `maxOutputTokens 800→1500` + parser robusto en cascada con regex-rescue del campo `response` cuando JSON.parse falla. Verificado en producción (commit `6783a09`).
+- ✅ **Limpieza `public/assets/` legacy.** -4.206 LOC. JS y CSS pre-Next.js huérfanos eliminados (11+14 ficheros). Mantenidas las 2 webp referenciadas. `pattern.svg` creado (estaba referenciado pero 404). `/assets/images/logo.png` repuntado a `/logo.png`.
+- ✅ **SEO fix: dominio canonical `.es` → `.com`.** 7 referencias en `blog/[slug]/page.tsx` y `BlogManager.tsx` apuntaban a `tuasesoralvaro.es` (dominio inexistente) cuando el real es `.com`. Corregido (commit `47de718`). Google estaba indexando URLs canónicas que no resolvían.
+- ✅ **`Whatsapp_Business_Api (Crude)` archivado** (no solo desactivado).
+- ✅ **Refactor monumental: `PropertiesManager.tsx` (1.313 → 101 LOC).** Split en 4 fases con commit + push verificado por cada una. Estructura final:
+  - `PropertiesManager.tsx` (101) — orquestador puro.
+  - `properties/types.ts` (69) — `Property`, schema zod, constantes.
+  - `properties/propertyUtils.tsx` (31) — `formatPrice`, `getStatusBadge`.
+  - `properties/PropertiesTable.tsx` (177) — tabla + búsqueda + acciones.
+  - `properties/SmartMatchmakerModal.tsx` (351) — modal de difusión (state propio: leads, sliders, webhook).
+  - `properties/PropertyFormModal.tsx` (667) — modal CRUD + uploads + slots.
+  - **Patrón a replicar** para `CalendarManager.tsx` (1.290) y `OperacionesTab.tsx` (1.054), commits `ab7766e..da32ef5`.
+
 ### ✅ [2026-05-26] Bootstrap + saneamiento técnico + auditoría n8n + consolidación WhatsApp
 
 **Sesión de mantenimiento ejecutada por agente Claude. Commits: `1770cca`, `bf8b80d`. Deploy Netlify `6a16042177` ✅ ready.**
