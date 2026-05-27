@@ -305,7 +305,7 @@ async function callGemini(
           generationConfig: {
             responseMimeType: 'application/json',
             temperature: 0.7,
-            maxOutputTokens: 800,
+            maxOutputTokens: 1500,
           },
         }),
       }
@@ -338,32 +338,80 @@ async function callGemini(
 
 /**
  * Parsea la respuesta JSON del LLM al tipo ChatbotEngineResponse.
+ *
+ * Estrategia en cascada:
+ *  1. JSON.parse directo (camino feliz).
+ *  2. Si falla (LLM truncado por maxOutputTokens, sintaxis defectuosa, etc.),
+ *     intentar rescatar el campo `response` con regex — así el usuario ve
+ *     texto útil en vez del JSON crudo.
+ *  3. Si todo falla, devolver un mensaje neutro. NUNCA mostrar JSON al usuario.
  */
 function parseLLMResponse(raw: string, conversationId: string): ChatbotEngineResponse {
+  // 1. Extraer del wrapper markdown si lo trae
+  let jsonStr = raw?.trim() || '';
+  const codeFence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (codeFence) {
+    jsonStr = codeFence[1];
+  }
+
+  // 2. Camino feliz: JSON válido
   try {
-    // Intentar extraer JSON del contenido (puede venir envuelto en markdown)
-    let jsonStr = raw;
-    const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-
     const parsed = JSON.parse(jsonStr);
-
     return {
       response: parsed.response || 'Lo siento, ha ocurrido un error. ¿Puedes repetir tu mensaje?',
       intent: parsed.intent || null,
-      confidence: parsed.confidence || 0.5,
+      confidence: parsed.confidence ?? 0.5,
       data_extracted: parsed.data_extracted || {},
       conversation_id: conversationId,
       should_escalate: parsed.intent === 'ESCALATE',
     };
   } catch {
-    // Si no se puede parsear, usar la respuesta raw
+    // 3. Fallback inteligente: regex sobre el JSON truncado/malformado
+    //    Captura el contenido de "response": "...". Soporta strings con
+    //    saltos de línea (\n) y comillas escapadas (\").
+    const responseMatch = jsonStr.match(/"response"\s*:\s*"((?:[^"\\]|\\.)*)/);
+    if (responseMatch && responseMatch[1]) {
+      // Des-escapar lo más común que mete el LLM (\n, \", \\)
+      const rescued = responseMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+
+      // Detectar si parece truncado (no termina en . ! ? o emoji)
+      const looksTruncated = !/[.!?\u{1F300}-\u{1FAFF}]\s*$/u.test(rescued);
+
+      // Intentar también extraer intent aunque el JSON esté roto.
+      // Whitelist contra el tipo AIIntent | 'ESCALATE' del contrato.
+      const VALID_INTENTS = ['schedule_visit', 'ask_price', 'valuation', 'general_inquiry', 'ESCALATE'] as const;
+      type ValidIntent = typeof VALID_INTENTS[number];
+      const intentMatch = jsonStr.match(/"intent"\s*:\s*"([^"]+)"/);
+      const rawIntent = intentMatch?.[1];
+      const intent: ValidIntent | null = (rawIntent && (VALID_INTENTS as readonly string[]).includes(rawIntent))
+        ? (rawIntent as ValidIntent)
+        : null;
+
+      console.warn('[parseLLMResponse] JSON inválido, rescatando "response" con regex', {
+        truncated: looksTruncated,
+        intent,
+        rawLength: raw?.length,
+      });
+
+      return {
+        response: rescued + (looksTruncated ? ' ...' : ''),
+        intent,
+        confidence: 0.5,
+        data_extracted: {},
+        conversation_id: conversationId,
+        should_escalate: intent === 'ESCALATE',
+      };
+    }
+
+    // 4. Último recurso: ni JSON válido ni regex encontró "response"
+    console.error('[parseLLMResponse] No se pudo extraer respuesta del LLM. Raw:', raw?.slice(0, 200));
     return {
-      response: raw || 'Lo siento, no he podido procesar tu mensaje. ¿Puedes reformularlo?',
+      response: 'Disculpa, he tenido un problema procesando tu mensaje. ¿Puedes reformularlo? Si lo prefieres, dime "hablar con Álvaro" y te pongo en contacto con él.',
       intent: null,
-      confidence: 0.3,
+      confidence: 0.2,
       data_extracted: {},
       conversation_id: conversationId,
       should_escalate: false,
