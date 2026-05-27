@@ -1,74 +1,22 @@
 import { useState, useEffect, useMemo } from "react";
-import { 
-  Plus, Trash2, Edit, X, Upload, Image as ImageIcon, Film, FileText, 
-  Check, Search, DollarSign, MapPin, Sparkles, Send, Settings, Info 
+import {
+  Plus, Trash2, Edit, X, Upload, Image as ImageIcon, Film, FileText,
+  Check, Search, DollarSign, MapPin, Sparkles, Send, Settings, Info
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import toast from "react-hot-toast";
 import { supabase } from "@/lib/supabase";
 import type { LeadRow } from "./dashboard/types";
-
-// Zod schema for full CRUD validation
-const propertySchema = z.object({
-  title: z.string().min(3, "El título debe tener al menos 3 caracteres"),
-  description: z.string().optional(),
-  price: z.number().min(0, "El precio no puede ser negativo"),
-  status: z.enum(['active', 'sold', 'rented', 'draft']).default('draft'),
-  propertyType: z.enum(['Piso', 'Casa', 'Parcela', 'Indiferente']).default('Piso'),
-  rooms: z.number().min(0, "Mínimo 0 habitaciones").default(1),
-  baths: z.number().min(0, "Mínimo 0 baños").default(1),
-  sqm: z.number().min(0, "Mínimo 0 metros cuadrados").default(0),
-  address: z.string().min(3, "La dirección exacta es obligatoria"),
-  latitude: z.number({ message: "La latitud debe ser un número" }).min(-90).max(90),
-  longitude: z.number({ message: "La longitud debe ser un número" }).min(-180).max(180),
-  is_visitable_online: z.boolean().default(false),
-});
-
-type PropertyFormValues = z.infer<typeof propertySchema>;
-
-interface Property {
-  id: string;
-  title: string;
-  price: number;
-  status: string;
-  created_at: string;
-  description?: string;
-  images?: string[];
-  features?: {
-    propertyType?: string;
-    rooms?: number;
-    baths?: number;
-    sqm?: number;
-    address?: string;
-    latitude?: number;
-    longitude?: number;
-    is_visitable_online?: boolean;
-    visitable_slots?: {
-      days: string[];
-      slots: string[];
-    };
-    video_url?: string;
-    plan_url?: string;
-  };
-}
-
-const AVAILABLE_DAYS = [
-  { key: "Lunes", label: "Lunes" },
-  { key: "Martes", label: "Martes" },
-  { key: "Miércoles", label: "Miércoles" },
-  { key: "Jueves", label: "Jueves" },
-  { key: "Viernes", label: "Viernes" },
-  { key: "Sábado", label: "Sábado" }
-];
-
-const AVAILABLE_HOURS = [
-  "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00", "19:30", "20:00"
-];
+import {
+  propertySchema,
+  type PropertyFormValues,
+  type Property,
+  AVAILABLE_DAYS,
+  AVAILABLE_HOURS,
+} from "./properties/types";
+import { formatPrice, getStatusBadge } from "./properties/propertyUtils";
 
 export default function PropertiesManager() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -501,24 +449,6 @@ export default function PropertiesManager() {
       toast.error("Error al lanzar la campaña.");
     } finally {
       setCampaignLaunching(false);
-    }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(price);
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold uppercase">Activo</span>;
-      case 'sold':
-        return <span className="px-2.5 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-xs font-bold uppercase">Vendido</span>;
-      case 'rented':
-        return <span className="px-2.5 py-1 bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-full text-xs font-bold uppercase">Alquilado</span>;
-      case 'draft':
-      default:
-        return <span className="px-2.5 py-1 bg-slate-500/10 text-slate-400 border border-slate-500/20 rounded-full text-xs font-bold uppercase">Borrador</span>;
     }
   };
 
