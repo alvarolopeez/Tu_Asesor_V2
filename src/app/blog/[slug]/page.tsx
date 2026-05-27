@@ -73,7 +73,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     },
     "headline": post.title,
     "description": post.seo_description || post.excerpt || post.title,
-    "image": post.cover_image ? [post.cover_image] : ["https://tuasesoralvaro.es/assets/images/logo.png"],
+    "image": post.cover_image ? [post.cover_image] : ["https://tuasesoralvaro.es/logo.png"],
     "datePublished": post.created_at,
     "dateModified": post.updated_at || post.created_at,
     "author": {
@@ -87,7 +87,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       "name": "Tu Asesor Álvaro",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://tuasesoralvaro.es/assets/images/logo.png"
+        "url": "https://tuasesoralvaro.es/logo.png"
       }
     },
     "articleBody": post.content

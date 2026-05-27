@@ -5,6 +5,7 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## 📥 Peticiones Pendientes
 - ⏳ **Workflows n8n fallan en producción por política de 24h de Meta.** Test end-to-end del workflow `Notificacion Nuevo Lead` confirmó que Meta acepta el API call (200 OK con `wamid`) pero después marca `status: failed` con código `131047` "Re-engagement message" porque el destinatario está fuera de la ventana de 24h. Afecta a los 3 workflows (Bienvenida, Difusión, Seguimiento) — todos envían texto libre a destinatarios que típicamente no han escrito al bot recientemente. **Solución:** crear plantillas HSM aprobadas en Meta Business Manager y cambiar los workflows a `type: "template"`. Tarea en curso al cierre 2026-05-26.
+- ⏳ **Mejorar UX de chats escalados.** Actualmente, cuando una conversación pasa a `status=escalated`, el webhook deja de responder sin avisar al cliente ni al asesor. Si el agente humano nunca responde, el cliente queda "en el limbo" indefinidamente. Propuestas: (1) avisar a Álvaro por WhatsApp cada vez que llega un mensaje a chat escalado, (2) comando `/bot` para que el cliente reactive la IA, (3) auto-desescalado tras N días sin actividad humana. Detectado 2026-05-27 cuando un chat escalado el 2026-05-25 dejó al cliente sin respuesta durante 2 días.
 
 ## ✅ Peticiones Completadas
 
