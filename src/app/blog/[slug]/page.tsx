@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   const seoTitle = post.seo_title || `${post.title} | Tu Asesor Álvaro`;
   const seoDesc = post.seo_description || post.excerpt || 'Noticias y consejos del sector inmobiliario en Sevilla.';
-  const canonicalUrl = `https://tuasesoralvaro.es/blog/${post.slug}`;
+  const canonicalUrl = `https://tuasesoralvaro.com/blog/${post.slug}`;
 
   // Extract keywords based on title or content for SEO targeting
   const defaultKeywords = ['inmobiliaria sevilla', 'tu asesor alvaro', 'vender piso sevilla', 'comprar casa sevilla', 'noticias inmobiliarias sevilla'];
@@ -69,25 +69,25 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
     "@type": "BlogPosting",
     "mainEntityOfPage": {
       "@type": "WebPage",
-      "@id": `https://tuasesoralvaro.es/blog/${post.slug}`
+      "@id": `https://tuasesoralvaro.com/blog/${post.slug}`
     },
     "headline": post.title,
     "description": post.seo_description || post.excerpt || post.title,
-    "image": post.cover_image ? [post.cover_image] : ["https://tuasesoralvaro.es/logo.png"],
+    "image": post.cover_image ? [post.cover_image] : ["https://tuasesoralvaro.com/logo.png"],
     "datePublished": post.created_at,
     "dateModified": post.updated_at || post.created_at,
     "author": {
       "@type": "Person",
       "name": "Álvaro López",
       "jobTitle": "Asesor Inmobiliario",
-      "url": "https://tuasesoralvaro.es"
+      "url": "https://tuasesoralvaro.com"
     },
     "publisher": {
       "@type": "Organization",
       "name": "Tu Asesor Álvaro",
       "logo": {
         "@type": "ImageObject",
-        "url": "https://tuasesoralvaro.es/logo.png"
+        "url": "https://tuasesoralvaro.com/logo.png"
       }
     },
     "articleBody": post.content

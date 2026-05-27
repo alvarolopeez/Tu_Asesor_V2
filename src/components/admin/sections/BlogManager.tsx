@@ -774,7 +774,7 @@ El mercado inmobiliario en Sevilla capital está viviendo un momento clave en es
                     /* Desktop preview */
                     <div className="font-sans text-sm max-w-xl">
                       <div className="text-[12px] text-[#202124] flex items-center gap-1.5 mb-1 leading-tight font-light truncate">
-                        <span>https://tuasesoralvaro.es</span>
+                        <span>https://tuasesoralvaro.com</span>
                         <span className="text-[#5f6368]">› blog › {currentPost?.slug || 'slug-del-articulo'}</span>
                       </div>
                       <h4 className="text-[20px] text-[#1a0dab] hover:underline cursor-pointer leading-tight mb-1 font-medium truncate">
@@ -794,7 +794,7 @@ El mercado inmobiliario en Sevilla capital está viviendo un momento clave en es
                         <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[9px] text-slate-600 font-bold border border-slate-200">TA</div>
                         <div className="flex flex-col">
                           <span className="text-[12px] text-[#202124] font-medium leading-none">Tu Asesor Álvaro</span>
-                          <span className="text-[10px] text-[#5f6368] leading-none">tuasesoralvaro.es › blog</span>
+                          <span className="text-[10px] text-[#5f6368] leading-none">tuasesoralvaro.com › blog</span>
                         </div>
                       </div>
                       <h4 className="text-[16px] text-[#1558d6] hover:underline cursor-pointer leading-snug mb-1 font-medium line-clamp-2">
