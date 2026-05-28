@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { 
-  Layers, 
-  BarChart3, 
-  MapPin, 
-  Search, 
-  TrendingUp, 
-  ArrowUpRight, 
-  ArrowDownRight, 
+import {
+  ArrowUpRight,
+  ArrowDownRight,
   Printer,
   PieChart,
   FileText,
@@ -29,6 +24,10 @@ import {
   computePropertyViews,
   computeSelectedMetrics,
 } from "./operaciones/operacionesUtils";
+import PipelineCard from "./operaciones/PipelineCard";
+import MarketDaysChart from "./operaciones/MarketDaysChart";
+import SevillaDemandChart from "./operaciones/SevillaDemandChart";
+import GrowthChart from "./operaciones/GrowthChart";
 
 export default function OperacionesTab() {
   const [loading, setLoading] = useState(true);
@@ -98,40 +97,14 @@ export default function OperacionesTab() {
   const pipelineMap = computePipeline(sellerLeads);
   const maxStageCount = Math.max(...Object.values(pipelineMap), 1);
 
-  // 2. Días en mercado + geometría del gráfico de líneas (SVG 320x120)
+  // 2. Días en mercado por rango de precio (geometría SVG en MarketDaysChart)
   const marketDaysPerRange = computeMarketDays(properties);
-  const points = marketDaysPerRange.map((item, idx) => {
-    const x = 40 + idx * 80;
-    // map 0..120 días a la altura SVG 100..20
-    const y = 100 - (item.avg / 120) * 80;
-    return { x, y, label: item.label, avg: item.avg };
-  });
 
-  const linePath = points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-
-  // 3. Demanda por barrios de Sevilla (filtro/orden dependen del buscador)
+  // 3. Demanda por barrios de Sevilla (filtro/orden + buscador en SevillaDemandChart)
   const mergedSevillaDemand = computeSevillaDemand(buyerLeads);
-  const filteredSevillaDemand = mergedSevillaDemand
-    .filter(item => item.zone.toLowerCase().includes(sevillaSearchQuery.toLowerCase()))
-    .sort((a, b) => b.count - a.count);
 
-  const top10SevillaDemand = filteredSevillaDemand.slice(0, 10);
-  const maxDemandCount = Math.max(...filteredSevillaDemand.map(item => item.count), 1);
-
-  // 4. Crecimiento acumulado de compradores + geometría del área (SVG)
+  // 4. Crecimiento acumulado de compradores (geometría SVG en GrowthChart)
   const growthData = computeGrowth(buyerLeads);
-  const maxGrowthVal = Math.max(...growthData.map(g => g.total), 200) || 200;
-
-  const growthPoints = growthData.map((item, idx) => {
-    const x = 50 + idx * 85;
-    const y = 120 - (item.total / maxGrowthVal) * 90;
-    return { x, y, ...item };
-  });
-
-  const growthLinePath = growthPoints.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  const growthAreaPath = growthPoints.length > 0
-    ? `${growthLinePath} L ${growthPoints[growthPoints.length - 1].x} 130 L ${growthPoints[0].x} 130 Z`
-    : "";
 
   // 5. Perfil financiero e intención de compra
   const {
@@ -365,230 +338,21 @@ export default function OperacionesTab() {
 
   return (
     <div className="space-y-6">
+
       {/* Pipeline & Market Days Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Seller stage pipeline bar */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-              <Layers size={18} className="text-[#FBBF24]" />
-              Pipeline de Propietarios (Cartera)
-            </h3>
-            <p className="text-slate-400 text-xs mb-6">Embudo operativo de captaciones activas</p>
-          </div>
-
-          <div className="space-y-4">
-            {[
-              { label: "Valoración Inicial", val: pipelineMap.valoracion, color: "bg-blue-500" },
-              { label: "Captación Activa", val: pipelineMap.captacion, color: "bg-indigo-500" },
-              { label: "Notas de Encargo firmadas", val: pipelineMap.notas_encargo, color: "bg-amber-500" },
-              { label: "Propuestas Recibidas", val: pipelineMap.propuestas, color: "bg-orange-500" },
-              { label: "Pendientes de Notaría", val: pipelineMap.pendientes_notaria, color: "bg-emerald-500" },
-            ].map((stage, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-slate-300">{stage.label}</span>
-                  <span className="text-white">{stage.val} propiedades</span>
-                </div>
-                <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-1000 ${stage.color}`}
-                    style={{ width: `${(stage.val / maxStageCount) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Average Days on Market Line Chart */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-              <BarChart3 size={18} className="text-[#FBBF24]" />
-              Media de Días en Mercado
-            </h3>
-            <p className="text-slate-400 text-xs mb-6">Comparativa por rango de precios de la propiedad</p>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center gap-4 justify-between">
-            {/* Responsive SVG Line Chart */}
-            <div className="w-full max-w-[340px] h-[160px] bg-slate-900/40 border border-white/5 rounded-xl p-2 relative">
-              <svg viewBox="0 0 320 120" className="w-full h-full">
-                {/* Grid lines */}
-                <line x1="10" y1="20" x2="310" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="3,3" />
-                <line x1="10" y1="60" x2="310" y2="60" stroke="rgba(255,255,255,0.05)" strokeDasharray="3,3" />
-                <line x1="10" y1="100" x2="310" y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="3,3" />
-
-                {/* Draw main line */}
-                <path d={linePath} fill="none" stroke="#FBBF24" strokeWidth="3" strokeLinecap="round" />
-
-                {/* Nodes & Labels */}
-                {points.map((p, idx) => (
-                  <g key={idx}>
-                    <circle cx={p.x} cy={p.y} r="5" fill="#1E293B" stroke="#FBBF24" strokeWidth="2" />
-                    {/* Tooltip values */}
-                    <text x={p.x} y={p.y - 12} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">
-                      {p.avg}d
-                    </text>
-                    <text x={p.x} y="116" fill="#94A3B8" fontSize="8" textAnchor="middle">
-                      {p.label}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-            </div>
-
-            {/* Quick Summary Cards */}
-            <div className="flex-1 w-full space-y-2">
-              <div className="bg-[#0F172A] p-3 rounded-xl border border-white/5 flex justify-between items-center">
-                <span className="text-xs text-slate-400">Media del Portal</span>
-                <span className="text-sm font-extrabold text-[#FBBF24]">{platformAvgDays} días</span>
-              </div>
-              <div className="bg-[#0F172A] p-3 rounded-xl border border-white/5 flex justify-between items-center">
-                <span className="text-xs text-slate-400">Óptimo de Cierre</span>
-                <span className="text-sm font-extrabold text-green-400">45 días</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PipelineCard pipelineMap={pipelineMap} maxStageCount={maxStageCount} />
+        <MarketDaysChart marketDaysPerRange={marketDaysPerRange} platformAvgDays={platformAvgDays} />
       </div>
 
       {/* Zonas de Demanda e Historial (Sevilla Province & Growth) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Sevilla Neighborhoods Demand Chart */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-          <div>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <MapPin size={18} className="text-[#FBBF24]" />
-                  Demandas por Barrios (Sevilla)
-                </h3>
-                <p className="text-slate-400 text-xs mt-0.5">Top 10 barrios con compradores activos y presupuestos medios</p>
-              </div>
-              
-              {/* Modern search input */}
-              <div className="relative w-full md:w-auto">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Search size={14} />
-                </span>
-                <input
-                  type="text"
-                  value={sevillaSearchQuery}
-                  onChange={(e) => setSevillaSearchQuery(e.target.value)}
-                  placeholder="Buscar barrio o municipio..."
-                  className="bg-slate-950/60 border border-white/10 text-xs text-white rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:ring-1 focus:ring-[#FBBF24] focus:border-transparent w-full md:w-56 placeholder-slate-500 transition-all duration-300"
-                />
-                {sevillaSearchQuery && (
-                  <button
-                    onClick={() => setSevillaSearchQuery("")}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-slate-500 hover:text-white"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Horizontal Bar Chart list */}
-            <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
-              {top10SevillaDemand.length > 0 ? (
-                top10SevillaDemand.map((item, idx) => {
-                  const widthPercent = Math.max(5, (item.count / maxDemandCount) * 100);
-                  return (
-                    <div key={idx} className="group flex flex-col space-y-1.5 hover:bg-white/5 p-2 rounded-lg transition-all duration-200">
-                      <div className="flex justify-between items-center text-xs font-semibold">
-                        <span className="text-slate-200 group-hover:text-[#FBBF24] transition-colors">{item.zone}</span>
-                        <span className="text-slate-400 text-[11px] font-normal">
-                          <strong className="text-white font-semibold font-mono">{item.count}</strong> compr. • <strong className="text-slate-300 font-semibold font-mono">{item.avgBudget.toLocaleString()}€</strong> med.
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-950/80 rounded-full h-2.5 relative overflow-hidden">
-                        <div 
-                          className="bg-gradient-to-r from-[#FBBF24] to-[#F59E0B] h-full rounded-full transition-all duration-1000 shadow-md group-hover:shadow-[#FBBF24]/20" 
-                          style={{ width: `${widthPercent}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-center py-10 text-slate-500 text-xs">
-                  No se encontraron compradores para "{sevillaSearchQuery}"
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Temporal Growth Area Chart */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-              <TrendingUp size={18} className="text-[#FBBF24]" />
-              Crecimiento de Compradores Activos
-            </h3>
-            <p className="text-slate-400 text-xs mb-6">Evolución mensual acumulada en la base de datos</p>
-
-            {/* Glowing SVG Area Chart */}
-            <div className="w-full h-[220px] bg-slate-950/40 border border-white/5 rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between">
-              <svg viewBox="0 0 500 160" className="w-full h-[140px] overflow-visible">
-                <defs>
-                  <linearGradient id="areaGrowthGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FBBF24" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#FBBF24" stopOpacity="0.00" />
-                  </linearGradient>
-                </defs>
-                
-                {/* Grid Lines */}
-                <line x1="20" y1="20" x2="480" y2="20" stroke="rgba(255,255,255,0.03)" strokeDasharray="3,3" />
-                <line x1="20" y1="56" x2="480" y2="56" stroke="rgba(255,255,255,0.03)" strokeDasharray="3,3" />
-                <line x1="20" y1="93" x2="480" y2="93" stroke="rgba(255,255,255,0.03)" strokeDasharray="3,3" />
-                <line x1="20" y1="130" x2="480" y2="130" stroke="rgba(255,255,255,0.05)" />
-
-                {/* Draw area filled with gradient */}
-                {growthAreaPath && (
-                  <path d={growthAreaPath} fill="url(#areaGrowthGrad)" />
-                )}
-
-                {/* Draw the line */}
-                {growthLinePath && (
-                  <path d={growthLinePath} fill="none" stroke="#FBBF24" strokeWidth="3" strokeLinecap="round" />
-                )}
-
-                {/* Nodes, Labels, Tooltips */}
-                {growthPoints.map((p, idx) => (
-                  <g key={idx} className="group/node cursor-pointer">
-                    <circle cx={p.x} cy={p.y} r="8" fill="transparent" />
-                    <circle cx={p.x} cy={p.y} r="4" fill="#1E293B" stroke="#FBBF24" strokeWidth="2.5" className="transition-all duration-300 group-hover/node:r-5 group-hover/node:fill-[#FBBF24]" />
-                    
-                    <text x={p.x} y={p.y - 12} fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle" className="opacity-70 group-hover/node:opacity-100 group-hover/node:scale-110 transition-all font-mono">
-                      {p.total}
-                    </text>
-
-                    <text x={p.x} y="148" fill="#64748B" fontSize="9" textAnchor="middle" className="font-semibold">
-                      {p.monthName}
-                    </text>
-                  </g>
-                ))}
-              </svg>
-
-              <div className="flex justify-between items-center px-2 pt-2 border-t border-white/5 mt-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#FBBF24]" />
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Total Acumulado</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-[11px] text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded border border-green-500/10 font-mono">
-                    +{(growthData[5].total - growthData[0].total)} en 6m
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SevillaDemandChart
+          demand={mergedSevillaDemand}
+          searchQuery={sevillaSearchQuery}
+          onSearchChange={setSevillaSearchQuery}
+        />
+        <GrowthChart growthData={growthData} />
       </div>
 
       {/* Active Buyers breakdown Section */}
