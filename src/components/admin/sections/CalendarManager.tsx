@@ -28,19 +28,15 @@ import {
   HelpCircle
 } from "lucide-react";
 import { AppointmentRow, LeadRow, PropertyRow } from "./dashboard/types";
-
-// Extender el tipo de cita local para incluir los joins de Supabase
-interface AppointmentWithRelations extends AppointmentRow {
-  leads?: {
-    name: string;
-    phone: string | null;
-    email: string | null;
-  } | null;
-  properties?: {
-    title: string;
-    price: number;
-  } | null;
-}
+import { TIME_SLOTS, DAYS_OF_WEEK } from "./calendar/types";
+import type { AppointmentWithRelations } from "./calendar/types";
+import {
+  getBadgeStyle,
+  getWeekDates,
+  getAppointmentForSlot,
+  getAppointmentTitle,
+  computeWeekStats,
+} from "./calendar/calendarUtils";
 
 export default function CalendarManager() {
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([]);
@@ -86,17 +82,6 @@ export default function CalendarManager() {
     return day - 1; // Lunes=0, ..., Sábado=5
   });
 
-  // Configuración de disponibilidad
-  const TIME_SLOTS = [
-    "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", 
-    "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", 
-    "16:00", "16:30", "17:00", "17:30", "18:00", "18:30", 
-    "19:00", "19:30"
-  ];
-
-  // Lunes a Sábado
-  const DAYS_OF_WEEK = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-
   useEffect(() => {
     fetchCalendarData();
   }, [selectedWeekStart]);
@@ -134,18 +119,7 @@ export default function CalendarManager() {
     }
   };
 
-  // Helper para obtener las fechas de la semana actual
-  const getWeekDates = () => {
-    const dates: Date[] = [];
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(selectedWeekStart);
-      d.setDate(d.getDate() + i);
-      dates.push(d);
-    }
-    return dates;
-  };
-
-  const weekDates = getWeekDates();
+  const weekDates = getWeekDates(selectedWeekStart);
 
   // Navegación de semanas
   const handlePrevWeek = () => {
@@ -167,32 +141,6 @@ export default function CalendarManager() {
     const monday = new Date(d.setDate(diff));
     monday.setHours(0, 0, 0, 0);
     setSelectedWeekStart(monday);
-  };
-
-  // Helper para buscar citas asociadas a un día y slot de hora
-  const getAppointmentForSlot = (date: Date, timeSlot: string) => {
-    return appointments.find(appt => {
-      const apptDate = new Date(appt.scheduled_at);
-      // Comparar fecha sin hora
-      const sameDay = apptDate.getFullYear() === date.getFullYear() &&
-                      apptDate.getMonth() === date.getMonth() &&
-                      apptDate.getDate() === date.getDate();
-      
-      if (!sameDay) return false;
-
-      // Comparar horas y minutos
-      const [slotH, slotM] = timeSlot.split(":").map(Number);
-      const apptH = apptDate.getHours();
-      const apptM = apptDate.getMinutes();
-
-      // Permitir solapamientos o duraciones mayores
-      const slotMinutesTotal = slotH * 60 + slotM;
-      const apptMinutesTotal = apptH * 60 + apptM;
-      const apptDuration = appt.duration_minutes || 30;
-
-      return slotMinutesTotal >= apptMinutesTotal && 
-             slotMinutesTotal < apptMinutesTotal + apptDuration;
-    });
   };
 
   // Abrir modal de creación/edición
@@ -358,69 +306,8 @@ export default function CalendarManager() {
     }
   };
 
-  // --- KPIs y Estadísticas de Productividad ---
-  // Total actividades (captacion, visita, cierre) de la semana actual
-  const activeWeekAppts = appointments.filter(a => ['captacion', 'visita', 'cierre'].includes(a.type || ''));
-  const totalActivities = activeWeekAppts.length;
-
-  // Tiempo estimado en carretera: 20 min por cita comercial presencial
-  const totalRoadTimeMinutes = activeWeekAppts.length * 20;
-  const roadTimeHours = Math.floor(totalRoadTimeMinutes / 60);
-  const roadTimeMins = totalRoadTimeMinutes % 60;
-  const roadTimeStr = roadTimeHours > 0 ? `${roadTimeHours}h ${roadTimeMins}m` : `${roadTimeMins} min`;
-
-  // Espacios libres: slots totales (6 días * 20 slots = 120) menos los slots ocupados (o con bloqueos)
-  const totalWeeklySlots = 6 * 20;
-  // Calculamos cuántos slots están tomados. Si una cita dura 60 min, consume 2 slots.
-  let occupiedSlotsCount = 0;
-  appointments.forEach(appt => {
-    const duration = appt.duration_minutes || 30;
-    const slots = Math.max(1, Math.ceil(duration / 30));
-    occupiedSlotsCount += slots;
-  });
-  const freeSlots = Math.max(0, totalWeeklySlots - occupiedSlotsCount);
-
-  // Mapear color e icono por tipo de actividad comercial
-  const getBadgeStyle = (type: string) => {
-    switch (type) {
-      case "captacion":
-        return {
-          bg: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20",
-          dot: "bg-emerald-400",
-          label: "Captación / Exclusiva"
-        };
-      case "visita":
-        return {
-          bg: "bg-sky-500/10 border-sky-500/30 text-sky-400 hover:bg-sky-500/20",
-          dot: "bg-sky-400",
-          label: "Visita Comprador"
-        };
-      case "cierre":
-        return {
-          bg: "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20",
-          dot: "bg-amber-400",
-          label: "Cierre / Legal"
-        };
-      case "admin":
-        return {
-          bg: "bg-slate-500/10 border-slate-500/30 text-slate-400 hover:bg-slate-500/20",
-          dot: "bg-slate-400",
-          label: "Administrativo"
-        };
-      case "blocked":
-        return {
-          bg: "bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/15 cursor-not-allowed pattern-stripes",
-          dot: "bg-red-500",
-          label: "Bloqueado"
-        };
-      default:
-        return {
-          bg: "bg-slate-700/50 border-slate-600/30 text-slate-300",
-          dot: "bg-slate-400",
-          label: "Reunión"
-        };
-    }
-  };
+  // KPIs de productividad semanal (actividades, carretera estimada, huecos libres)
+  const { totalActivities, roadTimeStr, freeSlots } = computeWeekStats(appointments);
 
   // Filtrar leads por búsqueda (nombre o teléfono)
   const filteredLeads = leads.filter(lead => {
@@ -611,7 +498,7 @@ export default function CalendarManager() {
 
                       {/* Day Columns */}
                       {weekDates.map((date, dayIdx) => {
-                        const appt = getAppointmentForSlot(date, timeSlot);
+                        const appt = getAppointmentForSlot(appointments, date, timeSlot);
                         const isToday = new Date().toDateString() === date.toDateString();
                         
                         return (
@@ -624,13 +511,8 @@ export default function CalendarManager() {
                               (() => {
                                 const style = getBadgeStyle(appt.type || "visita");
                                 // Mostrar datos de lead, propiedad o custom title
-                                const eventTitle = appt.title || 
-                                  (appt.type === "blocked" ? "Bloqueado" : 
-                                   appt.leads?.name ? `${appt.type === "captacion" ? "Captación:" : "Visita:"} ${appt.leads.name}` : 
-                                   "Sin título");
-                                
-                                const leadPhone = appt.leads?.phone;
-                                
+                                const eventTitle = getAppointmentTitle(appt);
+
                                 // Solo renderizar el inicio real en el slot de tiempo correspondiente (evitar repetir visualmente)
                                 const apptDate = new Date(appt.scheduled_at);
                                 const apptHours = String(apptDate.getHours()).padStart(2, '0');
@@ -750,7 +632,7 @@ export default function CalendarManager() {
             <div className="bg-[#1E293B] rounded-2xl border border-white/5 divide-y divide-white/5 overflow-hidden shadow-2xl">
               {TIME_SLOTS.map((timeSlot) => {
                 const date = weekDates[selectedDayIndex];
-                const appt = getAppointmentForSlot(date, timeSlot);
+                const appt = getAppointmentForSlot(appointments, date, timeSlot);
 
                 return (
                   <div key={timeSlot} className="flex min-h-[64px] items-stretch">
@@ -765,10 +647,7 @@ export default function CalendarManager() {
                       {appt ? (
                         (() => {
                           const style = getBadgeStyle(appt.type || "visita");
-                          const eventTitle = appt.title || 
-                            (appt.type === "blocked" ? "Bloqueado" : 
-                             appt.leads?.name ? `${appt.type === "captacion" ? "Captación:" : "Visita:"} ${appt.leads.name}` : 
-                             "Sin título");
+                          const eventTitle = getAppointmentTitle(appt);
 
                           const apptDate = new Date(appt.scheduled_at);
                           const apptHours = String(apptDate.getHours()).padStart(2, '0');
@@ -850,10 +729,7 @@ export default function CalendarManager() {
                 const hour = String(dateObj.getHours()).padStart(2, '0');
                 const minutes = String(dateObj.getMinutes()).padStart(2, '0');
                 
-                const apptTitle = appt.title || 
-                  (appt.type === "blocked" ? "Bloqueado" : 
-                   appt.leads?.name ? `${appt.type === "captacion" ? "Captación:" : "Visita:"} ${appt.leads.name}` : 
-                   "Cita comercial");
+                const apptTitle = getAppointmentTitle(appt, "Cita comercial");
 
                 return (
                   <div key={appt.id} className="relative group">
