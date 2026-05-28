@@ -3,27 +3,20 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import toast from "react-hot-toast";
-import { 
+import {
   Calendar as CalendarIcon,
   Clock,
   MapPin,
   Phone,
-  Plus,
   Edit2,
   Trash2,
   X,
-  ChevronLeft,
-  ChevronRight,
   Check,
-  CheckCircle,
   AlertCircle,
-  List,
-  Grid,
   Lock,
   User,
   Home,
   FileText,
-  Map,
   PlusCircle,
   HelpCircle
 } from "lucide-react";
@@ -35,8 +28,9 @@ import {
   getWeekDates,
   getAppointmentForSlot,
   getAppointmentTitle,
-  computeWeekStats,
 } from "./calendar/calendarUtils";
+import CalendarKpis from "./calendar/CalendarKpis";
+import CalendarToolbar from "./calendar/CalendarToolbar";
 
 export default function CalendarManager() {
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([]);
@@ -306,9 +300,6 @@ export default function CalendarManager() {
     }
   };
 
-  // KPIs de productividad semanal (actividades, carretera estimada, huecos libres)
-  const { totalActivities, roadTimeStr, freeSlots } = computeWeekStats(appointments);
-
   // Filtrar leads por búsqueda (nombre o teléfono)
   const filteredLeads = leads.filter(lead => {
     if (!leadSearch) return true;
@@ -334,107 +325,20 @@ export default function CalendarManager() {
 
   return (
     <div className="space-y-6">
-      
+
       {/* 1. KPIs DE PRODUCTIVIDAD (TOP PANEL) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        
-        {/* KPI 1: Actividades */}
-        <div className="bg-[#1E293B] p-5 rounded-2xl border border-white/5 flex items-center gap-4 shadow-xl">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0">
-            <CheckCircle className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Actividades Comerciales</p>
-            <h3 className="text-2xl font-bold text-white mt-1">{totalActivities} <span className="text-xs font-normal text-slate-400">citas activas</span></h3>
-            <p className="text-[11px] text-emerald-400/80 mt-0.5">Visitas, valoraciones y firmas</p>
-          </div>
-        </div>
-
-        {/* KPI 2: Carretera Heurística */}
-        <div className="bg-[#1E293B] p-5 rounded-2xl border border-white/5 flex items-center gap-4 shadow-xl">
-          <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-400 shrink-0">
-            <Map className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Carretera Estimado</p>
-            <h3 className="text-2xl font-bold text-white mt-1">{roadTimeStr}</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">20 min / desplazamiento comercial</p>
-          </div>
-        </div>
-
-        {/* KPI 3: Huecos Disponibles */}
-        <div className="bg-[#1E293B] p-5 rounded-2xl border border-white/5 flex items-center gap-4 shadow-xl">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
-            <Clock className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs uppercase tracking-wider font-semibold">Huecos Agendables AI</p>
-            <h3 className="text-2xl font-bold text-white mt-1">{freeSlots} <span className="text-xs font-normal text-slate-400">libres</span></h3>
-            <p className="text-[11px] text-amber-400/80 mt-0.5">Disponibles para visitas/chatbot</p>
-          </div>
-        </div>
-
-      </div>
+      <CalendarKpis appointments={appointments} />
 
       {/* 2. CALENDAR NAV & VIEWS SELECTOR */}
-      <div className="bg-[#1E293B] p-5 rounded-2xl border border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl">
-        
-        {/* Navigation */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
-          <div className="flex items-center gap-1">
-            <button 
-              onClick={handlePrevWeek} 
-              className="p-2 hover:bg-white/5 rounded-xl border border-white/5 text-slate-300 transition-colors"
-              title="Semana anterior"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={handleJumpToToday} 
-              className="px-4 py-2 hover:bg-white/5 rounded-xl border border-white/5 text-slate-200 text-sm font-semibold transition-colors"
-            >
-              Hoy
-            </button>
-            <button 
-              onClick={handleNextWeek} 
-              className="p-2 hover:bg-white/5 rounded-xl border border-white/5 text-slate-300 transition-colors"
-              title="Semana siguiente"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-
-          <h2 className="text-white font-bold text-sm md:text-lg">
-            Semana del {weekDates[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} al {weekDates[5].toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
-          </h2>
-        </div>
-
-        {/* View Toggle */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-          <div className="bg-slate-900 p-1 rounded-xl border border-white/5 flex">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'grid' ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-slate-400 hover:text-white'}`}
-            >
-              <Grid className="w-4 h-4" /> Cuadrícula Semanal
-            </button>
-            <button
-              onClick={() => setViewMode('route')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'route' ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-slate-400 hover:text-white'}`}
-            >
-              <List className="w-4 h-4" /> Lista de Ruta (Móvil)
-            </button>
-          </div>
-
-          <button
-            onClick={() => handleOpenCreateModal()}
-            className="flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-[#FBBF24]/10 shrink-0"
-          >
-            <Plus className="w-4 h-4" /> Nueva Cita / Bloqueo
-          </button>
-        </div>
-
-      </div>
+      <CalendarToolbar
+        weekDates={weekDates}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onPrevWeek={handlePrevWeek}
+        onNextWeek={handleNextWeek}
+        onJumpToToday={handleJumpToToday}
+        onNewClick={() => handleOpenCreateModal()}
+      />
 
       {/* 3. CALENDAR BODY */}
       {loading ? (
