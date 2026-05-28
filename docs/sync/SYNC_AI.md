@@ -15,7 +15,18 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
-### ✅ [2026-05-27] Sesión extendida — fixes en producción + refactor PropertiesManager
+### ✅ [2026-05-28] Refactor split — CalendarManager + OperacionesTab
+
+**Commits pusheados:** `26cfb91` (docs gitnexus), `3d5465e`, `a7be337`, `d3e535f`, `a915ebf` (CalendarManager), `e624128`, `c463a1f`, `7b3be3d`, `48aef78` (OperacionesTab). Netlify auto-deploy ✅ ready.
+
+- ✅ **GitNexus reindexado** sobre path canónico (`npx gitnexus analyze`). El índice estaba 13 commits atrás; auto-actualizó los contadores en AGENTS.md/CLAUDE.md (commit `26cfb91`). Nota: ahora hay 2 repos indexados con el mismo nombre (legacy OneDrive + canónico) → usar `repo: "C:\dev\tu-asesor\next-app"` en las tools de GitNexus.
+- ✅ **`CalendarManager.tsx` (1.290 → 200 LOC)** split en 4 fases (mismo patrón que PropertiesManager). Carpeta `calendar/`:
+  - `types.ts` (45), `calendarUtils.ts` (131), `CalendarKpis.tsx` (54), `CalendarToolbar.tsx` (85), `WeekGridView.tsx` (297), `RouteListView.tsx` (149), `AppointmentFormModal.tsx` (483).
+- ✅ **`OperacionesTab.tsx` (1.054 → 164 LOC)** split en 4 fases. Carpeta `dashboard/operaciones/`:
+  - `operacionesUtils.ts` (327, todas las derivaciones analíticas puras), `PipelineCard.tsx` (47), `MarketDaysChart.tsx` (72), `SevillaDemandChart.tsx` (86), `GrowthChart.tsx` (90), `BuyersBreakdown.tsx` (93), `PropertyViewsRanking.tsx` (58), `PropertyReportSelector.tsx` (125), `CaptacionReportModal.tsx` (235).
+- Sin cambios de comportamiento ni de contrato (ambos son default-export sin props). Build verde en cada fase; `gitnexus_impact` LOW (0 callers) y `detect_changes` con scope contenido al propio componente en cada commit.
+
+
 
 **Commits pusheados:** `47de718`, `6783a09`, `295cf85`, `3b2cd87`, `8f773bd`, `ab7766e`, `b463857`, `850968b`, `da32ef5`.
 
