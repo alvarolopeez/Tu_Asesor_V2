@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-  ArrowUpRight,
-  ArrowDownRight,
   Printer,
-  PieChart,
   FileText,
   Bot
 } from "lucide-react";
@@ -28,6 +25,8 @@ import PipelineCard from "./operaciones/PipelineCard";
 import MarketDaysChart from "./operaciones/MarketDaysChart";
 import SevillaDemandChart from "./operaciones/SevillaDemandChart";
 import GrowthChart from "./operaciones/GrowthChart";
+import BuyersBreakdown from "./operaciones/BuyersBreakdown";
+import PropertyViewsRanking from "./operaciones/PropertyViewsRanking";
 
 export default function OperacionesTab() {
   const [loading, setLoading] = useState(true);
@@ -107,10 +106,7 @@ export default function OperacionesTab() {
   const growthData = computeGrowth(buyerLeads);
 
   // 5. Perfil financiero e intención de compra
-  const {
-    sinEstudioCount, estudioHechoCount, preconcedidaCount, contadoCount,
-    habitualCount, inversionCount, totalFinCount, totalIntentCount,
-  } = computeBuyerProfiles(buyerLeads);
+  const buyerProfiles = computeBuyerProfiles(buyerLeads);
 
   // 6. Ranking de visitas (top/bottom 3) y medias de plataforma
   const { top3, bottom3, platformAvgViews, platformAvgDays } = computePropertyViews(properties);
@@ -356,155 +352,10 @@ export default function OperacionesTab() {
       </div>
 
       {/* Active Buyers breakdown Section */}
-      <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5">
-        <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-          <PieChart size={18} className="text-[#FBBF24]" />
-          Desglose de Compradores Activos
-        </h3>
-        <p className="text-slate-400 text-xs mb-6">Clasificación por capacidad financiera y propósito de adquisición</p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* Column 1: Financial Profile */}
-          <div className="space-y-4">
-            <h4 className="text-xs text-[#FBBF24] font-bold tracking-wider uppercase border-b border-white/5 pb-2">Capacidad Financiera</h4>
-            
-            <div className="space-y-4">
-              {[
-                { 
-                  label: "Hipoteca y sin estudio", 
-                  count: sinEstudioCount, 
-                  percent: ((sinEstudioCount / totalFinCount) * 100).toFixed(1),
-                  color: "bg-rose-500" 
-                },
-                { 
-                  label: "Hipoteca con estudio hecho", 
-                  count: estudioHechoCount, 
-                  percent: ((estudioHechoCount / totalFinCount) * 100).toFixed(1),
-                  color: "bg-blue-500" 
-                },
-                { 
-                  label: "Hipoteca preconcedida", 
-                  count: preconcedidaCount, 
-                  percent: ((preconcedidaCount / totalFinCount) * 100).toFixed(1),
-                  color: "bg-amber-500" 
-                },
-                { 
-                  label: "Al contado", 
-                  count: contadoCount, 
-                  percent: ((contadoCount / totalFinCount) * 100).toFixed(1),
-                  color: "bg-emerald-500" 
-                }
-              ].map((item, idx) => (
-                <div key={idx} className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-300">{item.label}</span>
-                    <span className="text-slate-400 font-normal">
-                      <strong className="text-white font-semibold font-mono">{item.count}</strong> ({item.percent}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-950/80 rounded-full h-2 relative overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-1000 ${item.color}`}
-                      style={{ width: `${item.percent}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Column 2: Purchase Intent */}
-          <div className="space-y-4">
-            <h4 className="text-xs text-[#FBBF24] font-bold tracking-wider uppercase border-b border-white/5 pb-2">Propósito de Adquisición</h4>
-            
-            <div className="space-y-6 pt-2">
-              {[
-                { 
-                  label: "Vivienda Habitual", 
-                  count: habitualCount, 
-                  percent: ((habitualCount / totalIntentCount) * 100).toFixed(1),
-                  color: "bg-indigo-500" 
-                },
-                { 
-                  label: "Vivienda de Inversión", 
-                  count: inversionCount, 
-                  percent: ((inversionCount / totalIntentCount) * 100).toFixed(1),
-                  color: "bg-purple-500" 
-                }
-              ].map((item, idx) => (
-                <div key={idx} className="space-y-2">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-300 text-sm">{item.label}</span>
-                    <span className="text-slate-400 font-normal">
-                      <strong className="text-white font-semibold font-mono">{item.count}</strong> ({item.percent}%)
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-950/80 rounded-full h-3 relative overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-1000 ${item.color}`}
-                      style={{ width: `${item.percent}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Micro-insight box */}
-              <div className="bg-slate-950/40 border border-white/5 p-3 rounded-xl text-[11px] text-slate-400 leading-relaxed mt-4">
-                <strong className="text-slate-200">Insight Operativo:</strong> El <strong className="text-[#FBBF24] font-mono">{((preconcedidaCount + contadoCount) / totalFinCount * 100).toFixed(0)}%</strong> de tus compradores activos tienen liquidez inmediata o pre-aprobación bancaria consolidada, óptimo para campañas de venta exprés.
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <BuyersBreakdown profiles={buyerProfiles} />
 
       {/* Visitas Top 3 vs Bottom 3 Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top 3 most visited */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2 text-green-400">
-            <ArrowUpRight size={18} /> Top 3 Inmuebles Más Visitados
-          </h3>
-          <div className="space-y-3">
-            {top3.map((prop, idx) => (
-              <div key={idx} className="bg-slate-900/40 p-3 rounded-xl border border-white/5 flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-bold text-white">{prop.title}</p>
-                  <p className="text-xs text-slate-400">{(Number(prop.price)).toLocaleString()}€</p>
-                </div>
-                <div className="text-right">
-                  <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded text-xs font-bold border border-green-500/20">
-                    {(prop.features as Record<string, any>)?.visitas_count || 0} visitas
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom 3 least visited */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2 text-orange-400">
-            <ArrowDownRight size={18} /> Bottom 3 Inmuebles Menos Visitados
-          </h3>
-          <div className="space-y-3">
-            {bottom3.map((prop, idx) => (
-              <div key={idx} className="bg-slate-900/40 p-3 rounded-xl border border-white/5 flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-bold text-white">{prop.title}</p>
-                  <p className="text-xs text-slate-400">{(Number(prop.price)).toLocaleString()}€</p>
-                </div>
-                <div className="text-right">
-                  <span className="bg-orange-500/10 text-orange-400 px-2 py-1 rounded text-xs font-bold border border-orange-500/20">
-                    {(prop.features as Record<string, any>)?.visitas_count || 0} visitas
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <PropertyViewsRanking top3={top3} bottom3={bottom3} />
 
       {/* Individual Property Report Selector (Informe de Captador) */}
       <div className="bg-[#1E293B]/85 backdrop-blur-md p-6 rounded-2xl border border-[#FBBF24]/30 shadow-xl">
