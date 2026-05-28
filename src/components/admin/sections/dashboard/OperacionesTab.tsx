@@ -13,13 +13,22 @@ import {
   FileText,
   Bot
 } from "lucide-react";
-import type { 
-  PropertyRow, 
-  LeadRow, 
-  AppointmentRow, 
-  BuyerActivityLogRow, 
-  BuyerDemandRow 
+import type {
+  PropertyRow,
+  LeadRow,
+  AppointmentRow,
+  BuyerActivityLogRow,
+  BuyerDemandRow
 } from "./types";
+import {
+  computePipeline,
+  computeMarketDays,
+  computeSevillaDemand,
+  computeGrowth,
+  computeBuyerProfiles,
+  computePropertyViews,
+  computeSelectedMetrics,
+} from "./operaciones/operacionesUtils";
 
 export default function OperacionesTab() {
   const [loading, setLoading] = useState(true);
@@ -83,126 +92,25 @@ export default function OperacionesTab() {
   }
 
   const buyerLeads = leads.filter((l) => l.type === "buyer");
-  
-  // 1. Estado de Cartera (Sellers pipeline counts)
   const sellerLeads = leads.filter((l) => l.type === "seller");
-  const pipelineMap = {
-    valoracion: sellerLeads.filter((s) => s.status === "new").length,
-    captacion: sellerLeads.filter((s) => s.status === "contacted").length,
-    notas_encargo: sellerLeads.filter((s) => s.status === "qualified").length,
-    propuestas: sellerLeads.filter((s) => s.status === "visit_scheduled").length,
-    pendientes_notaria: sellerLeads.filter((s) => s.status === "closed").length,
-  };
 
+  // 1. Estado de cartera (embudo de propietarios)
+  const pipelineMap = computePipeline(sellerLeads);
   const maxStageCount = Math.max(...Object.values(pipelineMap), 1);
 
-  // 2. Días en el Mercado price range data computation
-  const priceRanges = [
-    { label: "< 150k", filter: (p: PropertyRow) => p.price < 150000 },
-    { label: "150k-300k", filter: (p: PropertyRow) => p.price >= 150000 && p.price < 300000 },
-    { label: "300k-500k", filter: (p: PropertyRow) => p.price >= 300000 && p.price < 500000 },
-    { label: "> 500k", filter: (p: PropertyRow) => p.price >= 500000 }
-  ];
-
-  const marketDaysPerRange = priceRanges.map(range => {
-    const matched = properties.filter(range.filter);
-    const avg = matched.length > 0
-      ? Math.round(matched.reduce((acc, p) => acc + Number((p.features as Record<string, any>)?.dias_mercado || 0), 0) / matched.length)
-      : 0;
-    return { ...range, avg };
-  });
-
-  // Drawing a custom responsive SVG Line Chart
-  // Grid: width=320, height=120
+  // 2. Días en mercado + geometría del gráfico de líneas (SVG 320x120)
+  const marketDaysPerRange = computeMarketDays(properties);
   const points = marketDaysPerRange.map((item, idx) => {
     const x = 40 + idx * 80;
-    // standard range logic: map 0 to 120 days to SVG height 100 to 20
+    // map 0..120 días a la altura SVG 100..20
     const y = 100 - (item.avg / 120) * 80;
     return { x, y, label: item.label, avg: item.avg };
   });
 
   const linePath = points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 
-  // 3. Zonas de Demanda e Historial (Sevilla Province & Growth)
-  const SEVILLA_BARRIOS_BASELINE = [
-    { zone: "Triana", count: 48, totalBudget: 48 * 280000 },
-    { zone: "Nervión", count: 42, totalBudget: 42 * 310000 },
-    { zone: "Los Remedios", count: 35, totalBudget: 35 * 390000 },
-    { zone: "Centro / Alfalfa", count: 31, totalBudget: 31 * 340000 },
-    { zone: "Sevilla Este", count: 29, totalBudget: 29 * 210000 },
-    { zone: "Macarena", count: 24, totalBudget: 24 * 160000 },
-    { zone: "Viapol / San Bernardo", count: 22, totalBudget: 22 * 290000 },
-    { zone: "Dos Hermanas", count: 38, totalBudget: 38 * 180000 },
-    { zone: "Alcalá de Guadaíra", count: 30, totalBudget: 30 * 150000 },
-    { zone: "Tomares", count: 28, totalBudget: 28 * 270000 },
-    { zone: "Mairena del Aljarafe", count: 26, totalBudget: 26 * 240000 },
-    { zone: "Utrera", count: 19, totalBudget: 19 * 145000 },
-    { zone: "Camas", count: 18, totalBudget: 18 * 130000 },
-    { zone: "Bormujos", count: 15, totalBudget: 15 * 185000 },
-    { zone: "Montequinto", count: 14, totalBudget: 14 * 205000 },
-    { zone: "Gelves", count: 12, totalBudget: 12 * 165000 },
-    { zone: "Espartinas", count: 10, totalBudget: 10 * 220000 },
-    { zone: "San José de la Rinconada", count: 9, totalBudget: 9 * 140000 },
-  ];
-
-  const mergedSevillaDemand = SEVILLA_BARRIOS_BASELINE.map(item => {
-    const matches = buyerLeads.filter((b) => {
-      const rawZones = b.preferences?.zonas;
-      const zonesList = Array.isArray(rawZones) 
-        ? rawZones 
-        : typeof rawZones === "string" 
-          ? [rawZones] 
-          : [];
-      return zonesList.some((z: string) => z.toLowerCase().includes(item.zone.toLowerCase()) || item.zone.toLowerCase().includes(z.toLowerCase()));
-    });
-
-    const dbCount = matches.length;
-    const dbBudgetSum = matches.reduce((sum: number, b) => sum + Number(b.preferences?.presupuesto_max || 0), 0);
-
-    const totalCount = item.count + dbCount;
-    const totalBudgetSum = item.totalBudget + dbBudgetSum;
-
-    return {
-      zone: item.zone,
-      count: totalCount,
-      avgBudget: totalCount > 0 ? Math.round(totalBudgetSum / totalCount) : 0
-    };
-  });
-
-  // Parse any new non-Madrid zones from database
-  buyerLeads.forEach((b) => {
-    const rawZones = b.preferences?.zonas;
-    const zonesList = Array.isArray(rawZones) 
-      ? rawZones 
-      : typeof rawZones === "string" 
-        ? [rawZones] 
-        : [];
-    
-    const madridZones = ["chamartín", "retiro", "chueca", "malasaña", "carabanchel", "vallecas", "majadahonda", "pozuelo", "usera", "villaverde"];
-
-    zonesList.forEach((z: string) => {
-      const isMadrid = madridZones.some(mz => z.toLowerCase().includes(mz));
-      const isInBaseline = SEVILLA_BARRIOS_BASELINE.some(item => item.zone.toLowerCase().includes(z.toLowerCase()) || z.toLowerCase().includes(item.zone.toLowerCase()));
-
-      if (!isMadrid && !isInBaseline && z.trim().length > 0) {
-        const existingIdx = mergedSevillaDemand.findIndex(item => item.zone.toLowerCase() === z.toLowerCase());
-        const budget = Number(b.preferences?.presupuesto_max || 250000);
-        if (existingIdx === -1) {
-          mergedSevillaDemand.push({
-            zone: z,
-            count: 1,
-            avgBudget: budget
-          });
-        } else {
-          const item = mergedSevillaDemand[existingIdx];
-          const newCount = item.count + 1;
-          item.avgBudget = Math.round((item.avgBudget * item.count + budget) / newCount);
-          item.count = newCount;
-        }
-      }
-    });
-  });
-
+  // 3. Demanda por barrios de Sevilla (filtro/orden dependen del buscador)
+  const mergedSevillaDemand = computeSevillaDemand(buyerLeads);
   const filteredSevillaDemand = mergedSevillaDemand
     .filter(item => item.zone.toLowerCase().includes(sevillaSearchQuery.toLowerCase()))
     .sort((a, b) => b.count - a.count);
@@ -210,44 +118,8 @@ export default function OperacionesTab() {
   const top10SevillaDemand = filteredSevillaDemand.slice(0, 10);
   const maxDemandCount = Math.max(...filteredSevillaDemand.map(item => item.count), 1);
 
-  // Cumulative growth with beautiful, premium baseline over last 6 months
-  const monthsList = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  const currentMonthNum = new Date().getMonth();
-  
-  const growthMonths = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date();
-    d.setMonth(currentMonthNum - 5 + i);
-    return {
-      monthName: monthsList[d.getMonth()],
-      monthNum: d.getMonth(),
-      year: d.getFullYear(),
-      dbCount: 0
-    };
-  });
-
-  buyerLeads.forEach((b) => {
-    const date = new Date(b.created_at);
-    const m = date.getMonth();
-    const y = date.getFullYear();
-    
-    const match = growthMonths.find(gm => gm.monthNum === m && gm.year === y);
-    if (match) {
-      match.dbCount += 1;
-    }
-  });
-
-  const growthBaseline = [120, 131, 145, 156, 168, 184]; 
-  let cumulativeDbCount = 0;
-  
-  const growthData = growthMonths.map((m, idx) => {
-    cumulativeDbCount += m.dbCount;
-    const totalGrowth = growthBaseline[idx] + cumulativeDbCount;
-    return {
-      ...m,
-      total: totalGrowth
-    };
-  });
-
+  // 4. Crecimiento acumulado de compradores + geometría del área (SVG)
+  const growthData = computeGrowth(buyerLeads);
   const maxGrowthVal = Math.max(...growthData.map(g => g.total), 200) || 200;
 
   const growthPoints = growthData.map((item, idx) => {
@@ -261,103 +133,21 @@ export default function OperacionesTab() {
     ? `${growthLinePath} L ${growthPoints[growthPoints.length - 1].x} 130 L ${growthPoints[0].x} 130 Z`
     : "";
 
-  // Financial Profile & Intent calculations
-  let sinEstudioCount = 32;
-  let estudioHechoCount = 45;
-  let preconcedidaCount = 63;
-  let contadoCount = 40;
+  // 5. Perfil financiero e intención de compra
+  const {
+    sinEstudioCount, estudioHechoCount, preconcedidaCount, contadoCount,
+    habitualCount, inversionCount, totalFinCount, totalIntentCount,
+  } = computeBuyerProfiles(buyerLeads);
 
-  let habitualCount = 126;
-  let inversionCount = 54;
+  // 6. Ranking de visitas (top/bottom 3) y medias de plataforma
+  const { top3, bottom3, platformAvgViews, platformAvgDays } = computePropertyViews(properties);
 
-  buyerLeads.forEach((b) => {
-    const finProfile = b.preferences?.perfil_financiero;
-    if (finProfile === "sin_estudio") {
-      sinEstudioCount += 1;
-    } else if (finProfile === "estudio_hecho") {
-      estudioHechoCount += 1;
-    } else if (finProfile === "preconcedida") {
-      preconcedidaCount += 1;
-    } else if (finProfile === "contado") {
-      contadoCount += 1;
-    } else {
-      const isDerived = b.preferences?.financiera_derivado === true;
-      const budget = Number(b.preferences?.presupuesto_max || 0);
-      
-      if (isDerived) {
-        sinEstudioCount += 1;
-      } else if (budget >= 700000) {
-        contadoCount += 1;
-      } else {
-        const lastChar = b.id ? b.id.charCodeAt(b.id.length - 1) : 0;
-        const mod = lastChar % 3;
-        if (mod === 0) estudioHechoCount += 1;
-        else if (mod === 1) preconcedidaCount += 1;
-        else contadoCount += 1;
-      }
-    }
-
-    const tipoCompra = b.preferences?.tipo_compra;
-    if (tipoCompra === "habitual") {
-      habitualCount += 1;
-    } else if (tipoCompra === "inversion") {
-      inversionCount += 1;
-    } else {
-      const lastChar = b.id ? b.id.charCodeAt(b.id.length - 1) : 0;
-      if (lastChar % 2 === 0) {
-        habitualCount += 1;
-      } else {
-        inversionCount += 1;
-      }
-    }
-  });
-
-  const totalFinCount = sinEstudioCount + estudioHechoCount + preconcedidaCount + contadoCount;
-  const totalIntentCount = habitualCount + inversionCount;
-
-  // 4. Visitas Inmueble Top 3 vs Bottom 3
-  const sortedPropsByViews = [...properties].sort((a, b) => {
-    return Number((b.features as Record<string, any>)?.visitas_count || 0) - Number((a.features as Record<string, any>)?.visitas_count || 0);
-  });
-  const top3 = sortedPropsByViews.slice(0, 3);
-  const bottom3 = sortedPropsByViews.slice(-3).reverse();
-
-  // Helper properties average calculations
-  const platformAvgViews = properties.length > 0 
-    ? Math.round(properties.reduce((acc, p) => acc + Number((p.features as Record<string, any>)?.visitas_count || 0), 0) / properties.length)
-    : 0;
-
-  const platformAvgDays = properties.length > 0
-    ? Math.round(properties.reduce((acc, p) => acc + Number((p.features as Record<string, any>)?.dias_mercado || 0), 0) / properties.length)
-    : 0;
-
-  // Selected Property Metrics
+  // 7. Métricas de la propiedad seleccionada en el generador de informes
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
-  const selectedViews = selectedProperty ? Number((selectedProperty.features as Record<string, any>)?.visitas_count || 0) : 0;
-  const selectedDays = selectedProperty ? Number((selectedProperty.features as Record<string, any>)?.dias_mercado || 0) : 0;
-  const selectedPrice = selectedProperty ? Number(selectedProperty.price || 0) : 0;
-  const selectedValuation = selectedProperty ? Number((selectedProperty.features as Record<string, any>)?.precio_valoracion || 0) : 0;
-
-  // Valuation difference
-  const valuationDiffPct = selectedValuation > 0
-    ? ((selectedPrice - selectedValuation) / selectedValuation) * 100
-    : 0;
-
-  let correlationRating = "Normal";
-  let correlationColor = "text-yellow-400";
-  if (valuationDiffPct <= -10) {
-    correlationRating = "Precio Excelente";
-    correlationColor = "text-green-400";
-  } else if (valuationDiffPct <= -5) {
-    correlationRating = "Precio Competitivo";
-    correlationColor = "text-emerald-400";
-  } else if (valuationDiffPct > 10) {
-    correlationRating = "Precio Fuera de Mercado";
-    correlationColor = "text-red-400 font-extrabold";
-  } else if (valuationDiffPct > 0) {
-    correlationRating = "Precio Elevado";
-    correlationColor = "text-orange-400";
-  }
+  const {
+    selectedViews, selectedDays, selectedPrice, selectedValuation,
+    valuationDiffPct, correlationRating, correlationColor,
+  } = computeSelectedMetrics(selectedProperty);
 
   // ==========================================
   // PRINT PREVIEW REPORT GENERATOR (INFORME PDF)
