@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 import { mapDocumensoEvent } from "@/lib/documenso";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+
+/** Comparación en tiempo constante (evita timing attacks). */
+function secretsMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -21,12 +30,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Webhook no configurado" }, { status: 503 });
   }
 
-  const provided =
-    req.headers.get("x-documenso-secret") ||
-    req.headers.get("x-documenso-signature") ||
-    req.headers.get("authorization") ||
-    "";
-  if (provided !== expected) {
+  // Documenso envía el secreto en la cabecera X-Documenso-Secret (texto plano).
+  const provided = req.headers.get("x-documenso-secret") || "";
+  if (!secretsMatch(provided, expected)) {
     return NextResponse.json({ error: "Firma de webhook inválida" }, { status: 401 });
   }
 
