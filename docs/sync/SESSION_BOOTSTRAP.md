@@ -6,14 +6,14 @@ Every new AI coding session should run this procedure on startup, in order, befo
 
 ## 1. Confirm working directory
 
-Working directory should be `C:\dev\tu-asesor\next-app`.
+Working directory should be `/Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2` (Mac, canonical since 2026-05-29).
 
-If the path is anywhere inside `OneDrive`, **STOP** and tell the user to relaunch Claude Code from the correct location. The OneDrive copy is a legacy backup; never edit it.
+The project was migrated off Windows; the old `C:\dev\tu-asesor\next-app` path and the legacy OneDrive copy are no longer used.
 
 Quick check:
 ```bash
 pwd
-# expected: /c/dev/tu-asesor/next-app (or C:\dev\tu-asesor\next-app on Windows)
+# expected: /Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2
 ```
 
 ---
@@ -28,7 +28,7 @@ Ping each one with a trivial call and report status to user (✅ / ❌):
 | `github` | List repos for owner `alvarolopeez` — should include `Tu_Asesor_V2` |
 | `supabase` | List projects — should include project ref `hmzqgtitlonaxbwlhcob` |
 | `netlify` | List sites — should include the Tu Asesor site |
-| `n8n` | List workflows — should include `SCHdZGrCyWVvBsMZ` (WhatsApp Bot), `6E0AP0gqLUliPQtN` (Smart Matchmaker), `QikfXMJumWbpI3wL` (Nuevo Lead), `VnXhrEh2G8AeR0DT` (Seguimiento) |
+| `n8n` | List workflows — should include `6E0AP0gqLUliPQtN` (Smart Matchmaker), `QikfXMJumWbpI3wL` (Nuevo Lead), `VnXhrEh2G8AeR0DT` (Seguimiento) and `tFk38qR62f1yEnuz` (Generador Diario Blog), all active. *(`SCHdZGrCyWVvBsMZ` WhatsApp Bot was archived 2026-05-26 — the bot lives in `engine.ts`.)* |
 
 If ANY fails:
 - Stop and tell the user which one failed and the error.
@@ -68,7 +68,7 @@ Read (or re-read) in this order:
 Format:
 
 ```
-✅ Sesión inicializada en C:\dev\tu-asesor\next-app
+✅ Sesión inicializada en /Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2
 MCPs: gitnexus ✅ | github ✅ | supabase ✅ | netlify ✅ | n8n ✅
 Rama: master @ <commit-hash> "<commit-msg>"
 GitNexus index: <fresco | desactualizado>

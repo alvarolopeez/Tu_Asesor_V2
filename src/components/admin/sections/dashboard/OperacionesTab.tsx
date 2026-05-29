@@ -174,7 +174,7 @@ export default function OperacionesTab() {
       <BuyersBreakdown profiles={buyerProfiles} />
 
       {/* Visitas Top 3 vs Bottom 3 Row */}
-      <PropertyViewsRanking top3={top3} bottom3={bottom3} />
+      <PropertyViewsRanking top3={top3} bottom3={bottom3} visitsByProperty={visitsByProperty} />
 
       {/* Individual Property Report Selector (Informe de Captador) */}
       <PropertyReportSelector

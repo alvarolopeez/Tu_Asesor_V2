@@ -16,7 +16,7 @@ CRM + public website for an independent real estate advisor in Seville, Spain. S
 
 ## Local development
 - Repo: `https://github.com/alvarolopeez/Tu_Asesor_V2` (default branch `master`).
-- **Canonical local path: `C:\dev\tu-asesor\next-app`**. Do NOT use the legacy OneDrive copy (`...\OneDrive\Escritorio\Web-tuasesor-Alvaro-refactor-organizacion\Tu asesor 1.1\next-app`) — it's a backup, kept until the user confirms migration is solid.
+- **Canonical local path (Mac, since 2026-05-29): `/Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2`**. The project was migrated off Windows; the old Windows path (`C:\dev\tu-asesor\next-app`) and the legacy OneDrive copy are no longer used.
 - Setup: place `.env.local` in repo root (gitignored) → `npm install` → `npm run build` → `npm run dev` (port 3000).
 - For Meta webhook testing locally, use `ngrok` or equivalent and update the webhook URL in the Meta developer console.
 
@@ -49,11 +49,12 @@ CRM + public website for an independent real estate advisor in Seville, Spain. S
 - Before committing, run `gitnexus_detect_changes()` (see GitNexus block below).
 - Build must pass (`npm run build`) before any commit.
 
-## Known tech debt (as of 2026-05-26)
-- `middleware.ts` is deprecated in Next 16 → rename to `proxy.ts` (see Next 16 docs).
-- 2 moderate npm vulnerabilities — inspect with `npm audit`, non-blocking.
-- `ADVISOR_WHATSAPP_PHONE` placeholder still in some flows (see SYNC_AI.md "Peticiones Pendientes").
+## Known tech debt (as of 2026-05-29)
+- 2 moderate npm vulnerabilities (`postcss` < 8.5.10 via Next) — non-blocking; the proposed `audit fix` downgrades Next catastrophically, so wait for an upstream Next 16.x bump.
 - Production env vars on Netlify must mirror `.env.local` (see SYNC_AI.md backlog).
+- *(resolved 2026-05-26)* `middleware.ts` → `proxy.ts` rename done.
+- *(resolved 2026-05-26)* `ADVISOR_WHATSAPP_PHONE` set to `34697223944` in both Netlify and `.env.local`.
+- *(resolved 2026-05-29)* obsolete `features.dias_mercado` / `features.visitas_count` reads removed from the Operaciones report.
 
 ## What NOT to touch without explicit user confirmation
 - Supabase RLS policies (security-critical for client data).
@@ -72,7 +73,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Tu_Asesor_V2** (1901 symbols, 2590 relationships, 35 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Tu_Asesor_V2** (2077 symbols, 2763 relationships, 36 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

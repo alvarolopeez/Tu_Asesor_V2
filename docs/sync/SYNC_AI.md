@@ -11,9 +11,25 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
     - `seguimiento_lead` (MARKETING) → workflow `Seguimiento Leads Diario` / nodo `WhatsApp Seguimiento`. Params: {{1}}=nombre.
   - Al adaptar (tarea pendiente), cambiar el `jsonBody` de cada nodo de `type:"text"` a `type:"template"` con `template.name`, `language.code="es"` y `components[].parameters` mapeando los {{N}} a los campos del `$json`. La credencial Bearer (`Meta WhatsApp Cloud Token`, id `s3YA5o57rEEdFw1W`) ya está cableada — no tocarla.
   - BLOQUEADO hasta que las 3 plantillas estén en estado "Aprobada" en Meta.
-- ⏳ **Mejorar UX de chats escalados.** Actualmente, cuando una conversación pasa a `status=escalated`, el webhook deja de responder sin avisar al cliente ni al asesor. Si el agente humano nunca responde, el cliente queda "en el limbo" indefinidamente. Propuestas: (1) avisar a Álvaro por WhatsApp cada vez que llega un mensaje a chat escalado, (2) comando `/bot` para que el cliente reactive la IA, (3) auto-desescalado tras N días sin actividad humana. Detectado 2026-05-27 cuando un chat escalado el 2026-05-25 dejó al cliente sin respuesta durante 2 días.
-
 ## ✅ Peticiones Completadas
+
+### ✅ [2026-05-29] UX de chats escalados (aviso + `/bot` + auto-desescalado)
+
+Resuelve el problema del "limbo": antes, al pasar a `status='escalated'`, el webhook `POST /api/webhooks/whatsapp` hacía `return` temprano sin avisar a nadie. **Sin migración de schema** (uso del `metadata` jsonb existente de `chatbot_conversations`).
+
+- ✅ **(1) Aviso al asesor**: cuando llega un mensaje a un chat escalado, se notifica a Álvaro por WhatsApp (`ADVISOR_WHATSAPP_PHONE`, reusa `sendWhatsAppMessage`). **Throttle** por conversación vía `metadata.last_escalation_notify_at` (default 15 min, env `ESCALATION_NOTIFY_THROTTLE_MIN`) para no saturar.
+- ✅ **(2) Comando `/bot`**: si el cliente escribe `/bot` (o `bot`/`paula`/`volver al bot`/`activar bot`/`reactivar bot`/`asistente virtual`), la conversación vuelve a `status='active'`, se limpia `escalated_to` y Paula confirma. Además, **al escalar** el bot ahora avisa al cliente de que puede escribir *bot* para volver.
+- ✅ **(3) Auto-desescalado**: si no hay actividad humana (último mensaje con `intent_detected='agent_reply'`) en N días (default **3**, env `ESCALATION_AUTO_REACTIVATE_DAYS`), la IA retoma el control automáticamente al llegar el siguiente mensaje. Los mensajes del cliente NO resetean el reloj. Fallback de referencia: `metadata.escalated_at` → `started_at`.
+- 🔧 Nuevo helper `markEscalated()` registra `metadata.escalated_at` al escalar (tanto en escalación automática del motor como base para el cómputo). El envío manual del asesor (`/api/admin/chat/send`) ya genera mensajes `agent_reply`, que cuentan como actividad humana.
+- 🔑 **Envs opcionales nuevas** (con defaults sensatos, no obligatorias): `ESCALATION_AUTO_REACTIVATE_DAYS=3`, `ESCALATION_NOTIFY_THROTTLE_MIN=15`. Conviene añadirlas a Netlify + `.env.local` si se quiere afinar.
+- `gitnexus_impact` sobre `POST` = LOW (0 callers; entrypoint de Meta). Build verde.
+
+### ✅ [2026-05-29] Tech-debt menor (limpieza Operaciones + docs Mac)
+
+- ✅ **Eliminadas las lecturas obsoletas** `features.dias_mercado` / `features.visitas_count` del informe de Operaciones (Fase 3 ya usa `published_at` y `web_visits`). En `operacionesUtils.ts`: `computePropertyViews` y `computeSelectedMetrics` ya no caen al jsonb estático (siempre 0). **Bug corregido de paso:** `PropertyViewsRanking` ordenaba por visitas reales pero *mostraba* `features.visitas_count` (siempre "0 visitas"); ahora recibe `visitsByProperty` y muestra la cifra real. `featureNum` se mantiene (lo usa aún `precio_valoracion`, que NO es obsoleto). `gitnexus_impact` LOW (único caller `OperacionesTab`).
+- ✅ **Docs migrados a Mac**: `AGENTS.md` y `SESSION_BOOTSTRAP.md` ahora apuntan a `/Users/alvarolopezcuevas/Documents/GitHub/Tu_Asesor_V2` (canónico desde 2026-05-29); retiradas las advertencias de Windows/OneDrive. Actualizada la lista de workflows n8n del bootstrap (quitado el archivado `SCHdZGrCyWVvBsMZ`, añadido `tFk38qR62f1yEnuz`). Limpiada la sección "Known tech debt" (marcados resueltos middleware→proxy y ADVISOR_WHATSAPP_PHONE).
+- ℹ️ **`npm audit` (2 moderate, `postcss`<8.5.10 vía Next)**: SIN cambio — el `audit fix` propuesto degrada Next catastróficamente. Se mantiene a la espera de bump upstream en Next 16.x.
+- ⚙️ **Setup Mac**: recreados `.mcp.json` (faltaba; el `gitnexus` usa `npx`, sin rutas Windows) y `.env.local` (completo, 18 claves) desde las copias subidas; eliminados los ficheros planos `env.local`/`mcp.json`/`gitignore.txt` (secretos en claro no cubiertos por `.gitignore`). `node_modules` reinstalado para binarios nativos de Mac. GitNexus reindexado.
 
 ### ✅ [2026-05-29] Fase 4e — Generación lead-driven + página previa editable
 

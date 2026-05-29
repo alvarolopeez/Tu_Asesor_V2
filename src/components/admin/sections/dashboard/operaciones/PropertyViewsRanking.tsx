@@ -4,10 +4,12 @@ import type { PropertyRow } from "../types";
 interface PropertyViewsRankingProps {
   top3: PropertyRow[];
   bottom3: PropertyRow[];
+  /** Mapa id→visitas reales (desde web_visits). */
+  visitsByProperty: Record<string, number>;
 }
 
 /** Ranking de inmuebles por número de visitas (top 3 vs bottom 3). */
-export default function PropertyViewsRanking({ top3, bottom3 }: PropertyViewsRankingProps) {
+export default function PropertyViewsRanking({ top3, bottom3, visitsByProperty }: PropertyViewsRankingProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Top 3 most visited */}
@@ -24,7 +26,7 @@ export default function PropertyViewsRanking({ top3, bottom3 }: PropertyViewsRan
               </div>
               <div className="text-right">
                 <span className="bg-green-500/10 text-green-400 px-2 py-1 rounded text-xs font-bold border border-green-500/20">
-                  {(prop.features as Record<string, any>)?.visitas_count || 0} visitas
+                  {visitsByProperty[prop.id] ?? 0} visitas
                 </span>
               </div>
             </div>
@@ -46,7 +48,7 @@ export default function PropertyViewsRanking({ top3, bottom3 }: PropertyViewsRan
               </div>
               <div className="text-right">
                 <span className="bg-orange-500/10 text-orange-400 px-2 py-1 rounded text-xs font-bold border border-orange-500/20">
-                  {(prop.features as Record<string, any>)?.visitas_count || 0} visitas
+                  {visitsByProperty[prop.id] ?? 0} visitas
                 </span>
               </div>
             </div>

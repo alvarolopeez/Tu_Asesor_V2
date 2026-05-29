@@ -25,6 +25,12 @@ import { sendWhatsAppMessage } from '@/lib/whatsapp';
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || '';
 const ADVISOR_PHONE = process.env.ADVISOR_WHATSAPP_PHONE || ''; // Teléfono de Álvaro para escalaciones
 
+// ─── UX de chats escalados (Modo Humano) ─────────────
+// Días sin actividad humana tras los que la IA retoma el control automáticamente.
+const AUTO_REACTIVATE_DAYS = Number(process.env.ESCALATION_AUTO_REACTIVATE_DAYS || 3);
+// Minutos mínimos entre avisos al asesor por mensajes en un mismo chat escalado (anti-spam).
+const NOTIFY_THROTTLE_MIN = Number(process.env.ESCALATION_NOTIFY_THROTTLE_MIN || 15);
+
 // ─── GET: Verificación del Webhook por Meta ──────────
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -76,7 +82,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not create or find conversation' }, { status: 500 });
     }
 
-    const { id: conversationId, status: conversationStatus } = convInfo;
+    const { id: conversationId } = convInfo;
+    let conversationStatus = convInfo.status;
 
     // 3. Guardar el mensaje del usuario
     await supabase.from('chatbot_messages').insert({
@@ -93,12 +100,41 @@ export async function POST(request: NextRequest) {
     let shouldEscalate = false;
 
     if (conversationStatus === 'escalated') {
-      console.log(`[WhatsApp] 🚫 Chat en "Modo Humano" (escalado) para ${parsed.phoneNumber}. Omitiendo respuesta automática de la IA.`);
-      return NextResponse.json({
-        status: 'ok',
-        type: 'escalated_to_agent',
-        message_received: parsed.messageText,
-      });
+      // (1) El cliente puede recuperar a la IA escribiendo "/bot".
+      if (isBotReactivationCommand(parsed.messageText)) {
+        await reactivateConversation(conversationId, 'client_command');
+        const reply =
+          '🤖 ¡Listo! Vuelvo a estar yo, *Paula*, la asistente de Álvaro. ¿En qué puedo ayudarte? ' +
+          '(Si en cualquier momento quieres hablar de nuevo con Álvaro, solo tienes que pedírmelo.)';
+        await supabase.from('chatbot_messages').insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: reply,
+          intent_detected: 'bot_reactivated',
+          confidence: 1,
+        });
+        await sendWhatsAppMessage(parsed.phoneNumber, reply, { logTag: '[WhatsApp /bot]' });
+        console.log(`[WhatsApp] 🤖 Chat reactivado por el cliente (${parsed.phoneNumber}) vía comando /bot.`);
+        return NextResponse.json({ status: 'ok', type: 'reactivated_by_client' });
+      }
+
+      // (2) Auto-desescalado: si el humano lleva N días sin intervenir, la IA retoma el control.
+      const idleDays = await daysSinceLastHumanActivity(conversationId);
+      if (idleDays >= AUTO_REACTIVATE_DAYS) {
+        await reactivateConversation(conversationId, 'auto_timeout');
+        conversationStatus = 'active';
+        console.log(`[WhatsApp] ♻️ Auto-desescalado de ${parsed.phoneNumber} tras ${idleDays.toFixed(1)} días sin actividad humana. La IA retoma el control.`);
+        // No retornamos: cae al flujo normal del bot más abajo.
+      } else {
+        // (3) Sigue en Modo Humano → avisar a Álvaro del mensaje entrante (con throttle) y no autoresponder.
+        await notifyAdvisorOfEscalatedMessage(parsed, conversationId);
+        console.log(`[WhatsApp] 🚫 Chat en "Modo Humano" (escalado) para ${parsed.phoneNumber}. Omitiendo respuesta automática de la IA.`);
+        return NextResponse.json({
+          status: 'ok',
+          type: 'escalated_to_agent',
+          message_received: parsed.messageText,
+        });
+      }
     }
 
     if (conversationId) {
@@ -124,6 +160,12 @@ export async function POST(request: NextRequest) {
       chatbotConfidence = chatbotResponse.confidence;
     }
 
+    // Si el motor decide escalar, informamos al cliente de cómo volver con la IA.
+    if (shouldEscalate) {
+      chatbotResponseText +=
+        '\n\n_ℹ️ A partir de ahora te atenderá Álvaro personalmente. Cuando quieras volver a hablar conmigo (Paula), escribe *bot*._';
+    }
+
     // 5. Guardar respuesta del asistente en BD
     if (conversationId) {
       await supabase.from('chatbot_messages').insert({
@@ -136,10 +178,7 @@ export async function POST(request: NextRequest) {
 
       // Si hay escalación, actualizar conversación y notificar a Álvaro
       if (shouldEscalate) {
-        await supabase
-          .from('chatbot_conversations')
-          .update({ status: 'escalated', escalated_to: 'alvaro' })
-          .eq('id', conversationId);
+        await markEscalated(conversationId);
 
         // 🔔 Notificación de escalación al asesor vía WhatsApp
         if (ADVISOR_PHONE) {
@@ -336,6 +375,130 @@ async function findOrCreateConversation(
     .single();
 
   return newConv ? { id: newConv.id, status: newConv.status } : null;
+}
+
+// ═══════════════════════════════════════════════════════
+// GESTIÓN DE CHATS ESCALADOS (Modo Humano)
+// ═══════════════════════════════════════════════════════
+
+/**
+ * ¿El cliente está pidiendo recuperar la IA? (comando "/bot" y variantes).
+ */
+function isBotReactivationCommand(text: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/^[/#!.]+/, '').trim();
+  return ['bot', 'paula', 'volver al bot', 'activar bot', 'reactivar bot', 'asistente virtual'].includes(normalized);
+}
+
+/**
+ * Devuelve la conversación a modo IA (status='active') y registra el motivo en metadata.
+ */
+async function reactivateConversation(conversationId: string, reason: string): Promise<void> {
+  const { data } = await supabase
+    .from('chatbot_conversations')
+    .select('metadata')
+    .eq('id', conversationId)
+    .single();
+  const metadata = {
+    ...((data?.metadata as Record<string, unknown>) || {}),
+    reactivated_at: new Date().toISOString(),
+    reactivated_reason: reason,
+  };
+  await supabase
+    .from('chatbot_conversations')
+    .update({ status: 'active', escalated_to: null, metadata })
+    .eq('id', conversationId);
+}
+
+/**
+ * Marca una conversación como escalada, registrando `escalated_at` en metadata
+ * (no existe columna dedicada → reutilizamos el jsonb existente).
+ */
+async function markEscalated(conversationId: string): Promise<void> {
+  const { data } = await supabase
+    .from('chatbot_conversations')
+    .select('metadata')
+    .eq('id', conversationId)
+    .single();
+  const metadata = {
+    ...((data?.metadata as Record<string, unknown>) || {}),
+    escalated_at: new Date().toISOString(),
+  };
+  await supabase
+    .from('chatbot_conversations')
+    .update({ status: 'escalated', escalated_to: 'alvaro', metadata })
+    .eq('id', conversationId);
+}
+
+/**
+ * Días transcurridos desde la última actividad HUMANA en la conversación.
+ * Humana = mensaje del agente (`intent_detected='agent_reply'`). Si no hay ninguno,
+ * cae a `metadata.escalated_at` y, en último término, a `started_at`.
+ * Los mensajes del cliente NO cuentan como actividad humana (no resetean el reloj).
+ */
+async function daysSinceLastHumanActivity(conversationId: string): Promise<number> {
+  const { data: lastAgent } = await supabase
+    .from('chatbot_messages')
+    .select('created_at')
+    .eq('conversation_id', conversationId)
+    .eq('intent_detected', 'agent_reply')
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  let ref: string | null = lastAgent?.[0]?.created_at ?? null;
+
+  if (!ref) {
+    const { data: conv } = await supabase
+      .from('chatbot_conversations')
+      .select('metadata, started_at')
+      .eq('id', conversationId)
+      .single();
+    const meta = (conv?.metadata as Record<string, unknown>) || {};
+    ref = (meta.escalated_at as string) ?? conv?.started_at ?? null;
+  }
+
+  if (!ref) return 0;
+  return (Date.now() - new Date(ref).getTime()) / 86_400_000;
+}
+
+/**
+ * Avisa a Álvaro por WhatsApp de un mensaje entrante en un chat escalado.
+ * Throttle por conversación (`metadata.last_escalation_notify_at`) para no saturar.
+ */
+async function notifyAdvisorOfEscalatedMessage(
+  parsed: ParsedMessage,
+  conversationId: string
+): Promise<void> {
+  if (!ADVISOR_PHONE) return;
+
+  const { data: conv } = await supabase
+    .from('chatbot_conversations')
+    .select('metadata')
+    .eq('id', conversationId)
+    .single();
+  const metadata = (conv?.metadata as Record<string, unknown>) || {};
+  const lastNotify = metadata.last_escalation_notify_at
+    ? new Date(metadata.last_escalation_notify_at as string).getTime()
+    : 0;
+
+  if (Date.now() - lastNotify < NOTIFY_THROTTLE_MIN * 60_000) return; // throttle anti-spam
+
+  const text =
+    `💬 *Mensaje en chat escalado*\n\n` +
+    `👤 *Cliente:* ${parsed.contactName}\n` +
+    `📱 *Teléfono:* ${parsed.phoneNumber}\n` +
+    `💬 *Mensaje:* "${parsed.messageText}"\n` +
+    `⏰ ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}\n\n` +
+    `Estás en *Modo Humano* con este cliente. Respóndele desde el CRM o directamente al ${parsed.phoneNumber}.\n` +
+    `El cliente puede escribir *bot* para volver a hablar con Paula.`;
+
+  await sendWhatsAppMessage(ADVISOR_PHONE, text, { logTag: '[WhatsApp Escalation Msg]' });
+
+  await supabase
+    .from('chatbot_conversations')
+    .update({
+      metadata: { ...metadata, last_escalation_notify_at: new Date().toISOString() },
+    })
+    .eq('id', conversationId);
 }
 
 /**

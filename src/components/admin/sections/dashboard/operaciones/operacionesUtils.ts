@@ -277,15 +277,13 @@ export interface PropertyViews {
 }
 
 /**
- * @param visitsByProperty mapa id→visitas reales (desde web_visits). Si se omite,
- *   cae al antiguo `features.visitas_count`.
+ * @param visitsByProperty mapa id→visitas reales (desde web_visits). Si se omite, 0.
  */
 export function computePropertyViews(
   properties: PropertyRow[],
   visitsByProperty?: Record<string, number>,
 ): PropertyViews {
-  const views = (p: PropertyRow): number =>
-    visitsByProperty ? (visitsByProperty[p.id] ?? 0) : featureNum(p, "visitas_count");
+  const views = (p: PropertyRow): number => visitsByProperty?.[p.id] ?? 0;
 
   const sorted = [...properties].sort((a, b) => views(b) - views(a));
   const top3 = sorted.slice(0, 3);
@@ -327,9 +325,7 @@ export function computeSelectedMetrics(
   opts?: { days?: number | null; views?: number; valuation?: number },
 ): SelectedMetrics {
   const realDays = opts?.days !== undefined ? opts.days : (selectedProperty ? daysOnMarket(selectedProperty) : null);
-  const selectedViews = opts?.views !== undefined
-    ? opts.views
-    : (selectedProperty ? featureNum(selectedProperty, "visitas_count") : 0);
+  const selectedViews = opts?.views ?? 0;
   const selectedDays = realDays ?? 0;
   const isPublished = realDays !== null;
   const selectedPrice = selectedProperty ? Number(selectedProperty.price || 0) : 0;
