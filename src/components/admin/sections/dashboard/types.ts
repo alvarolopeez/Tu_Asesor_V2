@@ -29,6 +29,8 @@ export interface PropertyRow {
   images: string[]
   created_at: string
   updated_at: string
+  /** Fecha real de publicación al mercado (Fase 3). Null = aún no publicada. */
+  published_at?: string | null
 }
 
 export interface LeadRow {

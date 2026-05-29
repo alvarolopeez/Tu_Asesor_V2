@@ -5,6 +5,17 @@ function featureNum(p: PropertyRow, key: string): number {
   return Number((p.features as Record<string, any>)?.[key] || 0);
 }
 
+/**
+ * Días reales en el mercado = hoy − published_at (Fase 3).
+ * Devuelve null si la propiedad aún no se ha publicado (sin published_at).
+ * Sustituye el antiguo `features.dias_mercado` (campo estático que nadie rellenaba).
+ */
+export function daysOnMarket(p: PropertyRow): number | null {
+  if (!p.published_at) return null;
+  const ms = Date.now() - new Date(p.published_at).getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+}
+
 // ─── 1. Pipeline de propietarios ─────────────────────────────
 export interface PipelineMap {
   valoracion: number;
@@ -39,9 +50,12 @@ export function computeMarketDays(properties: PropertyRow[]): MarketDayRange[] {
   ];
 
   return priceRanges.map(range => {
-    const matched = properties.filter(range.filter);
+    // Solo cuentan las propiedades publicadas (con días reales en mercado)
+    const matched = properties.filter(range.filter)
+      .map(daysOnMarket)
+      .filter((d): d is number => d !== null);
     const avg = matched.length > 0
-      ? Math.round(matched.reduce((acc, p) => acc + featureNum(p, "dias_mercado"), 0) / matched.length)
+      ? Math.round(matched.reduce((acc, d) => acc + d, 0) / matched.length)
       : 0;
     return { label: range.label, avg };
   });
@@ -262,17 +276,29 @@ export interface PropertyViews {
   platformAvgDays: number;
 }
 
-export function computePropertyViews(properties: PropertyRow[]): PropertyViews {
-  const sorted = [...properties].sort((a, b) => featureNum(b, "visitas_count") - featureNum(a, "visitas_count"));
+/**
+ * @param visitsByProperty mapa id→visitas reales (desde web_visits). Si se omite,
+ *   cae al antiguo `features.visitas_count`.
+ */
+export function computePropertyViews(
+  properties: PropertyRow[],
+  visitsByProperty?: Record<string, number>,
+): PropertyViews {
+  const views = (p: PropertyRow): number =>
+    visitsByProperty ? (visitsByProperty[p.id] ?? 0) : featureNum(p, "visitas_count");
+
+  const sorted = [...properties].sort((a, b) => views(b) - views(a));
   const top3 = sorted.slice(0, 3);
   const bottom3 = sorted.slice(-3).reverse();
 
   const platformAvgViews = properties.length > 0
-    ? Math.round(properties.reduce((acc, p) => acc + featureNum(p, "visitas_count"), 0) / properties.length)
+    ? Math.round(properties.reduce((acc, p) => acc + views(p), 0) / properties.length)
     : 0;
 
-  const platformAvgDays = properties.length > 0
-    ? Math.round(properties.reduce((acc, p) => acc + featureNum(p, "dias_mercado"), 0) / properties.length)
+  // Media de días en mercado sobre las propiedades publicadas
+  const publishedDays = properties.map(daysOnMarket).filter((d): d is number => d !== null);
+  const platformAvgDays = publishedDays.length > 0
+    ? Math.round(publishedDays.reduce((acc, d) => acc + d, 0) / publishedDays.length)
     : 0;
 
   return { top3, bottom3, platformAvgViews, platformAvgDays };
@@ -287,13 +313,29 @@ export interface SelectedMetrics {
   valuationDiffPct: number;
   correlationRating: string;
   correlationColor: string;
+  /** false si la propiedad seleccionada aún no se ha publicado. */
+  isPublished: boolean;
 }
 
-export function computeSelectedMetrics(selectedProperty: PropertyRow | undefined): SelectedMetrics {
-  const selectedViews = selectedProperty ? featureNum(selectedProperty, "visitas_count") : 0;
-  const selectedDays = selectedProperty ? featureNum(selectedProperty, "dias_mercado") : 0;
+/**
+ * @param opts.days       días reales en mercado (desde published_at). null = sin publicar.
+ * @param opts.views      visitas reales (desde web_visits).
+ * @param opts.valuation  valoración de referencia (lead vinculado → fallback feature).
+ */
+export function computeSelectedMetrics(
+  selectedProperty: PropertyRow | undefined,
+  opts?: { days?: number | null; views?: number; valuation?: number },
+): SelectedMetrics {
+  const realDays = opts?.days !== undefined ? opts.days : (selectedProperty ? daysOnMarket(selectedProperty) : null);
+  const selectedViews = opts?.views !== undefined
+    ? opts.views
+    : (selectedProperty ? featureNum(selectedProperty, "visitas_count") : 0);
+  const selectedDays = realDays ?? 0;
+  const isPublished = realDays !== null;
   const selectedPrice = selectedProperty ? Number(selectedProperty.price || 0) : 0;
-  const selectedValuation = selectedProperty ? featureNum(selectedProperty, "precio_valoracion") : 0;
+  const selectedValuation = opts?.valuation && opts.valuation > 0
+    ? opts.valuation
+    : (selectedProperty ? featureNum(selectedProperty, "precio_valoracion") : 0);
 
   const valuationDiffPct = selectedValuation > 0
     ? ((selectedPrice - selectedValuation) / selectedValuation) * 100
@@ -323,5 +365,105 @@ export function computeSelectedMetrics(selectedProperty: PropertyRow | undefined
     valuationDiffPct,
     correlationRating,
     correlationColor,
+    isPublished,
+  };
+}
+
+// ─── 8. Estimación de bajada de precio (heurística explicable) ───────────
+export interface PriceDropEstimate {
+  /** Ajuste sugerido en € (rango bajo→alto, redondeado a 1.000€). */
+  eurLow: number;
+  eurHigh: number;
+  /** Ajuste sugerido en % (rango bajo→alto). */
+  pctLow: number;
+  pctHigh: number;
+  confidence: "alta" | "media" | "baja";
+  /** Frases explicando de dónde sale el ajuste (transparencia). */
+  reasons: string[];
+  /** true si no hay sobreprecio/señales → no se recomienda bajar. */
+  noAdjustment: boolean;
+}
+
+/**
+ * Heurística de ajuste de precio. Punto de partida documentado y fácil de tunear:
+ *
+ *   sobreprecio%  = (precio − valoración) / valoración × 100         (si hay valoración)
+ *   factorTiempo  = max(0, (díasPublicada − mediaDías) / mediaDías)
+ *   factorVisitas = max(0, (mediaVisitas − visitas) / mediaVisitas)
+ *   Ajuste% = clamp(W_PRECIO·max(0,sobreprecio%) + W_TIEMPO·factorTiempo + W_VISITAS·factorVisitas, 0, CAP)
+ *
+ * Confianza: baja si falta valoración o hay pocas muestras de mercado.
+ */
+export const PRICE_DROP_CONFIG = {
+  W_PRECIO: 0.5,
+  W_TIEMPO: 5,
+  W_VISITAS: 3,
+  CAP_PCT: 15, // tope del ajuste sugerido (decisión Álvaro: moderado)
+  RANGE_LOW_FACTOR: 0.6, // el extremo bajo del rango = 60% del ajuste
+};
+
+export function computePriceDropEstimate(args: {
+  price: number;
+  valuation: number;       // 0 = desconocida
+  daysOnMarket: number | null;
+  avgDays: number;
+  visits: number;
+  avgVisits: number;
+  marketSampleSize: number; // nº de propiedades publicadas (para confianza)
+}): PriceDropEstimate {
+  const { W_PRECIO, W_TIEMPO, W_VISITAS, CAP_PCT, RANGE_LOW_FACTOR } = PRICE_DROP_CONFIG;
+  const { price, valuation, daysOnMarket, avgDays, visits, avgVisits, marketSampleSize } = args;
+  const reasons: string[] = [];
+
+  const sobreprecioPct = valuation > 0 ? ((price - valuation) / valuation) * 100 : 0;
+  if (valuation > 0 && sobreprecioPct > 0) {
+    reasons.push(`Precio un ${sobreprecioPct.toFixed(0)}% por encima de la valoración de referencia.`);
+  }
+
+  const factorTiempo = avgDays > 0 && daysOnMarket !== null
+    ? Math.max(0, (daysOnMarket - avgDays) / avgDays)
+    : 0;
+  if (factorTiempo > 0) {
+    reasons.push(`Lleva ${daysOnMarket} días publicada (media ${avgDays}).`);
+  }
+
+  const factorVisitas = avgVisits > 0
+    ? Math.max(0, (avgVisits - visits) / avgVisits)
+    : 0;
+  if (factorVisitas > 0) {
+    reasons.push(`${visits} visitas, por debajo de la media (${avgVisits}).`);
+  }
+
+  const rawPct = W_PRECIO * Math.max(0, sobreprecioPct) + W_TIEMPO * factorTiempo + W_VISITAS * factorVisitas;
+  const pctHigh = Math.min(CAP_PCT, Math.max(0, rawPct));
+  const pctLow = pctHigh * RANGE_LOW_FACTOR;
+
+  const round1k = (n: number) => Math.round(n / 1000) * 1000;
+  const eurHigh = round1k(price * (pctHigh / 100));
+  const eurLow = round1k(price * (pctLow / 100));
+
+  // Confianza
+  let confidence: PriceDropEstimate["confidence"] = "alta";
+  if (valuation <= 0) {
+    confidence = "baja";
+    reasons.push("Sin valoración de referencia: estimación basada solo en tiempo y visitas.");
+  } else if (marketSampleSize < 3 || daysOnMarket === null) {
+    confidence = "media";
+  }
+
+  const noAdjustment = pctHigh < 0.5;
+  if (noAdjustment) {
+    reasons.length = 0;
+    reasons.push("Las señales actuales no justifican una bajada de precio.");
+  }
+
+  return {
+    eurLow,
+    eurHigh,
+    pctLow: Number(pctLow.toFixed(1)),
+    pctHigh: Number(pctHigh.toFixed(1)),
+    confidence,
+    reasons,
+    noAdjustment,
   };
 }

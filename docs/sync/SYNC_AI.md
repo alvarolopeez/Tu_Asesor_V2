@@ -15,6 +15,18 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-29] Fase 3 — Días publicada reales + estimación de bajada de precio
+
+Tercera fase: el informe de captación deja de usar campos estáticos y pasa a métricas reales + una estimación cuantitativa y explicable de ajuste de precio.
+
+- ⚠️ **CAMBIO DE SCHEMA (prod):** `ALTER TABLE properties ADD COLUMN published_at timestamptz` (nullable, aditivo, no destructivo). Backfill: `published_at = created_at` para las propiedades `status='active'`. Migración aplicada vía MCP (`add_properties_published_at`).
+- ✅ **"Días publicada" reales**: nuevo helper `daysOnMarket(p) = hoy − published_at` sustituye al estático `features.dias_mercado` (que nadie rellenaba → salía 0). `computeMarketDays` y `computePropertyViews` ahora promedian solo propiedades publicadas. El informe muestra "Sin publicar" si `published_at` es null.
+- ✅ **Botón Publicar**: en `PropertyFormModal`, control "Publicar hoy / Despublicar" + auto-set de `published_at` cuando una propiedad pasa a `active` sin fecha. Se conserva la fecha en otros estados.
+- ✅ **Visitas reales**: `OperacionesTab` carga `web_visits` y cuenta por `page_path` que contiene el id de la propiedad (antes usaba `features.visitas_count`, a 0).
+- ✅ **Estimación de bajada de precio** (`computePriceDropEstimate`, `PRICE_DROP_CONFIG`): heurística documentada y tuneable. `Ajuste% = clamp(0.5·sobreprecio% + 5·factorTiempo + 3·factorVisitas, 0, 15)`; €=redondeo a 1.000€; rango [60%·ajuste … ajuste]; confianza alta/media/baja. **Valoración de referencia (decisión Álvaro):** lead vinculado (`agent_valuation`→`estimated_value`) → fallback `features.precio_valoracion`. **Tope (decisión Álvaro):** 15% (moderado). Se muestra en el selector y en el dossier PDF con las razones (transparencia).
+- `SelectedMetrics` ampliado con `isPublished`; `computeSelectedMetrics` admite override de días/visitas/valoración (retrocompatible). `Property`/`PropertyRow` + `published_at?`.
+- 🔧 **Tech-debt resuelto:** `features.dias_mercado` y `features.visitas_count` quedan obsoletos (ya no se leen en el informe). Pendiente decidir si se eliminan del jsonb en una limpieza futura.
+
 ### ✅ [2026-05-29] Fase 2 — Promoción unificada a Encargo + agendado de hitos
 
 Segunda fase del refactor del ciclo de vida. **Objetivo:** convertir un lead en Encargo/Inmueble sin re-teclear datos, por una vía única, y agendar gestiones en el Calendario.

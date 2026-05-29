@@ -34,6 +34,8 @@ export interface Property {
   price: number;
   status: string;
   created_at: string;
+  /** Fecha real de salida al mercado. Null = aún no publicada. Base de "días publicada". */
+  published_at?: string | null;
   description?: string;
   images?: string[];
   features?: {

@@ -1,6 +1,6 @@
-import { Printer } from "lucide-react";
+import { Printer, TrendingDown } from "lucide-react";
 import type { PropertyRow } from "../types";
-import type { SelectedMetrics } from "./operacionesUtils";
+import type { SelectedMetrics, PriceDropEstimate } from "./operacionesUtils";
 
 interface PropertyReportSelectorProps {
   properties: PropertyRow[];
@@ -10,9 +10,16 @@ interface PropertyReportSelectorProps {
   metrics: SelectedMetrics;
   platformAvgViews: number;
   platformAvgDays: number;
+  priceDrop?: PriceDropEstimate;
   /** Abre la vista previa del dossier PDF. */
   onPrint: () => void;
 }
+
+const CONFIDENCE_STYLE: Record<string, string> = {
+  alta: "bg-emerald-500/15 text-emerald-400",
+  media: "bg-amber-500/15 text-amber-400",
+  baja: "bg-slate-500/15 text-slate-400",
+};
 
 /** Selector de inmueble + comparativa de métricas y disparador del informe. */
 export default function PropertyReportSelector({
@@ -23,9 +30,10 @@ export default function PropertyReportSelector({
   metrics,
   platformAvgViews,
   platformAvgDays,
+  priceDrop,
   onPrint,
 }: PropertyReportSelectorProps) {
-  const { selectedViews, selectedDays, selectedPrice, selectedValuation, valuationDiffPct, correlationRating, correlationColor } = metrics;
+  const { selectedViews, selectedDays, selectedPrice, selectedValuation, valuationDiffPct, correlationRating, correlationColor, isPublished } = metrics;
 
   return (
     <div className="bg-[#1E293B]/85 backdrop-blur-md p-6 rounded-2xl border border-[#FBBF24]/30 shadow-xl">
@@ -65,8 +73,8 @@ export default function PropertyReportSelector({
                 <span className="font-bold text-white">{selectedValuation > 0 ? `${selectedValuation.toLocaleString()}€` : "N/D"}</span>
               </div>
               <div className="flex justify-between pb-1 border-b border-white/5">
-                <span className="text-slate-400">Días en el Mercado</span>
-                <span className="font-bold text-white">{selectedDays} días</span>
+                <span className="text-slate-400">Días Publicada</span>
+                <span className="font-bold text-white">{isPublished ? `${selectedDays} días` : "Sin publicar"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Visitas Totales</span>
@@ -116,6 +124,49 @@ export default function PropertyReportSelector({
               <Printer size={14} /> Generar Informe PDF
             </button>
           </div>
+
+          {/* ─── ESTIMACIÓN DE BAJADA DE PRECIO (heurística) ─────────────── */}
+          {priceDrop && (
+            <div className="lg:col-span-3 bg-slate-900/40 p-5 rounded-xl border border-white/5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <TrendingDown size={16} className="text-[#FBBF24]" />
+                  Estimación de Ajuste de Precio
+                </h4>
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${CONFIDENCE_STYLE[priceDrop.confidence]}`}>
+                  Confianza {priceDrop.confidence}
+                </span>
+              </div>
+
+              {priceDrop.noAdjustment ? (
+                <p className="text-sm text-emerald-400 font-semibold">
+                  No se recomienda bajar el precio con las señales actuales. ✅
+                </p>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Ajuste sugerido</p>
+                    <p className="text-2xl font-black text-[#FBBF24] leading-tight">
+                      −{priceDrop.eurLow.toLocaleString()}€ … −{priceDrop.eurHigh.toLocaleString()}€
+                    </p>
+                    <p className="text-xs text-slate-400 font-bold">
+                      (−{priceDrop.pctLow}% … −{priceDrop.pctHigh}%)
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {priceDrop.reasons.length > 0 && (
+                <ul className="mt-3 space-y-1">
+                  {priceDrop.reasons.map((r, i) => (
+                    <li key={i} className="text-[11px] text-slate-400 flex gap-1.5">
+                      <span className="text-[#FBBF24]">•</span> {r}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <p className="text-slate-500 text-sm text-center py-6">Selecciona una propiedad para ver el análisis de valoración</p>

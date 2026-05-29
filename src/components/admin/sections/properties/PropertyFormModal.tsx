@@ -76,6 +76,9 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
   const [uploadedPlan, setUploadedPlan] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  // Fecha de publicación al mercado (base de "días publicada" en el informe)
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+
   // Online booking scheduling
   const [isVisitableOnline, setIsVisitableOnline] = useState(false);
   const [activeConfigDay, setActiveConfigDay] = useState<string>("Lunes");
@@ -107,6 +110,7 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
       setUploadedImages(editingProperty.images || []);
       setUploadedVideo(editingProperty.features?.video_url || null);
       setUploadedPlan(editingProperty.features?.plan_url || null);
+      setPublishedAt(editingProperty.published_at || null);
       setIsVisitableOnline(!!editingProperty.features?.is_visitable_online);
 
       if (editingProperty.features?.visitable_slots) {
@@ -141,6 +145,8 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
     } else {
       // Modo creación: reset a defaults, con prefill opcional (p.ej. promoción de lead)
       reset({ ...FORM_DEFAULTS, ...initialValues });
+      // Al crear un encargo activo lo consideramos publicado hoy por defecto
+      setPublishedAt(initialValues?.status === 'active' ? new Date().toISOString() : null);
       setUploadedImages([]);
       setUploadedVideo(null);
       setUploadedPlan(null);
@@ -214,11 +220,19 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
     try {
       const { title, description, price, status, ...featData } = data;
 
+      // "Días publicada" se mide desde published_at. Si la propiedad pasa a
+      // 'active' y aún no tiene fecha, se publica ahora; en otros estados se
+      // conserva la fecha existente (no se pierde el histórico).
+      const finalPublishedAt = status === 'active'
+        ? (publishedAt || new Date().toISOString())
+        : publishedAt;
+
       const dbPayload = {
         title,
         description,
         price,
         status,
+        published_at: finalPublishedAt,
         images: uploadedImages,
         features: {
           propertyType: featData.propertyType,
@@ -405,6 +419,38 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
                   <option value="rented">Alquilado</option>
                 </select>
               </div>
+            </div>
+
+            {/* Publicación al mercado (base de "días publicada" en el informe) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3">
+              <div className="text-xs">
+                <span className="font-semibold text-slate-300">Salida al mercado: </span>
+                {publishedAt ? (
+                  <span className="text-emerald-400 font-bold">
+                    Publicado el {new Date(publishedAt).toLocaleDateString('es-ES')}
+                    {" "}({Math.max(0, Math.floor((Date.now() - new Date(publishedAt).getTime()) / 86400000))} días en mercado)
+                  </span>
+                ) : (
+                  <span className="text-slate-500 font-bold">Sin publicar</span>
+                )}
+              </div>
+              {publishedAt ? (
+                <button
+                  type="button"
+                  onClick={() => setPublishedAt(null)}
+                  className="text-xs font-bold text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-all"
+                >
+                  Despublicar
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPublishedAt(new Date().toISOString())}
+                  className="text-xs font-extrabold text-[#2C3E50] px-3 py-1.5 rounded-lg bg-[#FBBF24] hover:bg-yellow-500 transition-all"
+                >
+                  Publicar hoy
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

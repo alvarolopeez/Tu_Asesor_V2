@@ -1,6 +1,6 @@
 import { Printer, FileText, Bot } from "lucide-react";
 import type { PropertyRow, AppointmentRow, BuyerActivityLogRow, BuyerDemandRow } from "../types";
-import type { SelectedMetrics } from "./operacionesUtils";
+import type { SelectedMetrics, PriceDropEstimate } from "./operacionesUtils";
 
 interface CaptacionReportModalProps {
   selectedProperty: PropertyRow;
@@ -10,6 +10,7 @@ interface CaptacionReportModalProps {
   appointments: AppointmentRow[];
   buyerActivityLogs: BuyerActivityLogRow[];
   buyersDemands: BuyerDemandRow[];
+  priceDrop?: PriceDropEstimate;
   onClose: () => void;
 }
 
@@ -22,9 +23,10 @@ export default function CaptacionReportModal({
   appointments,
   buyerActivityLogs,
   buyersDemands,
+  priceDrop,
   onClose,
 }: CaptacionReportModalProps) {
-  const { selectedViews, selectedDays, selectedPrice, selectedValuation, valuationDiffPct, correlationRating } = metrics;
+  const { selectedViews, selectedDays, selectedPrice, selectedValuation, valuationDiffPct, correlationRating, isPublished } = metrics;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
@@ -104,8 +106,8 @@ export default function CaptacionReportModal({
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-3 text-slate-600">Días en Mercado</td>
-                  <td className="px-4 py-3 text-right text-slate-900 font-bold">{selectedDays} días</td>
+                  <td className="px-4 py-3 text-slate-600">Días Publicada</td>
+                  <td className="px-4 py-3 text-right text-slate-900 font-bold">{isPublished ? `${selectedDays} días` : "Sin publicar"}</td>
                   <td className="px-4 py-3 text-right text-slate-500">{platformAvgDays} días</td>
                   <td className={`px-4 py-3 text-right font-bold ${selectedDays <= platformAvgDays ? "text-green-600" : "text-orange-600"}`}>
                     {selectedDays - platformAvgDays > 0 ? "+" : ""}{selectedDays - platformAvgDays}d
@@ -195,6 +197,24 @@ export default function CaptacionReportModal({
             <p className="text-xs text-slate-700 leading-relaxed">
               El inmueble se encuentra catalogado como <strong className="text-slate-950">{correlationRating}</strong> con una desviación de <strong>{valuationDiffPct.toFixed(1)}%</strong> respecto a la valoración media histórica de escrituración de la zona. {valuationDiffPct > 5 ? "Se recomienda encarecidamente una corrección de precio de venta a la baja para alinear la propiedad con los rangos de captación firmables ante notario en menos de 45 días." : "La propiedad mantiene una excelente sintonía de demanda en relación al ticket medio de venta."}
             </p>
+
+            {/* Recomendación cuantitativa de ajuste de precio */}
+            {priceDrop && !priceDrop.noAdjustment && (
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  <strong className="text-slate-950">Ajuste de precio sugerido:</strong>{" "}
+                  entre <strong>−{priceDrop.eurLow.toLocaleString()}€</strong> y{" "}
+                  <strong>−{priceDrop.eurHigh.toLocaleString()}€</strong>{" "}
+                  (−{priceDrop.pctLow}% … −{priceDrop.pctHigh}%).{" "}
+                  <span className="text-slate-500">Confianza {priceDrop.confidence}.</span>
+                </p>
+                {priceDrop.reasons.length > 0 && (
+                  <p className="text-[11px] text-slate-500 mt-1 italic">
+                    Basado en: {priceDrop.reasons.join(" ")}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Signatures */}

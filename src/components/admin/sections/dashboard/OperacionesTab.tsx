@@ -15,6 +15,8 @@ import {
   computeBuyerProfiles,
   computePropertyViews,
   computeSelectedMetrics,
+  computePriceDropEstimate,
+  daysOnMarket,
 } from "./operaciones/operacionesUtils";
 import PipelineCard from "./operaciones/PipelineCard";
 import MarketDaysChart from "./operaciones/MarketDaysChart";
@@ -39,6 +41,7 @@ export default function OperacionesTab() {
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
   const [buyerActivityLogs, setBuyerActivityLogs] = useState<BuyerActivityLogRow[]>([]);
   const [buyersDemands, setBuyersDemands] = useState<BuyerDemandRow[]>([]);
+  const [webVisits, setWebVisits] = useState<{ page_path: string }[]>([]);
 
   // Interactive individual property selector state
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
@@ -57,13 +60,15 @@ export default function OperacionesTab() {
         { data: leadsData },
         { data: apptsData },
         { data: logsData },
-        { data: buyersDemandsData }
+        { data: buyersDemandsData },
+        { data: webVisitsData }
       ] = await Promise.all([
         supabase.from("properties").select("*"),
         supabase.from("leads").select("*"),
         supabase.from("appointments").select("*"),
         supabase.from("buyer_activity_logs").select("*").order("event_date", { ascending: false }),
-        supabase.from("buyers_demands").select("id, name, phone, email, max_budget, status")
+        supabase.from("buyers_demands").select("id, name, phone, email, max_budget, status"),
+        supabase.from("web_visits").select("page_path")
       ]);
 
       const propsList = (propsData || []) as PropertyRow[];
@@ -72,6 +77,7 @@ export default function OperacionesTab() {
       setAppointments((apptsData || []) as AppointmentRow[]);
       setBuyerActivityLogs((logsData || []) as BuyerActivityLogRow[]);
       setBuyersDemands((buyersDemandsData || []) as BuyerDemandRow[]);
+      setWebVisits((webVisitsData || []) as { page_path: string }[]);
 
       // Default the selector to the first property if available
       if (propsList.length > 0) {
@@ -96,6 +102,21 @@ export default function OperacionesTab() {
   const buyerLeads = leads.filter((l) => l.type === "buyer");
   const sellerLeads = leads.filter((l) => l.type === "seller");
 
+  // Visitas reales por propiedad (web_visits cuyo page_path contiene el id)
+  const visitsByProperty: Record<string, number> = {};
+  for (const p of properties) {
+    visitsByProperty[p.id] = webVisits.filter(v => v.page_path?.includes(p.id)).length;
+  }
+
+  // Valoración de referencia por propiedad: lead vinculado → fallback feature.
+  const valuationByProperty: Record<string, number> = {};
+  for (const l of sellerLeads) {
+    if (!l.property_id) continue;
+    const prefs = l.preferences || {};
+    const v = Number((prefs as any).agent_valuation || (prefs as any).estimated_value || 0);
+    if (v > 0) valuationByProperty[l.property_id] = v;
+  }
+
   // Derivaciones analíticas (lógica pura en operacionesUtils)
   const pipelineMap = computePipeline(sellerLeads);
   const maxStageCount = Math.max(...Object.values(pipelineMap), 1);
@@ -103,11 +124,32 @@ export default function OperacionesTab() {
   const mergedSevillaDemand = computeSevillaDemand(buyerLeads);
   const growthData = computeGrowth(buyerLeads);
   const buyerProfiles = computeBuyerProfiles(buyerLeads);
-  const { top3, bottom3, platformAvgViews, platformAvgDays } = computePropertyViews(properties);
+  const { top3, bottom3, platformAvgViews, platformAvgDays } = computePropertyViews(properties, visitsByProperty);
+  const publishedCount = properties.filter(p => p.published_at).length;
 
   // Propiedad seleccionada en el generador de informes + sus métricas
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
-  const selectedMetrics = computeSelectedMetrics(selectedProperty);
+  const selectedDays = selectedProperty ? daysOnMarket(selectedProperty) : null;
+  const selectedVisits = selectedProperty ? (visitsByProperty[selectedProperty.id] ?? 0) : 0;
+  const selectedValuation = selectedProperty ? (valuationByProperty[selectedProperty.id] ?? 0) : 0;
+  const selectedMetrics = computeSelectedMetrics(selectedProperty, {
+    days: selectedDays,
+    views: selectedVisits,
+    valuation: selectedValuation,
+  });
+
+  // Estimación de bajada de precio (heurística explicable)
+  const priceDrop = selectedProperty
+    ? computePriceDropEstimate({
+        price: Number(selectedProperty.price || 0),
+        valuation: selectedValuation,
+        daysOnMarket: selectedDays,
+        avgDays: platformAvgDays,
+        visits: selectedVisits,
+        avgVisits: platformAvgViews,
+        marketSampleSize: publishedCount,
+      })
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -143,6 +185,7 @@ export default function OperacionesTab() {
         metrics={selectedMetrics}
         platformAvgViews={platformAvgViews}
         platformAvgDays={platformAvgDays}
+        priceDrop={priceDrop}
         onPrint={() => setShowPrintModal(true)}
       />
 
@@ -156,6 +199,7 @@ export default function OperacionesTab() {
           appointments={appointments}
           buyerActivityLogs={buyerActivityLogs}
           buyersDemands={buyersDemands}
+          priceDrop={priceDrop}
           onClose={() => setShowPrintModal(false)}
         />
       )}
