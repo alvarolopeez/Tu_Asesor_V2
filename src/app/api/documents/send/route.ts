@@ -52,16 +52,24 @@ export async function POST(req: NextRequest) {
     const template = (doc as any).document_templates;
     if (!template?.body) throw new Error("La plantilla asociada ya no existe");
 
-    const ctx = (doc.merged_data || {}) as Record<string, string>;
+    const merged = (doc.merged_data || {}) as Record<string, any>;
+    const ctx = merged as Record<string, string>;
     const text = mergeBody(template.body, ctx);
 
-    // Destinatarios firmantes: vendedor y, si aplica, comprador (emails válidos)
+    // Firmantes: preferimos la lista explícita guardada al generar (varios
+    // propietarios); si no existe, caemos a vendedor/comprador del contexto.
     const recipients: DocumensoRecipient[] = [];
-    if (EMAIL_RE.test(ctx["vendedor.email"] || "")) {
-      recipients.push({ name: ctx["vendedor.nombre"] || "Vendedor", email: ctx["vendedor.email"] });
+    const explicit = Array.isArray(merged.__recipients) ? merged.__recipients : [];
+    for (const r of explicit) {
+      if (r && EMAIL_RE.test(r.email || "")) recipients.push({ name: r.name || "Firmante", email: r.email });
     }
-    if (EMAIL_RE.test(ctx["comprador.email"] || "")) {
-      recipients.push({ name: ctx["comprador.nombre"] || "Comprador", email: ctx["comprador.email"] });
+    if (recipients.length === 0) {
+      if (EMAIL_RE.test(ctx["vendedor.email"] || "")) {
+        recipients.push({ name: ctx["vendedor.nombre"] || "Vendedor", email: ctx["vendedor.email"] });
+      }
+      if (EMAIL_RE.test(ctx["comprador.email"] || "")) {
+        recipients.push({ name: ctx["comprador.nombre"] || "Comprador", email: ctx["comprador.email"] });
+      }
     }
     if (recipients.length === 0) {
       return NextResponse.json(

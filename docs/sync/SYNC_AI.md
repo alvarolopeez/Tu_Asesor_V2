@@ -15,6 +15,18 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-29] Fase 4e — Generación lead-driven + página previa editable
+
+Refinamiento del generador (a petición de Álvaro): la Nota de encargo nace del **lead vendedor** (es lo que se firma para conseguir la exclusiva), no de una propiedad ya creada.
+
+- ✅ **Generador lead-driven**: en `DocumentsManager` el paso 1 es elegir plantilla + **lead vendedor** (antes era una `property` con `is_encargo`). Los datos del inmueble salen de `leads.preferences`.
+- ✅ **Página previa editable** (paso 2): modal con TODOS los campos autorrellenados y editables antes de generar, incl. los que no están en la ficha (DNI, domicilio del propietario, referencia catastral, duración del encargo). Así el contrato sale con el 100% de los datos.
+- ✅ **Varios propietarios**: lista repetible (añadir/quitar) → placeholder `{{propietarios}}` (lista formateada). El propietario principal sigue alimentando `{{vendedor.*}}`.
+- ✅ **Representación**: toggle "actúa en representación" → placeholder `{{representacion}}`.
+- ✅ **Firmantes Documenso**: ahora `merged_data.__recipients` lleva todos los propietarios con email válido (la ruta `/api/documents/send` los prioriza; fallback a vendedor/comprador).
+- ✅ Plantilla semilla "Nota de encargo" **actualizada** (SQL) para usar `{{propietarios}}`, `{{representacion}}`, `{{inmueble.referencia_catastral}}`, `{{duracion_meses}}`.
+- ⏭️ Sigue pendiente que Álvaro pase el **texto legal definitivo** y los **secrets de Documenso** ya están en Netlify+.env.local.
+
 ### ✅ [2026-05-29] Fase 4c/4d — Integración Documenso (envío a firma + webhook)
 
 **Código escrito; pendiente de activar con los secrets de Álvaro (no verificable end-to-end sin ellos).**
