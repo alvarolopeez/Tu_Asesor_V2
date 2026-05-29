@@ -15,6 +15,17 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-29] Fase 2 — Promoción unificada a Encargo + agendado de hitos
+
+Segunda fase del refactor del ciclo de vida. **Objetivo:** convertir un lead en Encargo/Inmueble sin re-teclear datos, por una vía única, y agendar gestiones en el Calendario.
+
+- ✅ **`PropertyFormModal` reutilizable** (props nuevas opcionales, retrocompatibles): `initialValues?: Partial<PropertyFormValues>`, `markAsEncargo?: boolean`, `submitLabel?: string`. Además **preserva `features.is_encargo`** al guardar (antes el rebuild de `features` lo borraba → un encargo editado desde Inmuebles desaparecía de Encargos; bug corregido).
+- ✅ **"Subir encargo"** (entrada manual) en `SellersManager`: botón que abre el modal con `markAsEncargo` + `status='active'`. La propiedad nace ya como encargo y aparece en la pestaña.
+- ✅ **Promoción desde lead** en `WarmLeadsManager` (drawer → Ficha Inmueble): CTA "Promover a Encargo en exclusiva" que abre el **mismo** modal prerellenado desde `leads.preferences` (dirección, tipo, m², hab, baños, planta, ascensor, `agent_valuation`→`price`). Al guardar: crea la propiedad (`is_encargo`, `active`), vincula `leads.property_id`, pone `status='closed'` y registra hito `Adquisición` en `seller_activity_logs`. Lead ya promovido → muestra badge de estado en vez del botón. **Ambos caminos comparten `PropertyFormModal` (sin lógica duplicada).**
+- ✅ **Hito con hora → cita en Calendario** (P2.1): el formulario de timeline de Vendedores admite `datetime-local` opcional y nueva opción de evento **"📍 Adquisición"** (= visita para captar la exclusiva, según definición de Álvaro). Si se fija fecha/hora, además de loguear el hito se crea un `appointment` vinculado al `lead_id` y aparece en el Calendario.
+  - ⚠️ **Tipos de cita:** se reutiliza el enum existente sin tocar BD: `Llamada/Email/Valoración → 'admin'`, `Nota de visita → 'visita'`, `Adquisición → 'captacion'`. **Decisión pendiente:** si se quiere un tipo dedicado `'llamada'` (con color/etiqueta propios en el Calendario), requiere migración del CHECK de `appointments.type` + `AppointmentFormModal` + `calendarUtils`. No hecho para evitar DDL en prod a mitad de fase.
+- Sin migración de schema en esta fase. Build verde en cada sub-commit (2a/2b/2c).
+
 ### ✅ [2026-05-29] Fase 1 — Separar ciclo de vida Vendedor de Inmuebles/Encargos
 
 Primera fase del refactor del ciclo de vida (Vendedor → Encargo → Inmueble → Documentos). **Objetivo:** un lead de valoración ya no ensucia Inmuebles/Encargos.

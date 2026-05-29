@@ -113,6 +113,8 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
   const [newLogType, setNewLogType] = useState<string>("Llamada");
   const [newLogTitle, setNewLogTitle] = useState<string>("");
   const [newLogNotes, setNewLogNotes] = useState<string>("");
+  // Opcional: si se rellena, el hito también se agenda en el Calendario (appointment)
+  const [newLogDateTime, setNewLogDateTime] = useState<string>("");
 
   // Promoción de lead → Encargo en exclusiva (reutiliza el form de Inmuebles)
   const [showPromoteForm, setShowPromoteForm] = useState(false);
@@ -321,14 +323,48 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
           event_type: newLogType,
           title: newLogTitle,
           notes: newLogNotes || null,
-          event_date: new Date().toISOString()
+          // Si se programó, el hito queda fechado en el momento de la cita
+          event_date: newLogDateTime ? new Date(newLogDateTime).toISOString() : new Date().toISOString()
         });
 
       if (error) throw error;
 
-      toast.success("Actividad registrada en la línea de tiempo");
+      // Si el asesor eligió fecha/hora, además creamos una cita en el Calendario
+      // vinculada al lead (recordatorio + visibilidad en agenda).
+      if (newLogDateTime) {
+        // Mapea el tipo de hito al tipo de cita existente (sin tocar el enum de BD).
+        const apptType =
+          newLogType === 'Nota de visita' ? 'visita' :
+          newLogType === 'Adquisición' ? 'captacion' :
+          'admin'; // Llamada / Email / Valoración → administrativo
+        const typeLabel =
+          newLogType === 'Nota de visita' ? '🏠 Visita' :
+          newLogType === 'Adquisición' ? '📍 Adquisición' :
+          newLogType === 'Llamada' ? '📞 Llamada' : newLogType;
+
+        const { error: apptError } = await supabase
+          .from('appointments')
+          .insert({
+            lead_id: selectedLead.id,
+            scheduled_at: new Date(newLogDateTime).toISOString(),
+            type: apptType,
+            status: 'pending',
+            title: `${typeLabel}: ${selectedLead.name}`,
+            notes: newLogNotes || newLogTitle || null,
+          });
+        if (apptError) {
+          console.error("No se pudo crear la cita en el calendario:", apptError.message);
+          toast.error("Hito guardado, pero no se pudo agendar en el calendario");
+        } else {
+          toast.success("Hito registrado y agendado en el Calendario 📅");
+        }
+      } else {
+        toast.success("Actividad registrada en la línea de tiempo");
+      }
+
       setNewLogTitle("");
       setNewLogNotes("");
+      setNewLogDateTime("");
       fetchTimelineLogs(selectedLead.id);
     } catch (err: any) {
       console.error("Error al insertar hito:", err.message);
@@ -470,6 +506,8 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
         return <PhoneCall size={14} className="text-blue-400" />;
       case 'Nota de visita':
         return <Eye size={14} className="text-indigo-400" />;
+      case 'Adquisición':
+        return <Briefcase size={14} className="text-[#FBBF24]" />;
       case 'Valoración':
         return <Calculator size={14} className="text-amber-400" />;
       case 'Email':
@@ -1139,6 +1177,7 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                       >
                         <option value="Llamada">📞 Llamada</option>
                         <option value="Nota de visita">🏠 Visita</option>
+                        <option value="Adquisición">📍 Adquisición</option>
                         <option value="Valoración">📊 Tasación</option>
                         <option value="Email">✉️ Email</option>
                       </select>
@@ -1152,7 +1191,7 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                       />
                     </div>
 
-                    <input 
+                    <input
                       type="text"
                       placeholder="Detalles y comentarios de la gestión..."
                       value={newLogNotes}
@@ -1160,11 +1199,35 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                       className="w-full bg-[#0F172A]/50 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#FBBF24] transition-all"
                     />
 
+                    {/* Programar en calendario (opcional) */}
+                    <div className="flex items-center gap-2">
+                      <Calendar size={14} className="text-slate-400 shrink-0" />
+                      <input
+                        type="datetime-local"
+                        value={newLogDateTime}
+                        onChange={(e) => setNewLogDateTime(e.target.value)}
+                        className="flex-1 bg-[#0F172A]/50 border border-white/10 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-[#FBBF24] transition-all [color-scheme:dark]"
+                      />
+                      {newLogDateTime && (
+                        <button
+                          type="button"
+                          onClick={() => setNewLogDateTime("")}
+                          className="text-slate-400 hover:text-white p-1"
+                          title="Quitar fecha (no agendar)"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 -mt-1">
+                      Opcional: si fijas fecha y hora, el hito también se agenda en el Calendario y queda vinculado a este vendedor.
+                    </p>
+
                     <button
                       type="submit"
                       className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] text-xs font-bold py-2 rounded-lg transition-all active:scale-95 cursor-pointer"
                     >
-                      Añadir a la Línea de Tiempo
+                      {newLogDateTime ? "Añadir y Agendar en Calendario" : "Añadir a la Línea de Tiempo"}
                     </button>
                   </form>
 
