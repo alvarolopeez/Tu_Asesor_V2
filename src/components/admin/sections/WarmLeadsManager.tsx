@@ -40,6 +40,8 @@ import {
   FileText
 } from "lucide-react";
 import toast from "react-hot-toast";
+import PropertyFormModal from "./properties/PropertyFormModal";
+import type { PropertyFormValues } from "./properties/types";
 
 // ─── INTERFACES & HELPER TYPES ──────────────────────────────────────────
 interface WarmLeadsManagerProps {
@@ -111,6 +113,9 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
   const [newLogType, setNewLogType] = useState<string>("Llamada");
   const [newLogTitle, setNewLogTitle] = useState<string>("");
   const [newLogNotes, setNewLogNotes] = useState<string>("");
+
+  // Promoción de lead → Encargo en exclusiva (reutiliza el form de Inmuebles)
+  const [showPromoteForm, setShowPromoteForm] = useState(false);
 
   // ─── INITIALIZATION & SYNC ─────────────────────────────────────────────
   useEffect(() => {
@@ -328,6 +333,65 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
     } catch (err: any) {
       console.error("Error al insertar hito:", err.message);
       toast.error("No se pudo registrar el hito de actividad");
+    }
+  };
+
+  // ─── PROMOCIÓN A ENCARGO ───────────────────────────────────────────────
+  // Mapea las características guardadas en leads.preferences al formato del
+  // formulario de Inmuebles, para prerellenar el modal sin teclear dos veces.
+  const buildPromoteInitialValues = (lead: Lead): Partial<PropertyFormValues> => {
+    const prefs = getPreferences(lead);
+    const allowedTypes = ['Piso', 'Casa', 'Parcela', 'Indiferente'];
+    const propertyType = (prefs.property_type && allowedTypes.includes(prefs.property_type)
+      ? prefs.property_type
+      : 'Piso') as PropertyFormValues['propertyType'];
+
+    return {
+      title: prefs.property_address || `Encargo de ${lead.name}`,
+      address: prefs.property_address || '',
+      propertyType,
+      rooms: prefs.rooms != null ? Number(prefs.rooms) : 1,
+      baths: prefs.baths != null ? Number(prefs.baths) : 1,
+      sqm: prefs.sqm != null ? Number(prefs.sqm) : 0,
+      floor: prefs.floor || '',
+      elevator: !!prefs.elevator,
+      price: Number(prefs.agent_valuation || prefs.estimated_value || 0),
+      status: 'active',
+    };
+  };
+
+  // Tras crear la propiedad: vincularla al lead, cerrar el funnel y dejar traza.
+  const handleLeadPromoted = async (savedPropertyId: string) => {
+    if (!selectedLead) return;
+    const leadId = selectedLead.id;
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ property_id: savedPropertyId, status: 'closed', updated_at: new Date().toISOString() })
+        .eq('id', leadId);
+      if (error) throw error;
+
+      await supabase.from('seller_activity_logs').insert({
+        lead_id: leadId,
+        event_type: 'Adquisición',
+        title: 'Encargo firmado en exclusiva',
+        notes: 'El lead se promovió a Encargo. Inmueble creado y publicado en la cartera.',
+        event_date: new Date().toISOString(),
+      });
+
+      // Reflejar en estado local
+      setSellerLeads(prev => prev.map(l =>
+        l.id === leadId ? { ...l, property_id: savedPropertyId, status: 'closed' } : l
+      ));
+      setSelectedLead(prev => prev ? { ...prev, property_id: savedPropertyId, status: 'closed' } : null);
+
+      setShowPromoteForm(false);
+      fetchTimelineLogs(leadId);
+      toast.success("Lead promovido a Encargo en exclusiva 🎉");
+    } catch (err: any) {
+      console.error("Error al promover lead a encargo:", err.message);
+      toast.error("La propiedad se creó, pero no se pudo vincular al lead. Revísalo en Encargos.");
+      setShowPromoteForm(false);
     }
   };
 
@@ -1040,6 +1104,22 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                     />
                   </div>
 
+                  {/* ─── PROMOCIÓN A ENCARGO EN EXCLUSIVA ─────────────────────── */}
+                  {selectedLead.property_id ? (
+                    <div className="p-4 rounded-2xl bg-emerald-500/[0.05] border border-emerald-500/30 flex items-center gap-3 text-sm text-emerald-300">
+                      <CheckCircle size={18} className="shrink-0" />
+                      <span>Este lead ya está promovido a <strong>Encargo en exclusiva</strong>. Gestiónalo desde la pestaña “Encargos”.</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowPromoteForm(true)}
+                      className="w-full flex items-center justify-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-extrabold py-3.5 rounded-2xl transition-all active:scale-[0.99] shadow-lg shadow-[#FBBF24]/10"
+                    >
+                      <Briefcase size={18} />
+                      Promover a Encargo en exclusiva
+                    </button>
+                  )}
+
                 </div>
               )}
 
@@ -1132,6 +1212,18 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── MODAL: PROMOVER LEAD → ENCARGO (reutiliza el form de Inmuebles) ─── */}
+      {showPromoteForm && selectedLead && (
+        <PropertyFormModal
+          editingProperty={null}
+          initialValues={buildPromoteInitialValues(selectedLead)}
+          markAsEncargo
+          submitLabel="Crear encargo y vincular al lead"
+          onClose={() => setShowPromoteForm(false)}
+          onSaved={(saved) => handleLeadPromoted(saved.id)}
+        />
       )}
 
     </div>
