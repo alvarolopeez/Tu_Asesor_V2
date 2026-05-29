@@ -40,6 +40,8 @@ const FORM_DEFAULTS: PropertyFormValues = {
   rooms: 2,
   baths: 1,
   sqm: 80,
+  floor: "",
+  elevator: false,
   address: "",
   latitude: 37.3891,
   longitude: -5.9845,
@@ -82,6 +84,8 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved }:
       setValue("rooms", Number(editingProperty.features?.rooms ?? 1));
       setValue("baths", Number(editingProperty.features?.baths ?? 1));
       setValue("sqm", Number(editingProperty.features?.sqm ?? 80));
+      setValue("floor", editingProperty.features?.floor || "");
+      setValue("elevator", !!editingProperty.features?.elevator);
       setValue("address", editingProperty.features?.address || "");
       setValue("latitude", Number(editingProperty.features?.latitude ?? 37.3891));
       setValue("longitude", Number(editingProperty.features?.longitude ?? -5.9845));
@@ -208,6 +212,8 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved }:
           rooms: featData.rooms,
           baths: featData.baths,
           sqm: featData.sqm,
+          floor: featData.floor,
+          elevator: featData.elevator,
           address: featData.address,
           latitude: featData.latitude,
           longitude: featData.longitude,
@@ -337,6 +343,27 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved }:
                   {...register("sqm", { valueAsNumber: true })}
                   className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-2.5 px-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all text-sm font-bold"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Planta</label>
+                <input
+                  {...register("floor")}
+                  className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-2.5 px-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all text-sm"
+                  placeholder="Ej: 3º, Bajo, Ático"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Ascensor</label>
+                <label className="flex items-center gap-3 bg-[#0F172A] border border-white/10 rounded-xl py-2.5 px-3 cursor-pointer h-[42px]">
+                  <span className="relative inline-flex items-center">
+                    <input type="checkbox" {...register("elevator")} className="sr-only peer" />
+                    <span className="w-10 h-5 bg-slate-700 rounded-full peer peer-checked:bg-emerald-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></span>
+                  </span>
+                  <span className="text-sm text-slate-300 font-semibold">Sí, dispone de ascensor</span>
+                </label>
               </div>
             </div>
 

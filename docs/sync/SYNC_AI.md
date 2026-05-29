@@ -7,13 +7,19 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 - ⏳ **Workflows n8n fallan en producción por política de 24h de Meta.** Test end-to-end del workflow `Notificacion Nuevo Lead` confirmó que Meta acepta el API call (200 OK con `wamid`) pero después marca `status: failed` con código `131047` "Re-engagement message" porque el destinatario está fuera de la ventana de 24h. Afecta a los 3 workflows (Bienvenida, Difusión, Seguimiento) — todos envían texto libre a destinatarios que típicamente no han escrito al bot recientemente. **Solución:** crear plantillas HSM aprobadas en Meta Business Manager y cambiar los workflows a `type: "template"`. Plantillas EN CREACIÓN por Álvaro al 2026-05-27.
   - **Nombres de plantilla acordados (usar EXACTAMENTE estos al cablear los workflows):**
     - `bienvenida_nuevo_lead` (MARKETING — Meta clasifica los mensajes de bienvenida como Marketing, NO Utility) → workflow `Notificacion Nuevo Lead` / nodo `WhatsApp Bienvenida`. Params: {{1}}=nombre, {{2}}=zona.
-    - `nueva_propiedad_match` (MARKETING) → workflow `Difusion Inteligente` / nodo `Enviar WhatsApp Meta`. Params: {{1}}=nombre, {{2}}=título, {{3}}=dirección, {{4}}=precio, {{5}}=m², {{6}}=habitaciones.
+    - `nueva_propiedad_match` (MARKETING, **7 variables** — Álvaro añadió planta+ascensor el 2026-05-29) → workflow `Difusion Inteligente` / nodo `Enviar WhatsApp Meta`. Params: {{1}}=nombre, {{2}}=título, {{3}}=dirección, {{4}}=precio, {{5}}=planta+ascensor, {{6}}=m², {{7}}=habitaciones. **OJO con el orden:** el `{{5}}` nuevo desplazó m² a `{{6}}` y habitaciones a `{{7}}`. El `{{5}}` se compone de `features.floor` (texto, ej. "3º") + `features.elevator` (bool) — el workflow debe construir la frase, ej. `"3º con ascensor"` / `"Bajo sin ascensor"`. Si `floor` está vacío, usar fallback genérico.
     - `seguimiento_lead` (MARKETING) → workflow `Seguimiento Leads Diario` / nodo `WhatsApp Seguimiento`. Params: {{1}}=nombre.
   - Al adaptar (tarea pendiente), cambiar el `jsonBody` de cada nodo de `type:"text"` a `type:"template"` con `template.name`, `language.code="es"` y `components[].parameters` mapeando los {{N}} a los campos del `$json`. La credencial Bearer (`Meta WhatsApp Cloud Token`, id `s3YA5o57rEEdFw1W`) ya está cableada — no tocarla.
   - BLOQUEADO hasta que las 3 plantillas estén en estado "Aprobada" en Meta.
 - ⏳ **Mejorar UX de chats escalados.** Actualmente, cuando una conversación pasa a `status=escalated`, el webhook deja de responder sin avisar al cliente ni al asesor. Si el agente humano nunca responde, el cliente queda "en el limbo" indefinidamente. Propuestas: (1) avisar a Álvaro por WhatsApp cada vez que llega un mensaje a chat escalado, (2) comando `/bot` para que el cliente reactive la IA, (3) auto-desescalado tras N días sin actividad humana. Detectado 2026-05-27 cuando un chat escalado el 2026-05-25 dejó al cliente sin respuesta durante 2 días.
 
 ## ✅ Peticiones Completadas
+
+### ✅ [2026-05-29] Nuevos campos de propiedad: planta + ascensor
+
+- ✅ Añadidos `floor` (texto libre, ej. "3º"/"Bajo"/"Ático") y `elevator` (booleano) al formulario de alta/edición de inmuebles (`PropertyFormModal.tsx`), persistidos dentro de `properties.features` (jsonb). No requiere migración SQL (columna `features` ya es jsonb flexible).
+- ✅ Schema Zod (`propertySchema`) e interface `Property.features` ampliados con ambos campos (opcionales/retrocompatibles). `gitnexus_impact` sobre `Property` marcó HIGH por nº de importadores, pero el cambio es puramente aditivo (campos opcionales) → 0 roturas. Build verde.
+- **Motivo:** dar fuente de datos al `{{5}}` de la plantilla `nueva_propiedad_match` (ver Peticiones Pendientes). Las propiedades existentes no tienen estos campos → el workflow debe contemplar fallback cuando `features.floor`/`features.elevator` no existan.
 
 ### ✅ [2026-05-28] Refactor split — CalendarManager + OperacionesTab
 

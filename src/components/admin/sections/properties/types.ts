@@ -14,6 +14,8 @@ export const propertySchema = z.object({
   rooms: z.number().min(0, "Mínimo 0 habitaciones").default(1),
   baths: z.number().min(0, "Mínimo 0 baños").default(1),
   sqm: z.number().min(0, "Mínimo 0 metros cuadrados").default(0),
+  floor: z.string().optional(),
+  elevator: z.boolean().default(false),
   address: z.string().min(3, "La dirección exacta es obligatoria"),
   latitude: z.number({ message: "La latitud debe ser un número" }).min(-90).max(90),
   longitude: z.number({ message: "La longitud debe ser un número" }).min(-180).max(180),
@@ -39,6 +41,8 @@ export interface Property {
     rooms?: number;
     baths?: number;
     sqm?: number;
+    floor?: string;
+    elevator?: boolean;
     address?: string;
     latitude?: number;
     longitude?: number;
