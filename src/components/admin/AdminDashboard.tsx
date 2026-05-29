@@ -40,8 +40,9 @@ import ChatManager from "./sections/ChatManager";
 import BlogManager from "./sections/BlogManager";
 import HeatmapManager from "./sections/HeatmapManager";
 import WebhooksManager from "./sections/WebhooksManager";
+import DocumentsManager from "./sections/DocumentsManager";
 
-type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'sellers' | 'warm_sellers' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
+type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'sellers' | 'warm_sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
 
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -189,6 +190,7 @@ export default function AdminDashboard() {
     { id: 'buyers', label: 'Pedidos', icon: Users },
     { id: 'sellers', label: 'Encargos', icon: Briefcase },
     { id: 'warm_sellers', label: 'Vendedores', icon: UserPlus },
+    { id: 'documents', label: 'Documentos', icon: FileText },
     { id: 'chat', label: 'Live Chat (IA)', icon: MessageCircle },
     { id: 'reviews', label: 'Reseñas', icon: Star },
     { id: 'blog', label: 'Blog', icon: PenTool },
@@ -334,6 +336,9 @@ export default function AdminDashboard() {
 
             {/* 11. WEBHOOKS */}
             {activeTab === 'webhooks' && <WebhooksManager />}
+
+            {/* 12. DOCUMENTOS */}
+            {activeTab === 'documents' && <DocumentsManager />}
 
           </div>
         )}

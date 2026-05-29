@@ -15,6 +15,14 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-29] Fase 4b — Tab "Documentos": plantillas + generación con autorrelleno
+
+- ✅ Nuevo tab admin **"Documentos"** (`AdminDashboard` → `TabType 'documents'`, icono FileText) y componente `DocumentsManager.tsx`.
+- ✅ **CRUD de plantillas** (`document_templates`): crear/editar/borrar, editor con cuerpo de texto y placeholders `{{...}}`.
+- ✅ **Generador con autorrelleno**: elige plantilla + encargo (property `is_encargo`) + comprador (`buyers_demands`, opcional). Construye el contexto desde el lead vendedor vinculado (`leads.property_id`): `vendedor.*`, `inmueble.*` (dirección/tipo/m²), `precio`, `comision_pct`, `honorarios`, `comprador.*`, fecha/lugar. Los campos sin dato (DNI, ref. catastral, duración) se dejan como línea de relleno "________".
+- ✅ Cada generación guarda un registro en `generated_documents` (`signature_status='draft'`, `merged_data` snapshot) y abre una **vista imprimible** (window.print → PDF). Lista de documentos generados con su estado.
+- ⏭️ **Pendiente 4c/4d:** subir el PDF a **Documenso** y enviarlo a firma (env `DOCUMENSO_*`) + webhook `/api/webhooks/documenso` que actualice `signature_status` (+ aviso WhatsApp a Álvaro al firmarse). El estado ya se pinta en la UI; falta el flujo real de firma.
+
 ### 🚧 [2026-05-29] Fase 4a — Esquema documental (Documenso) + RLS + seed
 
 Primer paso de la Fase 4 (plantillas + firma digital). **Solo BD; sin código aún.**
