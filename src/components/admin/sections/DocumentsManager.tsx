@@ -252,6 +252,31 @@ export default function DocumentsManager() {
     }
   };
 
+  // ─── ENVIAR A FIRMAR (Documenso) ────────────────────────────────────────
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const handleSendToSign = async (gd: GeneratedDocument) => {
+    setSendingId(gd.id);
+    try {
+      const res = await fetch("/api/documents/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generatedDocumentId: gd.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error || "No se pudo enviar a firmar");
+        return;
+      }
+      toast.success("Enviado a firmar con Documenso 📨");
+      fetchAll();
+    } catch (err) {
+      console.error("Error enviando a firmar:", err);
+      toast.error("Error de red al enviar a firmar");
+    } finally {
+      setSendingId(null);
+    }
+  };
+
   // ─── RENDER ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -376,9 +401,20 @@ export default function DocumentsManager() {
                           {prop?.title || "Sin inmueble"} · {new Date(g.created_at).toLocaleDateString("es-ES")}
                         </p>
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded shrink-0 ${st.cls}`}>
-                        {st.label}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {g.signature_status === "draft" && (
+                          <button
+                            onClick={() => handleSendToSign(g)}
+                            disabled={sendingId === g.id}
+                            className="text-[11px] font-bold text-[#2C3E50] bg-[#FBBF24] hover:bg-yellow-500 disabled:opacity-50 px-2.5 py-1 rounded-lg transition-all"
+                          >
+                            {sendingId === g.id ? "Enviando…" : "Enviar a firmar"}
+                          </button>
+                        )}
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${st.cls}`}>
+                          {st.label}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}

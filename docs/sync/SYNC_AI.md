@@ -15,6 +15,17 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-29] Fase 4c/4d — Integración Documenso (envío a firma + webhook)
+
+**Código escrito; pendiente de activar con los secrets de Álvaro (no verificable end-to-end sin ellos).**
+
+- ✅ **`src/lib/documenso.ts`**: cliente de Documenso Cloud (API v2). `isDocumensoConfigured()`, `buildSimplePdf(title, body)` (genera PDF A4 con **pdf-lib** — nueva dependencia, pure-JS/serverless-safe), `sendForSignature({title,pdfBytes,recipients})`, `mapDocumensoEvent()`. ⚠️ Endpoints/shapes v2 basados en docs públicas (openapi.documenso.com) — **confirmar contra la cuenta real antes de go-live**; están aislados para corregir en un sitio.
+- ✅ **`POST /api/documents/send`** (`{generatedDocumentId}`): recompone el texto (plantilla + `merged_data`), genera el PDF, lo envía a Documenso y guarda `documenso_id` + `signature_status='sent'`. Usa service-role. Si faltan envs → 503 con mensaje claro. Firmantes = vendedor (+ comprador si hay email válido).
+- ✅ **`POST /api/webhooks/documenso`**: verifica secreto (`DOCUMENSO_WEBHOOK_SECRET` vía cabecera `x-documenso-secret`/variantes), mapea evento (`DOCUMENT_SENT/OPENED/SIGNED/COMPLETED/REJECTED/CANCELLED`) a `signature_status`, actualiza por `documenso_id`. Al completarse, **avisa a Álvaro por WhatsApp** (`ADVISOR_WHATSAPP_PHONE`, reusa `sendWhatsAppMessage`). GET para validación del panel.
+- ✅ **UI**: botón "Enviar a firmar" en cada documento generado en estado borrador (`DocumentsManager`).
+- 🔑 **ACCIÓN REQUERIDA (Álvaro):** añadir en **Netlify + `.env.local`**: `DOCUMENSO_API_URL` (ej. `https://app.documenso.com/api/v2`), `DOCUMENSO_API_TOKEN` (`api_xxx`), `DOCUMENSO_WEBHOOK_SECRET`. Configurar en Documenso un webhook → `https://<dominio>/api/webhooks/documenso` con ese mismo secreto. Verificar el flujo real (endpoints v2) en un documento de prueba.
+- 📦 **Dependencia nueva:** `pdf-lib` (en `package.json`/lockfile).
+
 ### ✅ [2026-05-29] Fase 4b — Tab "Documentos": plantillas + generación con autorrelleno
 
 - ✅ Nuevo tab admin **"Documentos"** (`AdminDashboard` → `TabType 'documents'`, icono FileText) y componente `DocumentsManager.tsx`.
