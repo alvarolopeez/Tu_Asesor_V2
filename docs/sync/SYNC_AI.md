@@ -15,6 +15,19 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-29] Fase 1 — Separar ciclo de vida Vendedor de Inmuebles/Encargos
+
+Primera fase del refactor del ciclo de vida (Vendedor → Encargo → Inmueble → Documentos). **Objetivo:** un lead de valoración ya no ensucia Inmuebles/Encargos.
+
+- ✅ **`valoracion/page.tsx`** ya **NO inserta en `properties`**. El formulario público sólo crea el lead vendedor (`type='seller'`, `source='valoracion'`, sin `property_id`); todas las características del inmueble (dirección, tipo, m², hab, baños, planta, ascensor, ciudad, CP, estado, terraza, garaje) se guardan en `leads.preferences`. Esto además **arregla la desconexión de la "Consola de Tasación"** en Vendedores, que lee precisamente `leads.preferences`.
+- ✅ **Marcador `features.is_encargo` (jsonb, sin migración de schema).** `SellersManager` ("Encargos") ahora filtra `properties` por `features->>'is_encargo' = 'true'`. Sólo aparecen propiedades promovidas desde un lead o creadas vía "Subir encargo" (Fase 2). El catálogo completo sigue en "Inmuebles".
+- ✅ **Migración de datos (DML, vía Supabase MCP sobre prod, confirmada por Álvaro):**
+  - Desvinculados los `leads.property_id` y **borrados los 2 drafts de prueba** (`status='draft' AND price=0`, leads "yy yy"/"hh hh", `source='valoracion'`). Verificado con `SELECT` previo.
+  - **Backfill `is_encargo=true`** en las 5 propiedades reales existentes (`status<>'draft'`) para que "Encargos" no se vacíe con el nuevo filtro.
+  - Post-verificación: 0 drafts, 5 encargos marcados, 0 seller leads con property.
+- ⚠️ **Cambio de comportamiento a tener en cuenta:** crear una propiedad nueva desde "Inmuebles" ya **no** la hace aparecer en "Encargos" hasta que tenga `is_encargo=true`. La vía para crear encargos (botón "Subir encargo" + promoción desde lead que setean el flag) llega en **Fase 2**.
+- `Property.features` (en `properties/types.ts`) ampliado con `is_encargo?: boolean` (aditivo/opcional). `gitnexus_impact` HIGH por nº de importadores (19), pero cambio puramente aditivo → 0 roturas (mismo patrón que floor+ascensor).
+
 ### ✅ [2026-05-29] Nuevos campos de propiedad: planta + ascensor
 
 - ✅ Añadidos `floor` (texto libre, ej. "3º"/"Bajo"/"Ático") y `elevator` (booleano) al formulario de alta/edición de inmuebles (`PropertyFormModal.tsx`), persistidos dentro de `properties.features` (jsonb). No requiere migración SQL (columna `features` ya es jsonb flexible).

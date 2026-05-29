@@ -46,6 +46,8 @@ export interface Property {
     address?: string;
     latitude?: number;
     longitude?: number;
+    /** Marca una propiedad como Encargo en exclusiva (gestionada por Álvaro). Filtra la pestaña "Encargos". */
+    is_encargo?: boolean;
     is_visitable_online?: boolean;
     visitable_slots?: {
       days: string[];

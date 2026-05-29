@@ -106,28 +106,11 @@ export default function ValoracionPage() {
     setIsSubmitting(true)
 
     try {
+      // Un lead de valoración NUNCA crea una propiedad. Sólo se crea el lead
+      // vendedor; las características del inmueble viven en `leads.preferences`.
+      // La conversión a Inmueble/Encargo es una decisión manual de Álvaro
+      // (ver pestaña "Vendedores" → promoción a encargo en exclusiva).
       const addressFull = `${formData.street} ${formData.number}, Piso ${formData.floor}, ${formData.zipcode} ${formData.city}`
-      const descFull = `Tipo: ${formData.propertyType}. ${formData.sqm}m2, ${formData.rooms} hab, ${formData.baths} baños. Ascensor: ${formData.hasElevator ? 'Sí' : 'No'}. Terraza: ${formData.hasTerrace ? 'Sí' : 'No'}. Garaje: ${formData.hasGarage ? 'Sí' : 'No'}. Estado: ${formData.condition}.`
-      const propertyId = crypto.randomUUID()
-
-      const { error: propertyError } = await supabase
-        .from('properties')
-        .insert([{
-          id: propertyId,
-          title: addressFull,
-          description: descFull,
-          price: 0,
-          status: 'draft',
-          features: {
-            city: formData.city,
-            zipcode: formData.zipcode,
-            sqm: formData.sqm,
-            rooms: formData.rooms,
-            baths: formData.baths
-          }
-        }])
-
-      if (propertyError) throw propertyError
 
       const { error: leadError } = await supabase
         .from('leads')
@@ -137,7 +120,23 @@ export default function ValoracionPage() {
           email: formData.email,
           type: 'seller',
           source: 'valoracion',
-          property_id: propertyId
+          preferences: {
+            property_address: addressFull,
+            property_type: formData.propertyType,
+            street: formData.street,
+            number: formData.number,
+            floor: formData.floor,
+            elevator: formData.hasElevator,
+            city: formData.city,
+            zipcode: formData.zipcode,
+            sqm: formData.sqm ? Number(formData.sqm) : undefined,
+            rooms: formData.rooms,
+            baths: formData.baths,
+            condition: formData.condition,
+            hasTerrace: formData.hasTerrace,
+            hasGarage: formData.hasGarage,
+            rgpd_accepted: formData.privacyCheck
+          }
         }])
 
       if (leadError) throw leadError

@@ -52,6 +52,7 @@ interface Property {
     address?: string;
     latitude?: number;
     longitude?: number;
+    is_encargo?: boolean;
   };
 }
 
@@ -176,9 +177,13 @@ export default function SellersManager() {
   const fetchProperties = async () => {
     setLoading(true);
     try {
+      // "Encargos" sólo muestra propiedades marcadas como encargo en exclusiva
+      // (promovidas desde un lead o creadas vía "Subir encargo"). El catálogo
+      // completo vive en la pestaña "Inmuebles".
       const { data, error } = await supabase
         .from('properties')
         .select('*')
+        .eq('features->>is_encargo', 'true')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

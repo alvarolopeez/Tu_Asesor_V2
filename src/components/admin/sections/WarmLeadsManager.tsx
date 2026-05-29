@@ -52,6 +52,16 @@ interface SellerPreferences {
   sqm?: number;
   rooms?: number;
   baths?: number;
+  // Características capturadas en la calculadora pública de valoración
+  street?: string;
+  number?: string;
+  floor?: string;
+  elevator?: boolean;
+  city?: string;
+  zipcode?: string;
+  condition?: string;
+  hasTerrace?: boolean;
+  hasGarage?: boolean;
   estimated_value?: number;
   agent_valuation?: number;
   commission_pct?: number;
