@@ -20,6 +20,19 @@ interface PropertyFormModalProps {
   onClose: () => void;
   /** Se invoca tras guardar (insert o update) con la propiedad resultante. */
   onSaved: (savedProperty: Property) => void;
+  /**
+   * Valores iniciales para el modo creación (p.ej. al promover un lead a encargo,
+   * prerellenamos desde `leads.preferences`). Se ignora en modo edición.
+   */
+  initialValues?: Partial<PropertyFormValues>;
+  /**
+   * Si `true`, la propiedad creada/guardada se marca como encargo en exclusiva
+   * (`features.is_encargo = true`). Se usa desde "Subir encargo" y la promoción
+   * de leads. En modo edición normal se preserva el valor existente.
+   */
+  markAsEncargo?: boolean;
+  /** Texto opcional del botón de envío (override del por defecto). */
+  submitLabel?: string;
 }
 
 const DEFAULT_DAY_SCHEDULES: Record<string, string[]> = {
@@ -55,7 +68,7 @@ const FORM_DEFAULTS: PropertyFormValues = {
  * El padre solo decide cuándo se monta (pasando `editingProperty`)
  * y reacciona al `onSaved` para refrescar listas o abrir el matchmaker.
  */
-export default function PropertyFormModal({ editingProperty, onClose, onSaved }: PropertyFormModalProps) {
+export default function PropertyFormModal({ editingProperty, onClose, onSaved, initialValues, markAsEncargo, submitLabel }: PropertyFormModalProps) {
   // Media uploads
   const [uploadTab, setUploadTab] = useState<'images' | 'video' | 'plan'>('images');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
@@ -126,8 +139,8 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved }:
         setActiveConfigDay("Lunes");
       }
     } else {
-      // Modo creación: reset completo
-      reset(FORM_DEFAULTS);
+      // Modo creación: reset a defaults, con prefill opcional (p.ej. promoción de lead)
+      reset({ ...FORM_DEFAULTS, ...initialValues });
       setUploadedImages([]);
       setUploadedVideo(null);
       setUploadedPlan(null);
@@ -217,6 +230,9 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved }:
           address: featData.address,
           latitude: featData.latitude,
           longitude: featData.longitude,
+          // Preservar el marcador de encargo: si se pide explícitamente (creación
+          // desde "Subir encargo"/promoción) o si ya lo era (edición de un encargo).
+          is_encargo: markAsEncargo || editingProperty?.features?.is_encargo || undefined,
           is_visitable_online: isVisitableOnline,
           visitable_slots: isVisitableOnline ? {
             days: AVAILABLE_DAYS.map(d => d.key).filter(day => (daySchedules[day] || []).length > 0),
@@ -684,7 +700,7 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved }:
               type="submit"
               className="flex-1 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-extrabold py-3 rounded-xl transition-all active:scale-95 shadow-lg shadow-[#FBBF24]/10"
             >
-              {editingProperty ? "Guardar Cambios" : "Añadir Propiedad y Cruzar"}
+              {submitLabel || (editingProperty ? "Guardar Cambios" : "Añadir Propiedad y Cruzar")}
             </button>
           </div>
         </form>

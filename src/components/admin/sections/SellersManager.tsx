@@ -34,6 +34,7 @@ import {
   Briefcase
 } from "lucide-react";
 import toast from "react-hot-toast";
+import PropertyFormModal from "./properties/PropertyFormModal";
 
 // ─── TYPES ─────────────────────────────────────────────────────────────
 interface Property {
@@ -160,6 +161,9 @@ export default function SellersManager() {
   // Closure Success State
   const [showClosureModal, setShowClosureModal] = useState(false);
   const [acceptedOfferData, setAcceptedOfferData] = useState<Offer | null>(null);
+
+  // "Subir encargo" — alta manual de un encargo reutilizando el form de Inmuebles
+  const [showEncargoForm, setShowEncargoForm] = useState(false);
 
   // Fetch initial data
   useEffect(() => {
@@ -603,9 +607,18 @@ export default function SellersManager() {
               </p>
             </div>
 
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 self-start">
+            {/* SUBIR ENCARGO */}
+            <button
+              onClick={() => setShowEncargoForm(true)}
+              className="flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-extrabold text-xs md:text-sm px-4 py-2.5 rounded-xl transition-all active:scale-95 shadow-lg shadow-[#FBBF24]/10"
+            >
+              <Plus size={16} /> Subir encargo
+            </button>
+
             {/* TAB SELECTOR */}
-            <div className="flex bg-slate-900/60 p-1 rounded-xl border border-white/5 self-start">
-              <button 
+            <div className="flex bg-slate-900/60 p-1 rounded-xl border border-white/5">
+              <button
                 onClick={() => setActiveTab('activos')}
                 className={`px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition-all ${
                   activeTab === 'activos' 
@@ -625,6 +638,7 @@ export default function SellersManager() {
               >
                 Histórico Cerrados
               </button>
+            </div>
             </div>
           </div>
 
@@ -1451,6 +1465,22 @@ export default function SellersManager() {
 
           </div>
         </div>
+      )}
+
+      {/* ─── MODAL: SUBIR ENCARGO (reutiliza el form de Inmuebles) ───────── */}
+      {showEncargoForm && (
+        <PropertyFormModal
+          editingProperty={null}
+          initialValues={{ status: 'active' }}
+          markAsEncargo
+          submitLabel="Crear encargo"
+          onClose={() => setShowEncargoForm(false)}
+          onSaved={() => {
+            setShowEncargoForm(false);
+            fetchProperties();
+            toast.success("Encargo creado y añadido a tu cartera");
+          }}
+        />
       )}
 
     </div>
