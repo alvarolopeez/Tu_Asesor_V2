@@ -15,6 +15,18 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## ✅ Peticiones Completadas
 
+### 🚧 [2026-05-29] Fase 4a — Esquema documental (Documenso) + RLS + seed
+
+Primer paso de la Fase 4 (plantillas + firma digital). **Solo BD; sin código aún.**
+
+- ⚠️ **CAMBIO DE SCHEMA (prod):** 2 tablas nuevas (migración `phase4_document_templates_and_generated_docs`):
+  - `document_templates` (`id, name, category, body con {{placeholders}}, is_active, timestamps`).
+  - `generated_documents` (`id, template_id, property_id, seller_lead_id, buyer_id→buyers_demands, merged_data jsonb, pdf_url, documenso_id, signature_status['draft'|'sent'|'viewed'|'completed'|'rejected'], timestamps`).
+- ✅ **RLS** activado en ambas, replicando el patrón de `offers`/`property_documents`: 4 políticas `authenticated` (CRUD, `true`). **Sin acceso público** (contienen PII contractual). La escritura server-side (generación/webhook) usará el service-role (bypassa RLS).
+- ✅ **Seed:** plantilla "Nota de Encargo de Venta en Exclusiva" (`category='Nota de encargo'`) con placeholders `{{vendedor.*}}`, `{{inmueble.*}}`, `{{precio}}`, `{{comision_pct}}`, `{{honorarios}}`, etc. El texto legal vinculante lo completa Álvaro.
+- **Decisiones cerradas:** comprador para autorrelleno = `buyers_demands`; primer lote de plantillas = solo "Nota de encargo".
+- ⏭️ **Pendiente Fase 4:** 4b (tab "Documentos" + CRUD plantillas + generación/preview PDF), 4c (envío a Documenso API), 4d (webhook `/api/webhooks/documenso` + estados + aviso WhatsApp). **Env a añadir en Netlify + `.env.local` (Álvaro):** `DOCUMENSO_API_URL`, `DOCUMENSO_API_TOKEN`, `DOCUMENSO_WEBHOOK_SECRET`.
+
 ### ✅ [2026-05-29] Fase 3 — Días publicada reales + estimación de bajada de precio
 
 Tercera fase: el informe de captación deja de usar campos estáticos y pasa a métricas reales + una estimación cuantitativa y explicable de ajuste de precio.
