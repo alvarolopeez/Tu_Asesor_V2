@@ -21,7 +21,7 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
   1. `SUPABASE_SERVICE_ROLE_KEY` añadida a Netlify (contexto `all`, scopes builds/functions/runtime/post_processing). **OJO MCP**: `manage-env-vars` con `envVarIsSecret:true` creó la key SIN valor (bug); se arregló con `POST/PUT` directo a la API REST de Netlify (`/api/v1/accounts/{acct}/env`). Si vuelve a pasar, usar REST, no el flag secret del MCP.
   2. `/api/documents/send` endurecido: **exige** el service-role (503 con mensaje claro si falta, en vez del críptico "no encontrado") y lee plantilla en **2 queries** en vez de embed PostgREST.
   3. Rebuild disparado para que el runtime recoja la env.
-- ⚠️ **Pendiente de confirmar**: que tras el rebuild el endpoint deje de dar 503 y el flujo real de **Documenso** (subida PDF + envío a firma, endpoints v2) funcione end-to-end con un documento real. Si Documenso devuelve otro error, es de su API, no del 500 anterior.
+- ✅ **[2026-05-30] Documenso firma confirmada end-to-end**: tras el fix RLS apareció un 2.º error `Documenso create document falló (404) NOT_FOUND`. **Causa raíz**: la cuenta NO tiene API **v2** (`/api/v2/documents` → 404); solo **v1** (`/api/v1/documents` → 200). El código ya era compatible con v1 (la respuesta v1 trae `documentId`+`uploadUrl`+`recipients`, exactamente lo que `sendForSignature` espera). **Fix**: cambiar `DOCUMENSO_API_URL` de `/api/v2` → `/api/v1` en Netlify + `.env.local`. Verificado el flujo completo create(200)→upload PUT(200)→send(200, `sendStatus:"SENT"`) contra la cuenta real. `documenso.ts` actualizado (comentario v1). **Acción tras el rebuild**: reprobar "Enviar a firmar" desde el panel.
 
 ### ✅ [2026-05-29] UX de chats escalados (aviso + `/bot` + auto-desescalado)
 

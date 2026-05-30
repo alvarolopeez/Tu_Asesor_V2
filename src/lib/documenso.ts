@@ -10,12 +10,14 @@ export interface PdfLayout {
 /**
  * Cliente mínimo de Documenso Cloud (Fase 4c).
  *
- * ⚠️ Endpoints/shapes basados en la API pública v2 de Documenso
- * (https://openapi.documenso.com). Confírmalos contra tu cuenta antes de
- * pasar a producción real; están aislados aquí para corregirlos en un sitio.
+ * ✅ Usa la API v1 (verificada end-to-end contra la cuenta real el 2026-05-30:
+ * create→upload→send devuelven 200 con la forma esperada). La v2/v2-beta NO
+ * está disponible en esta cuenta (404). Flujo: POST /documents devuelve
+ * {documentId, uploadUrl, recipients} → PUT del PDF a uploadUrl → POST
+ * /documents/{id}/send.
  *
  * Variables de entorno (NO commitear; añadir en Netlify + .env.local):
- *   - DOCUMENSO_API_URL      (ej. https://app.documenso.com/api/v2)
+ *   - DOCUMENSO_API_URL      (= https://app.documenso.com/api/v1)
  *   - DOCUMENSO_API_TOKEN    (api_xxx)
  *   - DOCUMENSO_WEBHOOK_SECRET
  */
