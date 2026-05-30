@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { renderBrandedHtml } from "@/lib/brandedDoc";
 import {
   FileText,
   Plus,
@@ -70,10 +71,15 @@ interface GenForm {
   inmDireccion: string;
   inmTipo: string;
   inmM2: string;
+  inmM2Construidos: string;
+  inmDatosRegistrales: string;
+  inmAnexos: string;
   inmRefCatastral: string;
+  cargas: string;
   precio: string;
-  comisionPct: string;
-  duracionMeses: string;
+  honorariosPct: string;
+  fechaInicio: string;
+  fechaFin: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -113,7 +119,7 @@ export default function DocumentsManager() {
 
   // Editor de plantilla + preview imprimible
   const [editingTemplate, setEditingTemplate] = useState<DocumentTemplate | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<{ name: string; text: string } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ name: string; html: string } | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -173,10 +179,15 @@ export default function DocumentsManager() {
       inmDireccion: p.property_address || "",
       inmTipo: p.property_type || "",
       inmM2: p.sqm ? String(p.sqm) : "",
+      inmM2Construidos: "",
+      inmDatosRegistrales: "",
+      inmAnexos: "",
       inmRefCatastral: "",
+      cargas: "Ninguna",
       precio: String(p.agent_valuation || p.estimated_value || ""),
-      comisionPct: p.commission_pct ? String(p.commission_pct) : "",
-      duracionMeses: "",
+      honorariosPct: p.commission_pct ? String(p.commission_pct) : "",
+      fechaInicio: new Date().toISOString().slice(0, 10),
+      fechaFin: "",
     });
   };
 
@@ -190,19 +201,20 @@ export default function DocumentsManager() {
       const n = Number(raw);
       return n > 0 ? `${n.toLocaleString("es-ES")} €` : "________";
     };
+    const fmtDate = (d: string) => (d ? new Date(d).toLocaleDateString("es-ES") : "________");
     const price = Number(f.precio) || 0;
-    const comm = Number(f.comisionPct) || 0;
+    const comm = Number(f.honorariosPct) || 0;
     const honorarios = price > 0 && comm > 0 ? price * (comm / 100) : 0;
     const o0 = f.owners[0] || emptyOwner();
 
     const propietarios = f.owners
       .filter((o) => o.nombre.trim())
-      .map((o) => `D./Dña. ${o.nombre}${o.dni ? ` con DNI ${o.dni}` : ""}${o.direccion ? `, con domicilio en ${o.direccion}` : ""}`)
-      .join(" Y ") || "________";
+      .map((o) => `D./Dña. ${o.nombre}${o.dni ? `, NIF ${o.dni}` : ""}, mayor de edad${o.direccion ? `, con domicilio en ${o.direccion}` : ""}${o.telefono ? `, teléfono ${o.telefono}` : ""}${o.email ? `, email ${o.email}` : ""}.`)
+      .join("\n") || "________";
 
     const representacion = f.repEnabled
-      ? `Actúa en representación de la parte vendedora D./Dña. ${f.repNombre || "________"}${f.repDni ? ` con DNI ${f.repDni}` : ""}${f.repCalidad ? `, en calidad de ${f.repCalidad}` : ""}.`
-      : "";
+      ? `Actúa en representación de la parte vendedora D./Dña. ${f.repNombre || "________"}${f.repDni ? `, NIF ${f.repDni}` : ""}${f.repCalidad ? `, en calidad de ${f.repCalidad}` : ""}, según acreditará documentalmente.`
+      : "Actúa en su propio nombre y representación.";
 
     const ctx: Record<string, string> = {
       fecha: f.fecha ? new Date(f.fecha).toLocaleDateString("es-ES") : new Date().toLocaleDateString("es-ES"),
@@ -217,11 +229,17 @@ export default function DocumentsManager() {
       "inmueble.direccion": f.inmDireccion || "________",
       "inmueble.tipo": f.inmTipo || "________",
       "inmueble.m2": f.inmM2 || "________",
+      "inmueble.m2_construidos": f.inmM2Construidos || "________",
+      "inmueble.datos_registrales": f.inmDatosRegistrales || "________",
+      "inmueble.anexos": f.inmAnexos || "________",
       "inmueble.referencia_catastral": f.inmRefCatastral || "________",
+      cargas: f.cargas?.trim() || "Ninguna",
       precio: fmtEuro(f.precio),
+      honorarios_pct: comm > 0 ? String(comm) : "________",
       comision_pct: comm > 0 ? String(comm) : "________",
       honorarios: honorarios > 0 ? `${honorarios.toLocaleString("es-ES")} €` : "________",
-      duracion_meses: f.duracionMeses || "________",
+      fecha_inicio: fmtDate(f.fechaInicio),
+      fecha_fin: fmtDate(f.fechaFin),
     };
 
     // Firmantes: todos los propietarios con email válido
@@ -245,6 +263,15 @@ export default function DocumentsManager() {
 
     const { ctx, recipients } = flattenForm(form);
     const text = mergeBody(template.body, ctx);
+    const html = renderBrandedHtml(
+      {
+        title: template.name,
+        lugar: ctx.lugar,
+        fecha: ctx.fecha,
+        clientLabel: form.owners[0]?.nombre || "La parte vendedora",
+      },
+      text,
+    );
 
     try {
       const { error } = await supabase.from("generated_documents").insert({
@@ -258,7 +285,7 @@ export default function DocumentsManager() {
       if (error) throw error;
       toast.success("Documento generado (borrador guardado)");
       setForm(null);
-      setPreviewDoc({ name: template.name, text });
+      setPreviewDoc({ name: template.name, html });
       fetchAll();
     } catch (err) {
       console.error("Error generando documento:", err);
@@ -315,6 +342,24 @@ export default function DocumentsManager() {
       console.error("Error eliminando plantilla:", err);
       toast.error("No se pudo eliminar");
     }
+  };
+
+  // ─── VER / DESCARGAR un documento ya generado ────────────────────────────
+  const handleViewDoc = (gd: GeneratedDocument) => {
+    const tpl = templates.find((t) => t.id === gd.template_id);
+    if (!tpl) return toast.error("La plantilla de este documento ya no existe");
+    const ctx = (gd.merged_data || {}) as Record<string, string>;
+    const text = mergeBody(tpl.body, ctx);
+    const html = renderBrandedHtml(
+      {
+        title: tpl.name,
+        lugar: ctx.lugar,
+        fecha: ctx.fecha,
+        clientLabel: ctx["vendedor.nombre"] || "La parte vendedora",
+      },
+      text,
+    );
+    setPreviewDoc({ name: tpl.name, html });
   };
 
   // ─── ENVIAR A FIRMAR (Documenso) ─────────────────────────────────────────
@@ -448,6 +493,12 @@ export default function DocumentsManager() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleViewDoc(g)}
+                          className="text-[11px] font-bold text-slate-200 bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
+                        >
+                          <Printer size={12} /> Ver / PDF
+                        </button>
                         {g.signature_status === "draft" && (
                           <button
                             onClick={() => handleSendToSign(g)}
@@ -573,8 +624,12 @@ export default function DocumentsManager() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input className={`${inputCls} sm:col-span-2`} placeholder="Dirección del inmueble" value={form.inmDireccion} onChange={(e) => patch({ inmDireccion: e.target.value })} />
                   <input className={inputCls} placeholder="Tipo (Piso, Casa…)" value={form.inmTipo} onChange={(e) => patch({ inmTipo: e.target.value })} />
-                  <input className={inputCls} placeholder="Superficie (m²)" value={form.inmM2} onChange={(e) => patch({ inmM2: e.target.value })} />
-                  <input className={`${inputCls} sm:col-span-2`} placeholder="Referencia catastral" value={form.inmRefCatastral} onChange={(e) => patch({ inmRefCatastral: e.target.value })} />
+                  <input className={inputCls} placeholder="Referencia catastral" value={form.inmRefCatastral} onChange={(e) => patch({ inmRefCatastral: e.target.value })} />
+                  <input className={`${inputCls} sm:col-span-2`} placeholder="Datos registrales (Tomo, Libro, Folio, Finca)" value={form.inmDatosRegistrales} onChange={(e) => patch({ inmDatosRegistrales: e.target.value })} />
+                  <input className={inputCls} placeholder="M² útiles" value={form.inmM2} onChange={(e) => patch({ inmM2: e.target.value })} />
+                  <input className={inputCls} placeholder="M² construidos" value={form.inmM2Construidos} onChange={(e) => patch({ inmM2Construidos: e.target.value })} />
+                  <input className={`${inputCls} sm:col-span-2`} placeholder="Anexos (garaje / trastero…)" value={form.inmAnexos} onChange={(e) => patch({ inmAnexos: e.target.value })} />
+                  <input className={`${inputCls} sm:col-span-2`} placeholder='Cargas / gravámenes (o "Ninguna")' value={form.cargas} onChange={(e) => patch({ cargas: e.target.value })} />
                 </div>
               </section>
 
@@ -587,25 +642,29 @@ export default function DocumentsManager() {
                     <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
                   </div>
                   <div>
-                    <label className={labelCls}>Comisión (%)</label>
-                    <input className={inputCls} type="number" step="0.5" value={form.comisionPct} onChange={(e) => patch({ comisionPct: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Duración (meses)</label>
-                    <input className={inputCls} type="number" value={form.duracionMeses} onChange={(e) => patch({ duracionMeses: e.target.value })} />
+                    <label className={labelCls}>Honorarios (%)</label>
+                    <input className={inputCls} type="number" step="0.1" placeholder="Ej: 2" value={form.honorariosPct} onChange={(e) => patch({ honorariosPct: e.target.value })} />
                   </div>
                   <div>
                     <label className={labelCls}>Lugar</label>
                     <input className={inputCls} value={form.lugar} onChange={(e) => patch({ lugar: e.target.value })} />
                   </div>
                   <div>
-                    <label className={labelCls}>Fecha</label>
+                    <label className={labelCls}>Inicio del encargo</label>
+                    <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaInicio} onChange={(e) => patch({ fechaInicio: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Fin del encargo</label>
+                    <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaFin} onChange={(e) => patch({ fechaFin: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Fecha de firma</label>
                     <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
                   </div>
                 </div>
-                {Number(form.precio) > 0 && Number(form.comisionPct) > 0 && (
+                {Number(form.precio) > 0 && Number(form.honorariosPct) > 0 && (
                   <p className="text-[11px] text-emerald-400 font-bold">
-                    Honorarios estimados: {(Number(form.precio) * (Number(form.comisionPct) / 100)).toLocaleString("es-ES")} € + IVA
+                    Honorarios estimados: {(Number(form.precio) * (Number(form.honorariosPct) / 100)).toLocaleString("es-ES")} € + IVA
                   </p>
                 )}
               </section>
@@ -646,7 +705,8 @@ export default function DocumentsManager() {
               </div>
               <div>
                 <label className={labelCls}>
-                  Cuerpo · placeholders: <code className="text-[#FBBF24]">{"{{propietarios}}"}</code> <code className="text-[#FBBF24]">{"{{representacion}}"}</code> <code className="text-[#FBBF24]">{"{{vendedor.dni}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.direccion}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.referencia_catastral}}"}</code> <code className="text-[#FBBF24]">{"{{precio}}"}</code> <code className="text-[#FBBF24]">{"{{comision_pct}}"}</code> <code className="text-[#FBBF24]">{"{{honorarios}}"}</code> <code className="text-[#FBBF24]">{"{{duracion_meses}}"}</code>
+                  Formato: <code className="text-[#FBBF24]">## Sección</code> · <code className="text-[#FBBF24]">- Etiqueta: valor</code> · <code className="text-[#FBBF24]">- a) viñeta</code>.<br />
+                  Placeholders: <code className="text-[#FBBF24]">{"{{propietarios}}"}</code> <code className="text-[#FBBF24]">{"{{representacion}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.direccion}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.datos_registrales}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.referencia_catastral}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.m2}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.m2_construidos}}"}</code> <code className="text-[#FBBF24]">{"{{inmueble.anexos}}"}</code> <code className="text-[#FBBF24]">{"{{cargas}}"}</code> <code className="text-[#FBBF24]">{"{{precio}}"}</code> <code className="text-[#FBBF24]">{"{{honorarios_pct}}"}</code> <code className="text-[#FBBF24]">{"{{fecha_inicio}}"}</code> <code className="text-[#FBBF24]">{"{{fecha_fin}}"}</code> <code className="text-[#FBBF24]">{"{{fecha}}"}</code>
                 </label>
                 <textarea value={editingTemplate.body} onChange={(e) => setEditingTemplate({ ...editingTemplate, body: e.target.value })} rows={16} className={`${inputCls} font-mono text-xs`} />
               </div>
@@ -661,32 +721,38 @@ export default function DocumentsManager() {
         </div>
       )}
 
-      {/* ─── MODAL: VISTA PREVIA IMPRIMIBLE ────────────────────────────── */}
+      {/* ─── MODAL: VISTA PREVIA IMPRIMIBLE (render de marca en iframe) ─── */}
       {previewDoc && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#1E293B] border border-white/10 rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="bg-[#1E293B] border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[92vh]">
             <div className="bg-slate-900 px-6 py-4 border-b border-white/10 flex justify-between items-center">
               <h4 className="text-white font-extrabold flex items-center gap-2">
                 <FileText size={18} className="text-[#FBBF24]" /> {previewDoc.name}
               </h4>
               <div className="flex gap-2">
-                <button onClick={() => window.print()} className="px-4 py-2 bg-[#FBBF24] hover:bg-yellow-500 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5">
-                  <Printer size={14} /> Imprimir / PDF
+                <button
+                  onClick={() => {
+                    const fr = document.getElementById("doc-preview-frame") as HTMLIFrameElement | null;
+                    fr?.contentWindow?.focus();
+                    fr?.contentWindow?.print();
+                  }}
+                  className="px-4 py-2 bg-[#FBBF24] hover:bg-yellow-500 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5"
+                >
+                  <Printer size={14} /> Descargar / Imprimir PDF
                 </button>
                 <button onClick={() => setPreviewDoc(null)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs">Cerrar</button>
               </div>
             </div>
-            <div id="printable-doc" className="p-8 overflow-y-auto bg-white text-slate-900 whitespace-pre-wrap text-sm leading-relaxed">
-              {previewDoc.text}
+            <div className="p-4 overflow-y-auto bg-slate-700">
+              <iframe
+                id="doc-preview-frame"
+                title={previewDoc.name}
+                srcDoc={previewDoc.html}
+                className="w-full bg-white rounded-lg shadow-xl"
+                style={{ height: "80vh", border: "0" }}
+              />
             </div>
           </div>
-          <style dangerouslySetInnerHTML={{ __html: `
-            @media print {
-              body * { visibility: hidden; }
-              #printable-doc, #printable-doc * { visibility: visible; }
-              #printable-doc { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; }
-            }
-          `}} />
         </div>
       )}
     </div>

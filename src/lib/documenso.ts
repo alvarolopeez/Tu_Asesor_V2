@@ -1,4 +1,6 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { parseDoc, BRAND } from "./brandedDoc";
+import { BRAND_LOGO_PNG_BASE64 } from "./brandLogo";
 
 /**
  * Cliente mínimo de Documenso Cloud (Fase 4c).
@@ -30,57 +32,147 @@ function authHeaders(extra: Record<string, string> = {}): Record<string, string>
   return { Authorization: API_TOKEN, ...extra };
 }
 
+// Paleta de marca en rgb() de pdf-lib (0-1).
+const C = {
+  navy: rgb(0x0f / 255, 0x17 / 255, 0x2a / 255),
+  gold: rgb(0xfb / 255, 0xbf / 255, 0x24 / 255),
+  goldDark: rgb(0xb8 / 255, 0x86 / 255, 0x0b / 255),
+  ink: rgb(0x28 / 255, 0x30 / 255, 0x42 / 255),
+  muted: rgb(0x8a / 255, 0x93 / 255, 0xa3 / 255),
+  line: rgb(0xe7 / 255, 0xea / 255, 0xf0 / 255),
+  fill: rgb(0xaa / 255, 0xb2 / 255, 0xc0 / 255),
+  white: rgb(1, 1, 1),
+};
+
 /**
- * Genera un PDF A4 sencillo a partir de texto plano (cuerpo ya combinado).
- * Helvetica (WinAnsi) cubre acentos castellanos y el símbolo €.
+ * Genera el PDF A4 con la identidad de marca de Tu Asesor Álvaro a partir del
+ * cuerpo de plantilla ya combinado. Comparte el parser (`parseDoc`) con la vista
+ * previa HTML, de modo que el PDF firmado y la previsualización son coherentes.
+ * pdf-lib + Helvetica (WinAnsi cubre acentos y €) → serverless-safe.
  */
 export async function buildSimplePdf(title: string, body: string): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const logo = await pdf.embedPng(Buffer.from(BRAND_LOGO_PNG_BASE64, "base64"));
 
-  const [w, h] = [595.28, 841.89]; // A4
-  const margin = 56;
-  const size = 11;
-  const lh = 16;
-  const maxWidth = w - margin * 2;
+  const W = 595.28, H = 841.89; // A4 pt
+  const MX = 48; // margen lateral
+  const top = H - 44;
+  const bottom = 60;
+  const maxW = W - MX * 2;
+  const sanitize = (s: string) => s.replace(/[^\x00-\xFF]/g, "?");
 
-  let page = pdf.addPage([w, h]);
-  let y = h - margin;
+  let page = pdf.addPage([W, H]);
+  let y = top;
+  let pageNo = 0;
 
-  const sanitize = (s: string) => s.replace(/[^\x00-\xFF]/g, "?"); // fuera de WinAnsi → '?'
-
-  page.drawText(sanitize(title), { x: margin, y, size: 16, font: fontBold, color: rgb(0, 0, 0) });
-  y -= lh * 2;
-
-  const drawLine = (text: string) => {
-    if (y < margin) {
-      page = pdf.addPage([w, h]);
-      y = h - margin;
-    }
-    page.drawText(sanitize(text), { x: margin, y, size, font });
-    y -= lh;
+  const drawFooter = (p: PDFPage) => {
+    p.drawLine({ start: { x: MX, y: bottom - 6 }, end: { x: W - MX, y: bottom - 6 }, thickness: 0.6, color: C.line });
+    p.drawText(`${BRAND.name}  ·  ${BRAND.web}  ·  ${BRAND.email}`, { x: MX, y: bottom - 18, size: 7, font, color: C.muted });
+    p.drawText("Documento confidencial", { x: W - MX - 92, y: bottom - 18, size: 7, font, color: C.muted });
   };
 
-  for (const rawLine of body.split("\n")) {
-    if (rawLine.trim() === "") {
-      y -= lh;
-      continue;
-    }
-    const words = rawLine.split(" ");
+  const newPage = () => {
+    drawFooter(page);
+    page = pdf.addPage([W, H]);
+    pageNo += 1;
+    y = top;
+  };
+  const ensure = (need: number) => { if (y - need < bottom + 10) newPage(); };
+
+  // Ajuste de línea con soporte de tramos en negrita (segmentos).
+  const wrap = (text: string, f: PDFFont, size: number, width: number): string[] => {
+    const words = sanitize(text).split(/\s+/);
+    const lines: string[] = [];
     let line = "";
-    for (const word of words) {
-      const test = line ? `${line} ${word}` : word;
-      if (font.widthOfTextAtSize(sanitize(test), size) > maxWidth) {
-        if (line) drawLine(line);
-        line = word;
-      } else {
-        line = test;
-      }
+    for (const wd of words) {
+      const test = line ? `${line} ${wd}` : wd;
+      if (f.widthOfTextAtSize(test, size) > width && line) { lines.push(line); line = wd; }
+      else line = test;
     }
-    if (line) drawLine(line);
+    if (line) lines.push(line);
+    return lines;
+  };
+
+  const para = (text: string, opts: { size?: number; f?: PDFFont; color?: any; gap?: number; indent?: number } = {}) => {
+    const size = opts.size ?? 9.5;
+    const f = opts.f ?? font;
+    const indent = opts.indent ?? 0;
+    const lh = size * 1.42;
+    for (const ln of wrap(text, f, size, maxW - indent)) {
+      ensure(lh);
+      page.drawText(ln, { x: MX + indent, y: y - size, size, font: f, color: opts.color ?? C.ink });
+      y -= lh;
+    }
+    y -= opts.gap ?? 2;
+  };
+
+  // ── Cabecera de marca ──
+  const logoH = 30;
+  const logoW = (logo.width / logo.height) * logoH;
+  page.drawImage(logo, { x: MX, y: y - logoH, width: logoW, height: logoH });
+  page.drawText(BRAND.name, { x: MX + logoW + 10, y: y - 13, size: 13, font: fontBold, color: C.navy });
+  page.drawText(BRAND.tagline.toUpperCase(), { x: MX + logoW + 10, y: y - 25, size: 6.5, font, color: C.muted });
+  // título a la derecha
+  const tW = fontBold.widthOfTextAtSize(title, 15);
+  page.drawText(title, { x: W - MX - tW, y: y - 14, size: 15, font: fontBold, color: C.navy });
+  page.drawRectangle({ x: W - MX - 46, y: y + 4, width: 46, height: 2, color: C.gold });
+  y -= logoH + 6;
+  page.drawLine({ start: { x: MX, y }, end: { x: W - MX, y }, thickness: 0.8, color: C.line });
+  y -= 12;
+
+  // ── Banda de datos del asesor ──
+  const advisor = `Asesor: ${BRAND.advisor}   ·   DNI: ${BRAND.dni}   ·   ${BRAND.fiscalAddress}   ·   Tel.: ${BRAND.phone}   ·   ${BRAND.email}`;
+  para(advisor, { size: 7.4, color: C.muted, gap: 6 });
+
+  // ── Cuerpo (bloques compartidos con la vista previa) ──
+  let sec = 0;
+  for (const b of parseDoc(body)) {
+    if (b.type === "section") {
+      sec += 1;
+      ensure(20);
+      y -= 4;
+      const num = String(sec).padStart(2, "0");
+      page.drawText(num, { x: MX, y: y - 9, size: 9, font: fontBold, color: C.goldDark });
+      page.drawText(sanitize(b.text.toUpperCase()), { x: MX + 20, y: y - 9, size: 9, font: fontBold, color: C.navy });
+      y -= 16;
+    } else if (b.type === "row") {
+      ensure(13);
+      const labelColor = b.emphasis ? C.goldDark : C.muted;
+      const valColor = b.emphasis ? C.navy : C.ink;
+      const valFont = b.emphasis ? fontBold : font;
+      if (b.emphasis) page.drawRectangle({ x: MX, y: y - 11, width: 2, height: 12, color: C.gold });
+      page.drawText(sanitize(b.label), { x: MX + 6, y: y - 9, size: 8.4, font, color: labelColor });
+      const vx = MX + 6 + maxW * 0.32;
+      for (const ln of wrap(b.value, valFont, 8.6, maxW - (vx - MX) - 6)) {
+        ensure(12);
+        page.drawText(ln, { x: vx, y: y - 9, size: 8.6, font: valFont, color: valColor });
+        y -= 12;
+      }
+      y -= 2;
+    } else if (b.type === "bullet") {
+      para(b.text, { size: 9.3, indent: 14, gap: 1 });
+    } else {
+      para(b.text, { size: 9.5, gap: 4 });
+    }
   }
 
+  // ── Firmas ──
+  ensure(70);
+  y -= 18;
+  const colW = (maxW - 40) / 2;
+  const lineY = y - 34;
+  page.drawLine({ start: { x: MX, y: lineY }, end: { x: MX + colW, y: lineY }, thickness: 0.8, color: C.navy });
+  page.drawLine({ start: { x: MX + colW + 40, y: lineY }, end: { x: W - MX, y: lineY }, thickness: 0.8, color: C.navy });
+  page.drawText("EL ASESOR", { x: MX, y: lineY - 11, size: 8, font: fontBold, color: C.navy });
+  page.drawText(BRAND.advisor, { x: MX, y: lineY - 21, size: 7.4, font, color: C.muted });
+  page.drawText("EL CLIENTE", { x: MX + colW + 40, y: lineY - 11, size: 8, font: fontBold, color: C.navy });
+  page.drawText("La parte firmante", { x: MX + colW + 40, y: lineY - 21, size: 7.4, font, color: C.muted });
+  y = lineY - 34;
+  para("Documento firmado digitalmente mediante Documenso · validez legal eIDAS.", { size: 7.2, color: C.muted });
+
+  drawFooter(page);
   return pdf.save();
 }
 
