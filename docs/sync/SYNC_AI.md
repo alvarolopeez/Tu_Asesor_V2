@@ -13,6 +13,16 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
   - BLOQUEADO hasta que las 3 plantillas estén en estado "Aprobada" en Meta.
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-30] Documentos legales con marca + FIX firma (Documenso 500)
+
+- ✅ **Nota de Encargo y Propuesta de Compraventa con identidad de marca** (navy `#0f172a` + dorado `#FBBF24`, logo, secciones numeradas, firmas). Render único compartido en `src/lib/brandedDoc.ts` (parser `parseDoc` + `renderBrandedHtml` + `docLayout` por categoría) usado por la vista previa (iframe) y por el PDF de firma (`buildSimplePdf` en `documenso.ts`, con logo embebido en `brandLogo.ts`). La propuesta lleva comprador+vendedor, escalera de 3 pagos, 2 plazos y bloque de **aceptación del vendedor** con doble firma. Plantillas en BD `document_templates` ('Nota de Encargo', 'Propuesta de compraventa') con el texto legal definitivo de Álvaro (honorarios flexibles `{{honorarios_pct}}`, cobro a éxito, no renovación automática).
+- 🐞 **CAUSA RAÍZ del error 500 "Documento generado no encontrado"** al pulsar *Enviar a firmar*: **faltaba `SUPABASE_SERVICE_ROLE_KEY` en Netlify**. Sin ella, `/api/documents/send` caía al `anon key` → las RLS de `generated_documents` (solo rol `authenticated`) devolvían 0 filas → 500 confuso. NO era un problema de Documenso.
+- ✅ **Fix aplicado**:
+  1. `SUPABASE_SERVICE_ROLE_KEY` añadida a Netlify (contexto `all`, scopes builds/functions/runtime/post_processing). **OJO MCP**: `manage-env-vars` con `envVarIsSecret:true` creó la key SIN valor (bug); se arregló con `POST/PUT` directo a la API REST de Netlify (`/api/v1/accounts/{acct}/env`). Si vuelve a pasar, usar REST, no el flag secret del MCP.
+  2. `/api/documents/send` endurecido: **exige** el service-role (503 con mensaje claro si falta, en vez del críptico "no encontrado") y lee plantilla en **2 queries** en vez de embed PostgREST.
+  3. Rebuild disparado para que el runtime recoja la env.
+- ⚠️ **Pendiente de confirmar**: que tras el rebuild el endpoint deje de dar 503 y el flujo real de **Documenso** (subida PDF + envío a firma, endpoints v2) funcione end-to-end con un documento real. Si Documenso devuelve otro error, es de su API, no del 500 anterior.
+
 ### ✅ [2026-05-29] UX de chats escalados (aviso + `/bot` + auto-desescalado)
 
 Resuelve el problema del "limbo": antes, al pasar a `status='escalated'`, el webhook `POST /api/webhooks/whatsapp` hacía `return` temprano sin avisar a nadie. **Sin migración de schema** (uso del `metadata` jsonb existente de `chatbot_conversations`).
