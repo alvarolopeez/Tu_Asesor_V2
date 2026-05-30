@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { renderBrandedHtml } from "@/lib/brandedDoc";
+import { renderBrandedHtml, docLayout } from "@/lib/brandedDoc";
 import {
   FileText,
   Plus,
@@ -56,8 +56,17 @@ interface OwnerInput {
   direccion: string;
 }
 
+interface PartyInput {
+  nombre: string;
+  nif: string;
+  email: string;
+}
+
 /** Formulario editable de la "página previa" antes de generar el documento. */
 interface GenForm {
+  /** "nota" = Nota de encargo (owners=vendedores). "propuesta" = Propuesta de
+   *  compraventa (owners=compradores/proponentes + sellers=vendedores). */
+  kind: "nota" | "propuesta";
   templateId: string;
   leadId: string;
   buyerId: string;
@@ -80,6 +89,14 @@ interface GenForm {
   honorariosPct: string;
   fechaInicio: string;
   fechaFin: string;
+  // ── Propuesta de compraventa ──
+  sellers: PartyInput[];
+  pagoInicial: string;
+  pagoAmpliacion: string;
+  pagoRestante: string;
+  plazoContrato: string; // YYYY-MM-DD
+  plazoEscritura: string; // YYYY-MM-DD
+  diasHabiles: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -92,6 +109,7 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const emptyOwner = (): OwnerInput => ({ nombre: "", dni: "", telefono: "", email: "", direccion: "" });
+const emptyParty = (): PartyInput => ({ nombre: "", nif: "", email: "" });
 
 /**
  * Sección admin "Documentos" (Fase 4).
@@ -157,21 +175,29 @@ export default function DocumentsManager() {
     if (!lead) return toast.error("Selecciona un lead vendedor");
 
     const p = lead.preferences || {};
+    const isPropuesta = (template.category || "").toLowerCase().includes("propuesta")
+      || template.name.toLowerCase().includes("propuesta");
+    const today = new Date().toISOString().slice(0, 10);
+
+    // En propuesta, el "owner" que firma es el COMPRADOR (vacío, se teclea) y el
+    // vendedor sale del lead. En nota, el owner es el VENDEDOR (= lead).
+    const ownerFromLead: OwnerInput = {
+      nombre: lead.name || "",
+      dni: "",
+      telefono: lead.phone || "",
+      email: lead.email || "",
+      direccion: "",
+    };
+
     setForm({
+      kind: isPropuesta ? "propuesta" : "nota",
       templateId: template.id,
       leadId: lead.id,
       buyerId: "",
       lugar: p.city || "Sevilla",
-      fecha: new Date().toISOString().slice(0, 10),
-      owners: [
-        {
-          nombre: lead.name || "",
-          dni: "",
-          telefono: lead.phone || "",
-          email: lead.email || "",
-          direccion: "",
-        },
-      ],
+      fecha: today,
+      owners: isPropuesta ? [emptyOwner()] : [ownerFromLead],
+      sellers: isPropuesta ? [{ nombre: lead.name || "", nif: "", email: lead.email || "" }] : [],
       repEnabled: false,
       repNombre: "",
       repDni: "",
@@ -186,8 +212,14 @@ export default function DocumentsManager() {
       cargas: "Ninguna",
       precio: String(p.agent_valuation || p.estimated_value || ""),
       honorariosPct: p.commission_pct ? String(p.commission_pct) : "",
-      fechaInicio: new Date().toISOString().slice(0, 10),
+      fechaInicio: today,
       fechaFin: "",
+      pagoInicial: "",
+      pagoAmpliacion: "",
+      pagoRestante: "",
+      plazoContrato: "",
+      plazoEscritura: "",
+      diasHabiles: "7",
     });
   };
 
@@ -242,7 +274,45 @@ export default function DocumentsManager() {
       fecha_fin: fmtDate(f.fechaFin),
     };
 
-    // Firmantes: todos los propietarios con email válido
+    // ── Propuesta de compraventa: añade placeholders y firmantes propios ──
+    if (f.kind === "propuesta") {
+      const compradores = f.owners
+        .filter((o) => o.nombre.trim())
+        .map((o) => `D./Dña. ${o.nombre}${o.dni ? `, NIF ${o.dni}` : ""}, mayor de edad${o.direccion ? `, con domicilio en ${o.direccion}` : ""}${o.telefono ? `, teléfono ${o.telefono}` : ""}${o.email ? `, email ${o.email}` : ""}.`)
+        .join("\n") || "________";
+
+      const vendedores = f.sellers
+        .filter((s) => s.nombre.trim())
+        .map((s) => `D./Dña. ${s.nombre}${s.nif ? `, NIF ${s.nif}` : ""}`)
+        .join(" y ") || "________";
+
+      const repComprador = f.repEnabled
+        ? `Actúa en representación de la parte proponente D./Dña. ${f.repNombre || "________"}${f.repDni ? `, NIF ${f.repDni}` : ""}${f.repCalidad ? `, en calidad de ${f.repCalidad}` : ""}, según acreditará documentalmente.`
+        : "Actúa en su propio nombre y representación.";
+
+      Object.assign(ctx, {
+        compradores,
+        representacion: repComprador,
+        vendedores,
+        "comprador.nombre": o0.nombre || "________",
+        "comprador.email": o0.email || "________",
+        "pago.inicial": fmtEuro(f.pagoInicial),
+        "pago.ampliacion": fmtEuro(f.pagoAmpliacion),
+        "pago.restante": fmtEuro(f.pagoRestante),
+        "plazo.contrato": fmtDate(f.plazoContrato),
+        "plazo.escritura": fmtDate(f.plazoEscritura),
+        dias_habiles: f.diasHabiles?.trim() || "________",
+      });
+
+      // Firmantes: compradores (proponentes) + vendedores, todos con email válido.
+      const recipients = [
+        ...f.owners.filter((o) => EMAIL_RE.test(o.email)).map((o) => ({ name: o.nombre || "Comprador", email: o.email })),
+        ...f.sellers.filter((s) => EMAIL_RE.test(s.email)).map((s) => ({ name: s.nombre || "Vendedor", email: s.email })),
+      ];
+      return { ctx, recipients };
+    }
+
+    // ── Nota de encargo: firmantes = propietarios con email válido ──
     const recipients = f.owners
       .filter((o) => EMAIL_RE.test(o.email))
       .map((o) => ({ name: o.nombre || "Propietario", email: o.email }));
@@ -259,16 +329,19 @@ export default function DocumentsManager() {
     const template = templates.find((t) => t.id === form.templateId);
     const lead = sellerLeads.find((l) => l.id === form.leadId);
     if (!template) return toast.error("Plantilla no encontrada");
-    if (!form.owners.some((o) => o.nombre.trim())) return toast.error("Indica al menos un propietario");
+    if (!form.owners.some((o) => o.nombre.trim())) return toast.error(form.kind === "propuesta" ? "Indica al menos un comprador" : "Indica al menos un propietario");
+    if (form.kind === "propuesta" && !form.sellers.some((s) => s.nombre.trim())) return toast.error("Indica al menos un vendedor");
 
     const { ctx, recipients } = flattenForm(form);
     const text = mergeBody(template.body, ctx);
+    const clientLabel = form.owners[0]?.nombre || (form.kind === "propuesta" ? "El comprador" : "La parte vendedora");
     const html = renderBrandedHtml(
       {
         title: template.name,
         lugar: ctx.lugar,
         fecha: ctx.fecha,
-        clientLabel: form.owners[0]?.nombre || "La parte vendedora",
+        clientLabel,
+        ...docLayout(template.category, clientLabel),
       },
       text,
     );
@@ -350,12 +423,14 @@ export default function DocumentsManager() {
     if (!tpl) return toast.error("La plantilla de este documento ya no existe");
     const ctx = (gd.merged_data || {}) as Record<string, string>;
     const text = mergeBody(tpl.body, ctx);
+    const clientLabel = ctx["comprador.nombre"] || ctx["vendedor.nombre"] || "La parte firmante";
     const html = renderBrandedHtml(
       {
         title: tpl.name,
         lugar: ctx.lugar,
         fecha: ctx.fecha,
-        clientLabel: ctx["vendedor.nombre"] || "La parte vendedora",
+        clientLabel,
+        ...docLayout(tpl.category, clientLabel),
       },
       text,
     );
@@ -568,24 +643,24 @@ export default function DocumentsManager() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* PROPIETARIOS */}
+              {/* PROPIETARIOS / COMPRADORES */}
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] flex items-center gap-2">
-                    <Users size={14} /> Propietarios
+                    <Users size={14} /> {form.kind === "propuesta" ? "Compradores (Proponentes)" : "Propietarios"}
                   </h4>
                   <button
                     onClick={() => patch({ owners: [...form.owners, emptyOwner()] })}
                     className="flex items-center gap-1.5 text-[11px] font-bold text-[#2C3E50] bg-[#FBBF24] hover:bg-yellow-500 px-2.5 py-1 rounded-lg transition-all"
                   >
-                    <UserPlus size={13} /> Añadir propietario
+                    <UserPlus size={13} /> {form.kind === "propuesta" ? "Añadir comprador" : "Añadir propietario"}
                   </button>
                 </div>
 
                 {form.owners.map((o, idx) => (
                   <div key={idx} className="bg-[#0F172A]/60 border border-white/5 rounded-xl p-3 space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-bold text-slate-400">Propietario {idx + 1}{idx === 0 ? " (principal)" : ""}</span>
+                      <span className="text-[11px] font-bold text-slate-400">{form.kind === "propuesta" ? "Comprador" : "Propietario"} {idx + 1}{idx === 0 ? " (principal)" : ""}</span>
                       {form.owners.length > 1 && (
                         <button onClick={() => patch({ owners: form.owners.filter((_, i) => i !== idx) })} className="text-slate-500 hover:text-red-400 p-1">
                           <Trash2 size={13} />
@@ -597,17 +672,51 @@ export default function DocumentsManager() {
                       <input className={inputCls} placeholder="DNI" value={o.dni} onChange={(e) => patchOwner(idx, { dni: e.target.value })} />
                       <input className={inputCls} placeholder="Teléfono" value={o.telefono} onChange={(e) => patchOwner(idx, { telefono: e.target.value })} />
                       <input className={inputCls} placeholder="Email (para firmar)" value={o.email} onChange={(e) => patchOwner(idx, { email: e.target.value })} />
-                      <input className={`${inputCls} sm:col-span-2`} placeholder="Domicilio del propietario" value={o.direccion} onChange={(e) => patchOwner(idx, { direccion: e.target.value })} />
+                      <input className={`${inputCls} sm:col-span-2`} placeholder="Domicilio" value={o.direccion} onChange={(e) => patchOwner(idx, { direccion: e.target.value })} />
                     </div>
                   </div>
                 ))}
               </section>
 
+              {/* VENDEDORES (solo propuesta) */}
+              {form.kind === "propuesta" && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] flex items-center gap-2">
+                      <Users size={14} /> Vendedores (propietarios del inmueble)
+                    </h4>
+                    <button
+                      onClick={() => patch({ sellers: [...form.sellers, emptyParty()] })}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-[#2C3E50] bg-[#FBBF24] hover:bg-yellow-500 px-2.5 py-1 rounded-lg transition-all"
+                    >
+                      <UserPlus size={13} /> Añadir vendedor
+                    </button>
+                  </div>
+                  {form.sellers.map((s, idx) => (
+                    <div key={idx} className="bg-[#0F172A]/60 border border-white/5 rounded-xl p-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[11px] font-bold text-slate-400">Vendedor {idx + 1}</span>
+                        {form.sellers.length > 1 && (
+                          <button onClick={() => patch({ sellers: form.sellers.filter((_, i) => i !== idx) })} className="text-slate-500 hover:text-red-400 p-1">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <input className={inputCls} placeholder="Nombre y apellidos" value={s.nombre} onChange={(e) => patch({ sellers: form.sellers.map((x, i) => (i === idx ? { ...x, nombre: e.target.value } : x)) })} />
+                        <input className={inputCls} placeholder="NIF" value={s.nif} onChange={(e) => patch({ sellers: form.sellers.map((x, i) => (i === idx ? { ...x, nif: e.target.value } : x)) })} />
+                        <input className={inputCls} placeholder="Email (para firmar la aceptación)" value={s.email} onChange={(e) => patch({ sellers: form.sellers.map((x, i) => (i === idx ? { ...x, email: e.target.value } : x)) })} />
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
+
               {/* REPRESENTACIÓN */}
               <section className="space-y-3">
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" checked={form.repEnabled} onChange={(e) => patch({ repEnabled: e.target.checked })} className="w-4 h-4 accent-[#FBBF24]" />
-                  <span className="text-sm font-bold text-white">Actúa en representación del/los propietario(s)</span>
+                  <span className="text-sm font-bold text-white">{form.kind === "propuesta" ? "El comprador actúa en representación de un tercero" : "Actúa en representación del/los propietario(s)"}</span>
                 </label>
                 {form.repEnabled && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">

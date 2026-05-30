@@ -76,6 +76,50 @@ const esc = (s: string) =>
 const softFill = (s: string) =>
   esc(s).replace(/_{4,}/g, '<span style="color:#aab2c0">________</span>');
 
+/** Fila de casillas de firma. */
+function signaturesHtml(slots: SignSlot[]): string {
+  const cells = slots
+    .map(
+      (s) =>
+        `<div class="sign"><div class="line"><div class="who">${esc(s.who)}</div><div class="sub">${esc(s.sub || "")}</div></div></div>`,
+    )
+    .join("");
+  // siempre 2 columnas para alinear; si hay 1, rellenamos con un hueco
+  const filler = slots.length === 1 ? '<div class="sign"></div>' : "";
+  return `<div class="signs">${cells}${filler}</div>`;
+}
+
+/** Bloque de aceptación destacado (con su propia firma). */
+function acceptanceHtml(a: AcceptanceBlock): string {
+  const opts = (a.options || [])
+    .map((o) => `<span><span class="box"></span>${softFill(o)}</span>`)
+    .join("");
+  return `<div class="accept">
+    <div class="ah"><span class="dot"></span> ${esc(a.heading)}</div>
+    <p>${softFill(a.body)}</p>
+    ${opts ? `<div class="opts">${opts}</div>` : ""}
+    <div class="signs" style="margin-top:6px;">
+      <div class="sign"><div class="line"><div class="who">${esc(a.sign.who)}</div><div class="sub">${esc(a.sign.sub || "")}</div></div></div>
+      <div class="sign"></div>
+    </div>
+  </div>`;
+}
+
+/** Una casilla de firma (rótulo + subtítulo). */
+export interface SignSlot {
+  who: string;
+  sub?: string;
+}
+
+/** Bloque de aceptación destacado (p.ej. el Vendedor acepta la propuesta). */
+export interface AcceptanceBlock {
+  heading: string;
+  body: string;
+  /** Opciones tipo casilla (□) que se muestran antes de la firma. */
+  options?: string[];
+  sign: SignSlot;
+}
+
 export interface BrandedDocMeta {
   title: string;
   ref?: string;
@@ -85,6 +129,52 @@ export interface BrandedDocMeta {
   logoSrc?: string;
   /** Nombre que firma como cliente (pie de firma). */
   clientLabel?: string;
+  /** Casillas de firma. Si se omite → [El Asesor, El Cliente]. */
+  signatures?: SignSlot[];
+  /** Bloque de aceptación opcional (propuesta de compraventa). */
+  acceptance?: AcceptanceBlock;
+}
+
+/**
+ * Layout de firmas/aceptación según el tipo de documento. FUENTE ÚNICA que
+ * consumen tanto la vista previa HTML como el PDF del servidor, de modo que
+ * ambas salidas son idénticas.
+ *
+ * @param category  categoría de la plantilla (`document_templates.category`).
+ * @param clientLabel  nombre de quien firma como cliente/proponente.
+ */
+export function docLayout(
+  category: string | undefined,
+  clientLabel?: string,
+): { signatures: SignSlot[]; acceptance?: AcceptanceBlock } {
+  const cat = (category || "").toLowerCase();
+
+  if (cat.includes("propuesta")) {
+    return {
+      signatures: [
+        { who: "El Proponente (Comprador)", sub: clientLabel || "Nombre y NIF · Firma" },
+        { who: "El Asesor", sub: BRAND.advisor },
+      ],
+      acceptance: {
+        heading: "Aceptación de la propuesta por la parte vendedora",
+        body:
+          "Con la firma del presente apartado, el Vendedor ACEPTA formalmente todas las condiciones y plazos establecidos en esta propuesta, adquiriendo las cantidades entregadas la condición legal de Arras Penitenciales (Art. 1.454 C.C.).",
+        options: [
+          "Oferta conforme con el Encargo de Venta.",
+          "Aceptada la propuesta NO conforme con el Encargo de Venta.",
+        ],
+        sign: { who: "El Vendedor", sub: "Nombre y NIF · Firma" },
+      },
+    };
+  }
+
+  // Por defecto (Nota de encargo y otros): Asesor + Cliente.
+  return {
+    signatures: [
+      { who: "El Asesor", sub: BRAND.advisor },
+      { who: "El Cliente", sub: clientLabel || "La parte firmante" },
+    ],
+  };
 }
 
 /** Renderiza los bloques a fragmentos HTML del cuerpo. */
@@ -130,6 +220,11 @@ function blocksToHtml(blocks: DocBlock[]): string {
 export function renderBrandedHtml(meta: BrandedDocMeta, body: string): string {
   const blocks = parseDoc(body);
   const logo = meta.logoSrc || "/logo.png";
+  const sigs: SignSlot[] = meta.signatures ?? [
+    { who: "El Asesor", sub: BRAND.advisor },
+    { who: "El Cliente", sub: meta.clientLabel || "La parte firmante" },
+  ];
+  const acceptance = meta.acceptance;
   const metaLine = [
     meta.ref ? `Ref. ${esc(meta.ref)}` : "",
     `${esc(meta.lugar || "Sevilla")}, ${esc(meta.fecha || "")}`,
@@ -174,6 +269,12 @@ export function renderBrandedHtml(meta: BrandedDocMeta, body: string): string {
   .sign .line{border-top:1px solid var(--navy);margin-top:42px;padding-top:5px;}
   .sign .who{font-weight:700;color:var(--navy);font-size:8.4pt;text-transform:uppercase;letter-spacing:1px;}
   .sign .sub{color:var(--muted);font-size:7.6pt;margin-top:1px;}
+  .accept{margin-top:16px;border:1px solid var(--gold);border-radius:8px;background:#fffdf6;padding:12px 14px;}
+  .accept .ah{font-size:8.6pt;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px;}
+  .accept .ah .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);}
+  .accept p{margin:6px 0;text-align:justify;}
+  .opts{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:6px;font-size:8.4pt;color:var(--ink);}
+  .opts .box{width:11px;height:11px;border:1.3px solid var(--navy);border-radius:2px;display:inline-block;vertical-align:-1px;margin-right:6px;}
   .esign{margin-top:12px;font-size:7.4pt;color:var(--muted);letter-spacing:.4px;}
   .esign b{color:var(--gold-2);}
   .footer{position:absolute;left:16mm;right:16mm;bottom:11mm;display:flex;justify-content:space-between;align-items:center;padding-top:7px;border-top:1px solid var(--line);font-size:7.2pt;color:var(--muted);}
@@ -194,10 +295,8 @@ export function renderBrandedHtml(meta: BrandedDocMeta, body: string): string {
     <span><b>Email:</b> ${BRAND.email}</span>
   </div>
   ${blocksToHtml(blocks)}
-  <div class="signs">
-    <div class="sign"><div class="line"><div class="who">El Asesor</div><div class="sub">${BRAND.advisor}</div></div></div>
-    <div class="sign"><div class="line"><div class="who">El Cliente</div><div class="sub">${esc(meta.clientLabel || "La parte firmante")}</div></div></div>
-  </div>
+  ${signaturesHtml(sigs)}
+  ${acceptance ? acceptanceHtml(acceptance) : ""}
   <div class="esign">Documento firmado digitalmente mediante <b>Documenso</b> · validez legal eIDAS.</div>
   <footer class="footer"><span><b>${BRAND.name}</b> · ${BRAND.web} · ${BRAND.email}</span><span>Documento confidencial</span></footer>
 </div></body></html>`;

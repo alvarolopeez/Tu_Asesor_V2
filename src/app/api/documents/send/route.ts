@@ -6,6 +6,7 @@ import {
   sendForSignature,
   type DocumensoRecipient,
 } from "@/lib/documenso";
+import { docLayout } from "@/lib/brandedDoc";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: doc, error } = await supabaseAdmin
       .from("generated_documents")
-      .select("id, merged_data, template_id, document_templates(name, body)")
+      .select("id, merged_data, template_id, document_templates(name, body, category)")
       .eq("id", generatedDocumentId)
       .single();
     if (error || !doc) throw new Error("Documento generado no encontrado");
@@ -78,7 +79,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const pdfBytes = await buildSimplePdf(template.name || "Documento", text);
+    const clientLabel = ctx["comprador.nombre"] || ctx["vendedor.nombre"] || undefined;
+    const layout = docLayout(template.category, clientLabel);
+    const pdfBytes = await buildSimplePdf(template.name || "Documento", text, layout);
     const { documentId } = await sendForSignature({ title: template.name || "Documento", pdfBytes, recipients });
 
     await supabaseAdmin

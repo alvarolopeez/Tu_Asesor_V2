@@ -1,6 +1,11 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { parseDoc, BRAND } from "./brandedDoc";
+import { parseDoc, BRAND, type SignSlot, type AcceptanceBlock } from "./brandedDoc";
 import { BRAND_LOGO_PNG_BASE64 } from "./brandLogo";
+
+export interface PdfLayout {
+  signatures?: SignSlot[];
+  acceptance?: AcceptanceBlock;
+}
 
 /**
  * Cliente mínimo de Documenso Cloud (Fase 4c).
@@ -50,7 +55,7 @@ const C = {
  * previa HTML, de modo que el PDF firmado y la previsualización son coherentes.
  * pdf-lib + Helvetica (WinAnsi cubre acentos y €) → serverless-safe.
  */
-export async function buildSimplePdf(title: string, body: string): Promise<Uint8Array> {
+export async function buildSimplePdf(title: string, body: string, layout: PdfLayout = {}): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -158,18 +163,62 @@ export async function buildSimplePdf(title: string, body: string): Promise<Uint8
     }
   }
 
-  // ── Firmas ──
-  ensure(70);
-  y -= 18;
   const colW = (maxW - 40) / 2;
-  const lineY = y - 34;
-  page.drawLine({ start: { x: MX, y: lineY }, end: { x: MX + colW, y: lineY }, thickness: 0.8, color: C.navy });
-  page.drawLine({ start: { x: MX + colW + 40, y: lineY }, end: { x: W - MX, y: lineY }, thickness: 0.8, color: C.navy });
-  page.drawText("EL ASESOR", { x: MX, y: lineY - 11, size: 8, font: fontBold, color: C.navy });
-  page.drawText(BRAND.advisor, { x: MX, y: lineY - 21, size: 7.4, font, color: C.muted });
-  page.drawText("EL CLIENTE", { x: MX + colW + 40, y: lineY - 11, size: 8, font: fontBold, color: C.navy });
-  page.drawText("La parte firmante", { x: MX + colW + 40, y: lineY - 21, size: 7.4, font, color: C.muted });
-  y = lineY - 34;
+
+  // Dibuja una fila de hasta 2 casillas de firma a la altura actual de `y`.
+  const drawSignRow = (slots: SignSlot[]) => {
+    ensure(90);
+    y -= 18;
+    const lineY = y - 34;
+    slots.slice(0, 2).forEach((s, i) => {
+      const x0 = i === 0 ? MX : MX + colW + 40;
+      const x1 = i === 0 ? MX + colW : W - MX;
+      page.drawLine({ start: { x: x0, y: lineY }, end: { x: x1, y: lineY }, thickness: 0.8, color: C.navy });
+      page.drawText(sanitize(s.who.toUpperCase()), { x: x0, y: lineY - 11, size: 8, font: fontBold, color: C.navy });
+      if (s.sub) page.drawText(sanitize(s.sub), { x: x0, y: lineY - 21, size: 7.4, font, color: C.muted });
+    });
+    y = lineY - 30;
+  };
+
+  // ── Firmas principales ──
+  const sigs: SignSlot[] = layout.signatures ?? [
+    { who: "El Asesor", sub: BRAND.advisor },
+    { who: "El Cliente", sub: "La parte firmante" },
+  ];
+  drawSignRow(sigs);
+
+  // ── Bloque de aceptación (propuesta) ──
+  if (layout.acceptance) {
+    const a = layout.acceptance;
+    ensure(210);
+    y -= 12;
+    const boxTop = y;
+    const innerX = MX + 12;
+    const innerW = maxW - 24;
+    y -= 14;
+    page.drawText(sanitize(a.heading.toUpperCase()), { x: innerX, y: y - 8, size: 8.4, font: fontBold, color: C.navy });
+    y -= 18;
+    for (const ln of wrap(a.body, font, 8.6, innerW)) {
+      page.drawText(ln, { x: innerX, y: y - 8, size: 8.6, font, color: C.ink });
+      y -= 12;
+    }
+    for (const opt of a.options || []) {
+      y -= 2;
+      page.drawRectangle({ x: innerX, y: y - 9, width: 8, height: 8, borderColor: C.navy, borderWidth: 1 });
+      page.drawText(sanitize(opt), { x: innerX + 13, y: y - 8, size: 8.4, font, color: C.ink });
+      y -= 13;
+    }
+    drawSignRow([a.sign]);
+    const boxBottom = y - 4;
+    // marco dorado del bloque
+    page.drawRectangle({
+      x: MX, y: boxBottom, width: maxW, height: boxTop - boxBottom,
+      borderColor: C.gold, borderWidth: 1,
+    });
+    y = boxBottom - 8;
+  }
+
+  ensure(16);
   para("Documento firmado digitalmente mediante Documenso · validez legal eIDAS.", { size: 7.2, color: C.muted });
 
   drawFooter(page);
