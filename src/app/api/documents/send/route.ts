@@ -8,9 +8,17 @@ import {
 } from "@/lib/documenso";
 import { docLayout } from "@/lib/brandedDoc";
 
+// El service role key es obligatorio: las tablas `generated_documents` /
+// `document_templates` tienen RLS que solo permite el rol `authenticated`. Si
+// el servidor cae al anon key, las lecturas devuelven 0 filas y el flujo falla
+// con un confuso "Documento generado no encontrado". Por eso NO hacemos
+// fallback al anon key aquí; exigimos el service role.
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const HAS_SERVICE_ROLE = Boolean(SERVICE_ROLE_KEY);
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+  SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
 );
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,6 +43,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta generatedDocumentId" }, { status: 400 });
   }
 
+  if (!HAS_SERVICE_ROLE) {
+    return NextResponse.json(
+      { error: "Falta SUPABASE_SERVICE_ROLE_KEY en el servidor (Netlify). Sin ella, las políticas RLS impiden leer el documento. Añádela en las variables de entorno de Netlify y vuelve a desplegar." },
+      { status: 503 },
+    );
+  }
+
   if (!isDocumensoConfigured()) {
     return NextResponse.json(
       { error: "Documenso no está configurado. Añade DOCUMENSO_API_URL y DOCUMENSO_API_TOKEN en Netlify y .env.local." },
@@ -43,15 +58,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Dos consultas independientes (sin embed PostgREST): no existe FK declarada
+    // entre generated_documents.template_id y document_templates.id, así que el
+    // join embebido falla. Esto es más robusto y no depende del schema.
     const { data: doc, error } = await supabaseAdmin
       .from("generated_documents")
-      .select("id, merged_data, template_id, document_templates(name, body, category)")
+      .select("id, merged_data, template_id")
       .eq("id", generatedDocumentId)
       .single();
     if (error || !doc) throw new Error("Documento generado no encontrado");
 
-    const template = (doc as any).document_templates;
-    if (!template?.body) throw new Error("La plantilla asociada ya no existe");
+    if (!doc.template_id) throw new Error("El documento no tiene plantilla asociada");
+    const { data: template, error: tplError } = await supabaseAdmin
+      .from("document_templates")
+      .select("name, body, category")
+      .eq("id", doc.template_id)
+      .single();
+    if (tplError || !template?.body) throw new Error("La plantilla asociada ya no existe");
 
     const merged = (doc.merged_data || {}) as Record<string, any>;
     const ctx = merged as Record<string, string>;
