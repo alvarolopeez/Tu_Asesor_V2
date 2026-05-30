@@ -260,7 +260,14 @@ export async function sendForSignature(opts: {
   const uploadUrl: string | undefined = created.uploadUrl ?? created.upload?.url;
   if (!documentId) throw new Error("Documenso no devolvió un id de documento.");
 
-  // 2) Subir el PDF (Documenso v2 devuelve una URL de subida tipo S3).
+  // Documenso v1 devuelve los recipients creados (con su recipientId), en el
+  // mismo orden en que los enviamos. Los necesitamos para anclar el campo de
+  // firma a cada uno.
+  const createdRecipients: Array<{ recipientId: number }> = Array.isArray(created.recipients)
+    ? created.recipients
+    : [];
+
+  // 2) Subir el PDF (la respuesta trae una URL de subida tipo S3 prefirmada).
   if (uploadUrl) {
     const putRes = await fetch(uploadUrl, {
       method: "PUT",
@@ -272,7 +279,36 @@ export async function sendForSignature(opts: {
     }
   }
 
-  // 3) Enviar a firmar.
+  // 3) Crear un campo de FIRMA por cada destinatario. Documenso rechaza el
+  //    envío si algún firmante no tiene al menos un campo de firma
+  //    ("Signers must have at least one signature field"). Colocamos el campo
+  //    en la última página (donde está el bloque de firmas del PDF de marca),
+  //    en columnas alternas para no solaparse cuando hay varios firmantes.
+  const pageCount = (await PDFDocument.load(opts.pdfBytes)).getPageCount();
+  for (let i = 0; i < createdRecipients.length; i++) {
+    const recipientId = createdRecipients[i]?.recipientId;
+    if (!recipientId) continue;
+    const col = i % 2; // 0 = izquierda, 1 = derecha
+    const row = Math.floor(i / 2);
+    const fieldRes = await fetch(`${API_URL}/documents/${documentId}/fields`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        recipientId,
+        type: "SIGNATURE",
+        pageNumber: pageCount,
+        pageX: 12 + col * 45,
+        pageY: Math.min(88, 82 - row * 10),
+        pageWidth: 28,
+        pageHeight: 6,
+      }),
+    });
+    if (!fieldRes.ok) {
+      throw new Error(`Documenso crear campo de firma falló (${fieldRes.status}): ${await safeText(fieldRes)}`);
+    }
+  }
+
+  // 4) Enviar a firmar.
   const sendRes = await fetch(`${API_URL}/documents/${documentId}/send`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
