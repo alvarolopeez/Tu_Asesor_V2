@@ -103,7 +103,9 @@ export async function POST(req: NextRequest) {
     }
 
     const clientLabel = ctx["comprador.nombre"] || ctx["vendedor.nombre"] || undefined;
-    const layout = docLayout(template.category, clientLabel);
+    const sellerName = (merged as any).__sellers?.[0]?.nombre || ctx["vendedor.nombre"];
+    const buyerName = (merged as any).__owners?.[0]?.nombre || ctx["comprador.nombre"];
+    const layout = docLayout(template.category, clientLabel, { sellerName, buyerName });
     const pdfBytes = await buildSimplePdf(template.name || "Documento", text, layout);
     const { documentId } = await sendForSignature({ title: template.name || "Documento", pdfBytes, recipients });
 

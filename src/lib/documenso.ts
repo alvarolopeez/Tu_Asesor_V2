@@ -1,10 +1,12 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { parseDoc, BRAND, type SignSlot, type AcceptanceBlock } from "./brandedDoc";
+import { parseDoc, BRAND, type SignSlot, type AcceptanceBlock, type DocVariant } from "./brandedDoc";
 import { BRAND_LOGO_PNG_BASE64 } from "./brandLogo";
 
 export interface PdfLayout {
   signatures?: SignSlot[];
   acceptance?: AcceptanceBlock;
+  /** "corporate" (default, con marca) o "legal" (sobrio, serif, sin logo). */
+  variant?: DocVariant;
 }
 
 /**
@@ -58,10 +60,15 @@ const C = {
  * pdf-lib + Helvetica (WinAnsi cubre acentos y €) → serverless-safe.
  */
 export async function buildSimplePdf(title: string, body: string, layout: PdfLayout = {}): Promise<Uint8Array> {
+  const variant: DocVariant = layout.variant ?? "corporate";
   const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const logo = await pdf.embedPng(Buffer.from(BRAND_LOGO_PNG_BASE64, "base64"));
+  // Para la variante "legal" usamos Times (serif) para acercarnos al papel
+  // notarial; corporate sigue con Helvetica para coherencia con la marca.
+  const font = await pdf.embedFont(variant === "legal" ? StandardFonts.TimesRoman : StandardFonts.Helvetica);
+  const fontBold = await pdf.embedFont(variant === "legal" ? StandardFonts.TimesRomanBold : StandardFonts.HelveticaBold);
+  const logo = variant === "corporate"
+    ? await pdf.embedPng(Buffer.from(BRAND_LOGO_PNG_BASE64, "base64"))
+    : null;
 
   const W = 595.28, H = 841.89; // A4 pt
   const MX = 48; // margen lateral
@@ -75,6 +82,13 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
   let pageNo = 0;
 
   const drawFooter = (p: PDFPage) => {
+    if (variant === "legal") {
+      p.drawLine({ start: { x: MX, y: bottom - 6 }, end: { x: W - MX, y: bottom - 6 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.85) });
+      const txt = `Tu Asesor Álvaro  ·  ${BRAND.web}  ·  Documento confidencial`;
+      const tw = font.widthOfTextAtSize(txt, 7.4);
+      p.drawText(txt, { x: (W - tw) / 2, y: bottom - 18, size: 7.4, font, color: rgb(0.5, 0.5, 0.5) });
+      return;
+    }
     p.drawLine({ start: { x: MX, y: bottom - 6 }, end: { x: W - MX, y: bottom - 6 }, thickness: 0.6, color: C.line });
     p.drawText(`${BRAND.name}  ·  ${BRAND.web}  ·  ${BRAND.email}`, { x: MX, y: bottom - 18, size: 7, font, color: C.muted });
     p.drawText("Documento confidencial", { x: W - MX - 92, y: bottom - 18, size: 7, font, color: C.muted });
@@ -115,72 +129,113 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
     y -= opts.gap ?? 2;
   };
 
-  // ── Cabecera de marca ──
-  const logoH = 30;
-  const logoW = (logo.width / logo.height) * logoH;
-  page.drawImage(logo, { x: MX, y: y - logoH, width: logoW, height: logoH });
-  page.drawText(BRAND.name, { x: MX + logoW + 10, y: y - 13, size: 13, font: fontBold, color: C.navy });
-  page.drawText(BRAND.tagline.toUpperCase(), { x: MX + logoW + 10, y: y - 25, size: 6.5, font, color: C.muted });
-  // título a la derecha
-  const tW = fontBold.widthOfTextAtSize(title, 15);
-  page.drawText(title, { x: W - MX - tW, y: y - 14, size: 15, font: fontBold, color: C.navy });
-  page.drawRectangle({ x: W - MX - 46, y: y + 4, width: 46, height: 2, color: C.gold });
-  y -= logoH + 6;
-  page.drawLine({ start: { x: MX, y }, end: { x: W - MX, y }, thickness: 0.8, color: C.line });
-  y -= 12;
+  // ═══ CABECERA ═══
+  if (variant === "legal") {
+    // Título centrado en mayúsculas, sin logo ni cabecera con marca.
+    const T = sanitize(title.toUpperCase());
+    const tW = fontBold.widthOfTextAtSize(T, 14);
+    page.drawText(T, { x: (W - tW) / 2, y: y - 14, size: 14, font: fontBold, color: rgb(0, 0, 0) });
+    y -= 24;
+    if (layout && (title || layout)) {
+      // "En Sevilla, a [fecha]." lo escribe el cuerpo (primera línea de la plantilla).
+    }
+  } else {
+    // Cabecera corporate con logo + título + franja dorada.
+    const logoH = 30;
+    const logoW = logo ? (logo.width / logo.height) * logoH : 0;
+    if (logo) page.drawImage(logo, { x: MX, y: y - logoH, width: logoW, height: logoH });
+    page.drawText(BRAND.name, { x: MX + logoW + 10, y: y - 13, size: 13, font: fontBold, color: C.navy });
+    page.drawText(BRAND.tagline.toUpperCase(), { x: MX + logoW + 10, y: y - 25, size: 6.5, font, color: C.muted });
+    const tW = fontBold.widthOfTextAtSize(title, 15);
+    page.drawText(title, { x: W - MX - tW, y: y - 14, size: 15, font: fontBold, color: C.navy });
+    page.drawRectangle({ x: W - MX - 46, y: y + 4, width: 46, height: 2, color: C.gold });
+    y -= logoH + 6;
+    page.drawLine({ start: { x: MX, y }, end: { x: W - MX, y }, thickness: 0.8, color: C.line });
+    y -= 12;
+    // Banda de datos del asesor
+    const advisor = `Asesor: ${BRAND.advisor}   ·   DNI: ${BRAND.dni}   ·   ${BRAND.fiscalAddress}   ·   Tel.: ${BRAND.phone}   ·   ${BRAND.email}`;
+    para(advisor, { size: 7.4, color: C.muted, gap: 6 });
+  }
 
-  // ── Banda de datos del asesor ──
-  const advisor = `Asesor: ${BRAND.advisor}   ·   DNI: ${BRAND.dni}   ·   ${BRAND.fiscalAddress}   ·   Tel.: ${BRAND.phone}   ·   ${BRAND.email}`;
-  para(advisor, { size: 7.4, color: C.muted, gap: 6 });
-
-  // ── Cuerpo (bloques compartidos con la vista previa) ──
-  let sec = 0;
-  for (const b of parseDoc(body)) {
-    if (b.type === "section") {
-      sec += 1;
-      ensure(20);
-      y -= 4;
-      const num = String(sec).padStart(2, "0");
-      page.drawText(num, { x: MX, y: y - 9, size: 9, font: fontBold, color: C.goldDark });
-      page.drawText(sanitize(b.text.toUpperCase()), { x: MX + 20, y: y - 9, size: 9, font: fontBold, color: C.navy });
-      y -= 16;
-    } else if (b.type === "row") {
-      ensure(13);
-      const labelColor = b.emphasis ? C.goldDark : C.muted;
-      const valColor = b.emphasis ? C.navy : C.ink;
-      const valFont = b.emphasis ? fontBold : font;
-      if (b.emphasis) page.drawRectangle({ x: MX, y: y - 11, width: 2, height: 12, color: C.gold });
-      page.drawText(sanitize(b.label), { x: MX + 6, y: y - 9, size: 8.4, font, color: labelColor });
-      const vx = MX + 6 + maxW * 0.32;
-      for (const ln of wrap(b.value, valFont, 8.6, maxW - (vx - MX) - 6)) {
-        ensure(12);
-        page.drawText(ln, { x: vx, y: y - 9, size: 8.6, font: valFont, color: valColor });
-        y -= 12;
+  // ═══ CUERPO ═══
+  if (variant === "legal") {
+    // Render jurídico: Reunidos/Manifiestan/Estipulaciones centrados; resto párrafo justificado.
+    const PILLAR = /^(reunidos|manifiestan|estipulaciones)$/i;
+    for (const b of parseDoc(body)) {
+      if (b.type === "section") {
+        ensure(28);
+        y -= 8;
+        const isPillar = PILLAR.test(b.text.trim());
+        const txt = sanitize(b.text.toUpperCase());
+        const size = isPillar ? 11.5 : 10.5;
+        const tW = fontBold.widthOfTextAtSize(txt, size);
+        const x = isPillar ? (W - tW) / 2 : MX;
+        page.drawText(txt, { x, y: y - size, size, font: fontBold, color: rgb(0, 0, 0) });
+        y -= size + 8;
+      } else if (b.type === "bullet") {
+        para(b.text, { size: 10.2, indent: 16, gap: 1, color: rgb(0, 0, 0) });
+      } else if (b.type === "row") {
+        para(`${b.label}: ${b.value}`, { size: 10.5, gap: 3, color: rgb(0, 0, 0) });
+      } else {
+        para(b.text, { size: 10.5, gap: 4, color: rgb(0, 0, 0) });
       }
-      y -= 2;
-    } else if (b.type === "bullet") {
-      para(b.text, { size: 9.3, indent: 14, gap: 1 });
-    } else {
-      para(b.text, { size: 9.5, gap: 4 });
+    }
+  } else {
+    // Render corporate (con secciones numeradas y filas k/v resaltadas).
+    let sec = 0;
+    for (const b of parseDoc(body)) {
+      if (b.type === "section") {
+        sec += 1;
+        ensure(20);
+        y -= 4;
+        const num = String(sec).padStart(2, "0");
+        page.drawText(num, { x: MX, y: y - 9, size: 9, font: fontBold, color: C.goldDark });
+        page.drawText(sanitize(b.text.toUpperCase()), { x: MX + 20, y: y - 9, size: 9, font: fontBold, color: C.navy });
+        y -= 16;
+      } else if (b.type === "row") {
+        ensure(13);
+        const labelColor = b.emphasis ? C.goldDark : C.muted;
+        const valColor = b.emphasis ? C.navy : C.ink;
+        const valFont = b.emphasis ? fontBold : font;
+        if (b.emphasis) page.drawRectangle({ x: MX, y: y - 11, width: 2, height: 12, color: C.gold });
+        page.drawText(sanitize(b.label), { x: MX + 6, y: y - 9, size: 8.4, font, color: labelColor });
+        const vx = MX + 6 + maxW * 0.32;
+        for (const ln of wrap(b.value, valFont, 8.6, maxW - (vx - MX) - 6)) {
+          ensure(12);
+          page.drawText(ln, { x: vx, y: y - 9, size: 8.6, font: valFont, color: valColor });
+          y -= 12;
+        }
+        y -= 2;
+      } else if (b.type === "bullet") {
+        para(b.text, { size: 9.3, indent: 14, gap: 1 });
+      } else {
+        para(b.text, { size: 9.5, gap: 4 });
+      }
     }
   }
 
-  const colW = (maxW - 40) / 2;
-
-  // Dibuja una fila de hasta 2 casillas de firma a la altura actual de `y`.
+  // Dibuja una fila de N casillas de firma (1-3) a la altura actual de `y`.
+  // Color y tipografía se ajustan a la variante (legal = negro; corporate = navy).
   const drawSignRow = (slots: SignSlot[]) => {
     ensure(90);
     y -= 18;
     const lineY = y - 34;
-    slots.slice(0, 2).forEach((s, i) => {
-      const x0 = i === 0 ? MX : MX + colW + 40;
-      const x1 = i === 0 ? MX + colW : W - MX;
-      page.drawLine({ start: { x: x0, y: lineY }, end: { x: x1, y: lineY }, thickness: 0.8, color: C.navy });
-      page.drawText(sanitize(s.who.toUpperCase()), { x: x0, y: lineY - 11, size: 8, font: fontBold, color: C.navy });
-      if (s.sub) page.drawText(sanitize(s.sub), { x: x0, y: lineY - 21, size: 7.4, font, color: C.muted });
+    const n = Math.min(3, slots.length || 1);
+    const gap = 24;
+    const colW = (maxW - gap * (n - 1)) / n;
+    const lineColor = variant === "legal" ? rgb(0, 0, 0) : C.navy;
+    const labelColor = variant === "legal" ? rgb(0, 0, 0) : C.navy;
+    const subColor = variant === "legal" ? rgb(0.4, 0.4, 0.4) : C.muted;
+    slots.slice(0, n).forEach((s, i) => {
+      const x0 = MX + i * (colW + gap);
+      const x1 = x0 + colW;
+      page.drawLine({ start: { x: x0, y: lineY }, end: { x: x1, y: lineY }, thickness: 0.8, color: lineColor });
+      page.drawText(sanitize(s.who.toUpperCase()), { x: x0, y: lineY - 11, size: 8, font: fontBold, color: labelColor });
+      if (s.sub) page.drawText(sanitize(s.sub), { x: x0, y: lineY - 21, size: 7.4, font, color: subColor });
     });
     y = lineY - 30;
   };
+  const colW = (maxW - 40) / 2; // (legacy) usado solo por el bloque de aceptación corporate
 
   // ── Firmas principales ──
   const sigs: SignSlot[] = layout.signatures ?? [

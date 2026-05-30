@@ -76,6 +76,88 @@ const esc = (s: string) =>
 const softFill = (s: string) =>
   esc(s).replace(/_{4,}/g, '<span style="color:#aab2c0">________</span>');
 
+/**
+ * Variante "legal" — diseño jurídico clásico para contratos privados:
+ *   - Tipografía serif (Iowan/Palatino/Georgia), negro sobre blanco.
+ *   - Sin logo ni colores de marca; título centrado en mayúsculas.
+ *   - "REUNIDOS / MANIFIESTAN / ESTIPULACIONES" como pilares centrados.
+ *   - Hasta 3 firmas en fila al pie.
+ */
+function renderLegalHtml(meta: BrandedDocMeta, body: string): string {
+  const sigs: SignSlot[] = meta.signatures ?? [];
+  const place = esc(meta.lugar || "Sevilla");
+  const date = esc(meta.fecha || "");
+
+  // Heurística: si una sección es "Reunidos" / "Manifiestan" / "Estipulaciones",
+  // se renderiza como pilar centrado en mayúsculas; el resto, párrafo normal.
+  const blocks = parseDoc(body);
+  const PILLAR = /^(reunidos|manifiestan|estipulaciones)$/i;
+  const parts: string[] = [];
+  let inList = false;
+  const closeList = () => { if (inList) { parts.push("</ul>"); inList = false; } };
+  for (const b of blocks) {
+    if (b.type === "section") {
+      closeList();
+      if (PILLAR.test(b.text.trim())) {
+        parts.push(`<h2 class="pillar">${esc(b.text.toUpperCase())}</h2>`);
+      } else {
+        parts.push(`<h3 class="stip">${esc(b.text)}</h3>`);
+      }
+    } else if (b.type === "bullet") {
+      if (!inList) { parts.push("<ul>"); inList = true; }
+      parts.push(`<li>${softFill(b.text)}</li>`);
+    } else if (b.type === "row") {
+      closeList();
+      parts.push(`<p><b>${softFill(b.label)}:</b> ${softFill(b.value)}</p>`);
+    } else {
+      closeList();
+      parts.push(`<p>${softFill(b.text)}</p>`);
+    }
+  }
+  closeList();
+
+  const signsHtml = sigs.length === 0 ? "" :
+    `<div class="signs n${sigs.length}">${sigs.map((s) =>
+      `<div class="sign"><div class="line"><div class="who">${esc(s.who)}</div><div class="sub">${esc(s.sub || "")}</div></div></div>`,
+    ).join("")}</div>`;
+
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>${esc(meta.title)}</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#fff;}
+  body{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;color:#111;line-height:1.55;font-size:11pt;}
+  .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;position:relative;padding:25mm 22mm 22mm;}
+  h1.title{text-align:center;margin:0 0 4px;font-size:14pt;font-weight:700;letter-spacing:2px;text-transform:uppercase;}
+  .subtitle{text-align:center;margin:0 0 18px;font-size:10pt;font-style:italic;color:#444;}
+  h2.pillar{text-align:center;margin:18px 0 10px;font-size:11.5pt;font-weight:700;letter-spacing:6px;text-transform:uppercase;}
+  h2.pillar::before,h2.pillar::after{content:"";display:inline-block;width:36px;height:1px;background:#111;vertical-align:middle;margin:0 14px;}
+  h3.stip{margin:10px 0 2px;font-size:11pt;font-weight:700;}
+  p{margin:5px 0;text-align:justify;text-indent:0;}
+  ul{margin:5px 0 5px 0;padding-left:22px;}
+  ul li{margin:3px 0;text-align:justify;}
+  .signs{display:grid;gap:32px;margin-top:30px;}
+  .signs.n1{grid-template-columns:1fr;}
+  .signs.n2{grid-template-columns:1fr 1fr;}
+  .signs.n3{grid-template-columns:1fr 1fr 1fr;}
+  .sign .line{border-top:1px solid #111;margin-top:60px;padding-top:6px;text-align:center;}
+  .sign .who{font-weight:700;font-size:10pt;}
+  .sign .sub{color:#555;font-size:9pt;margin-top:2px;font-style:italic;}
+  .esign{margin-top:18px;text-align:center;font-size:8.6pt;color:#666;font-style:italic;}
+  .footer{position:absolute;left:22mm;right:22mm;bottom:12mm;text-align:center;font-size:8pt;color:#888;border-top:1px solid #ddd;padding-top:6px;font-style:italic;}
+  @page{size:A4;margin:0;}
+  @media print{.page{margin:0;}}
+</style></head>
+<body><div class="page">
+  <h1 class="title">${esc(meta.title)}</h1>
+  <p class="subtitle">En ${place}, a ${date}.</p>
+  ${parts.join("\n")}
+  ${signsHtml}
+  <p class="esign">Documento firmado digitalmente mediante Documenso — validez legal eIDAS.</p>
+  <div class="footer">Tu Asesor Álvaro · ${esc(BRAND.web)} · Documento confidencial</div>
+</div></body></html>`;
+}
+
 /** Fila de casillas de firma. */
 function signaturesHtml(slots: SignSlot[]): string {
   const cells = slots
@@ -120,6 +202,15 @@ export interface AcceptanceBlock {
   sign: SignSlot;
 }
 
+/**
+ * Variantes visuales del documento:
+ *   - "corporate" (default): cabecera de marca con logo + navy + dorado.
+ *   - "legal":   estilo jurídico clásico (serif, sobrio, sin logo, sin colores).
+ *     Usar para contratos privados / escrituras / cualquier documento que deba
+ *     leerse como "papel notarial".
+ */
+export type DocVariant = "corporate" | "legal";
+
 export interface BrandedDocMeta {
   title: string;
   ref?: string;
@@ -133,24 +224,42 @@ export interface BrandedDocMeta {
   signatures?: SignSlot[];
   /** Bloque de aceptación opcional (propuesta de compraventa). */
   acceptance?: AcceptanceBlock;
+  /** Variante visual (default: "corporate"). */
+  variant?: DocVariant;
 }
 
 /**
- * Layout de firmas/aceptación según el tipo de documento. FUENTE ÚNICA que
- * consumen tanto la vista previa HTML como el PDF del servidor, de modo que
- * ambas salidas son idénticas.
+ * Layout de firmas/aceptación + variante visual según el tipo de documento.
+ * FUENTE ÚNICA que consumen tanto la vista previa HTML como el PDF del
+ * servidor, de modo que ambas salidas son idénticas.
  *
  * @param category  categoría de la plantilla (`document_templates.category`).
  * @param clientLabel  nombre de quien firma como cliente/proponente.
+ * @param parties opcionales: nombres concretos para etiquetar a vendedor/comprador en el contrato privado.
  */
 export function docLayout(
   category: string | undefined,
   clientLabel?: string,
-): { signatures: SignSlot[]; acceptance?: AcceptanceBlock } {
+  parties?: { sellerName?: string; buyerName?: string },
+): { signatures: SignSlot[]; acceptance?: AcceptanceBlock; variant: DocVariant } {
   const cat = (category || "").toLowerCase();
+
+  if (cat.includes("contrato")) {
+    // Contrato privado: 3 firmas — Vendedora, Compradora, Asesor mediador.
+    // Variante visual "legal" (sobrio, serif, sin logo ni colores).
+    return {
+      variant: "legal",
+      signatures: [
+        { who: "La Parte Vendedora", sub: parties?.sellerName || "Nombre y DNI · Firma" },
+        { who: "La Parte Compradora", sub: parties?.buyerName || "Nombre y DNI · Firma" },
+        { who: "El Asesor Mediador", sub: BRAND.advisor },
+      ],
+    };
+  }
 
   if (cat.includes("propuesta")) {
     return {
+      variant: "corporate",
       signatures: [
         { who: "El Proponente (Comprador)", sub: clientLabel || "Nombre y NIF · Firma" },
         { who: "El Asesor", sub: BRAND.advisor },
@@ -168,8 +277,9 @@ export function docLayout(
     };
   }
 
-  // Por defecto (Nota de encargo y otros): Asesor + Cliente.
+  // Por defecto (Nota de encargo y otros): Asesor + Cliente, variante corporate.
   return {
+    variant: "corporate",
     signatures: [
       { who: "El Asesor", sub: BRAND.advisor },
       { who: "El Cliente", sub: clientLabel || "La parte firmante" },
@@ -218,6 +328,8 @@ function blocksToHtml(blocks: DocBlock[]): string {
 
 /** Documento HTML A4 completo, autocontenido (CSS inline), listo para print/PDF. */
 export function renderBrandedHtml(meta: BrandedDocMeta, body: string): string {
+  if ((meta.variant ?? "corporate") === "legal") return renderLegalHtml(meta, body);
+
   const blocks = parseDoc(body);
   const logo = meta.logoSrc || "/logo.png";
   const sigs: SignSlot[] = meta.signatures ?? [

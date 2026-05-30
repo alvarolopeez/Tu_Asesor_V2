@@ -65,8 +65,12 @@ interface PartyInput {
 /** Formulario editable de la "página previa" antes de generar el documento. */
 interface GenForm {
   /** "nota" = Nota de encargo (owners=vendedores). "propuesta" = Propuesta de
-   *  compraventa (owners=compradores/proponentes + sellers=vendedores). */
-  kind: "nota" | "propuesta";
+   *  compraventa (owners=compradores/proponentes + sellers=vendedores).
+   *  "contrato" = Contrato privado (mismo modelo de partes que propuesta, con
+   *  campos notariales adicionales; se pre-rellena desde una propuesta origen). */
+  kind: "nota" | "propuesta" | "contrato";
+  /** Sólo en contrato: id de la propuesta de origen que pre-rellenó el form. */
+  sourceProposalId?: string;
   templateId: string;
   leadId: string;
   buyerId: string;
@@ -97,6 +101,15 @@ interface GenForm {
   plazoContrato: string; // YYYY-MM-DD
   plazoEscritura: string; // YYYY-MM-DD
   diasHabiles: string;
+  // ── Contrato privado de compraventa ──
+  notarioNombre: string;
+  notarioCiudad: string;
+  notarioFechaEscritura: string; // YYYY-MM-DD
+  notarioNumProtocolo: string;
+  registroNumero: string;
+  registroCiudad: string;
+  ibanVendedor: string;
+  formaPagoAmpliacion: string;
 }
 
 const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
@@ -131,6 +144,8 @@ export default function DocumentsManager() {
   // Selección inicial (paso 1)
   const [genTemplateId, setGenTemplateId] = useState("");
   const [genLeadId, setGenLeadId] = useState("");
+  /** Sólo para contratos: id de la propuesta a usar como origen del autorrelleno. */
+  const [genProposalId, setGenProposalId] = useState("");
 
   // Página previa de edición (paso 2)
   const [form, setForm] = useState<GenForm | null>(null);
@@ -167,16 +182,28 @@ export default function DocumentsManager() {
     }
   };
 
+  // Categoría → kind del formulario.
+  const detectKind = (template: DocumentTemplate): GenForm["kind"] => {
+    const cat = (template.category || "").toLowerCase();
+    const nam = template.name.toLowerCase();
+    if (cat.includes("contrato") || nam.includes("contrato privado")) return "contrato";
+    if (cat.includes("propuesta") || nam.includes("propuesta")) return "propuesta";
+    return "nota";
+  };
+
   // ─── PASO 1 → 2: abrir la página previa con datos autorrellenados ────────
   const openEditor = () => {
     const template = templates.find((t) => t.id === genTemplateId);
-    const lead = sellerLeads.find((l) => l.id === genLeadId);
     if (!template) return toast.error("Selecciona una plantilla");
+
+    const kind = detectKind(template);
+    if (kind === "contrato") return openEditorFromProposal(template);
+
+    const lead = sellerLeads.find((l) => l.id === genLeadId);
     if (!lead) return toast.error("Selecciona un lead vendedor");
 
     const p = lead.preferences || {};
-    const isPropuesta = (template.category || "").toLowerCase().includes("propuesta")
-      || template.name.toLowerCase().includes("propuesta");
+    const isPropuesta = kind === "propuesta";
     const today = new Date().toISOString().slice(0, 10);
 
     // En propuesta, el "owner" que firma es el COMPRADOR (vacío, se teclea) y el
@@ -191,6 +218,7 @@ export default function DocumentsManager() {
 
     setForm({
       kind: isPropuesta ? "propuesta" : "nota",
+      sourceProposalId: undefined,
       templateId: template.id,
       leadId: lead.id,
       buyerId: "",
@@ -220,7 +248,102 @@ export default function DocumentsManager() {
       plazoContrato: "",
       plazoEscritura: "",
       diasHabiles: "7",
+      notarioNombre: "",
+      notarioCiudad: "Sevilla",
+      notarioFechaEscritura: "",
+      notarioNumProtocolo: "",
+      registroNumero: "",
+      registroCiudad: "Sevilla",
+      ibanVendedor: "",
+      formaPagoAmpliacion: "transferencia bancaria",
     });
+  };
+
+  /**
+   * Apertura especial para CONTRATO PRIVADO: parte de una propuesta existente
+   * y autorrellena todo lo que ya estaba (vendedor, comprador, inmueble, precio,
+   * escalera de pagos, plazos, honorarios%). El usuario sólo añade los datos
+   * notariales (notario, registro, IBAN, etc.).
+   */
+  const openEditorFromProposal = (template: DocumentTemplate) => {
+    const propId = genProposalId;
+    if (!propId) return toast.error("Selecciona una propuesta de origen");
+    const proposal = generated.find((g) => g.id === propId);
+    if (!proposal) return toast.error("Propuesta no encontrada");
+
+    const ctx = (proposal.merged_data || {}) as Record<string, any>;
+    const lead = sellerLeads.find((l) => l.id === proposal.seller_lead_id);
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Reconstruir owners (compradores) y sellers (vendedores) a partir del
+    // snapshot guardado. La propuesta no guardó cada owner por separado, pero
+    // sí guardó al menos el "comprador.nombre/email" y el "vendedores" string.
+    const owners: OwnerInput[] = Array.isArray(ctx.__owners) && ctx.__owners.length > 0
+      ? ctx.__owners
+      : [{
+          nombre: String(ctx["comprador.nombre"] || ""),
+          dni: "",
+          telefono: "",
+          email: String(ctx["comprador.email"] || ""),
+          direccion: "",
+        }];
+    const sellers: PartyInput[] = Array.isArray(ctx.__sellers) && ctx.__sellers.length > 0
+      ? ctx.__sellers
+      : (lead ? [{ nombre: lead.name || "", nif: "", email: lead.email || "" }] : [emptyParty()]);
+
+    // Honorarios % desde la NOTA DE ENCARGO del mismo seller_lead, si existe.
+    const noteTpl = templates.find((t) => (t.category || "").toLowerCase().includes("nota"));
+    const note = noteTpl && lead
+      ? generated.find((g) => g.template_id === noteTpl.id && g.seller_lead_id === lead.id)
+      : undefined;
+    const noteCtx = (note?.merged_data || {}) as Record<string, any>;
+    const honorariosPct = String(noteCtx.honorarios_pct ?? ctx.honorarios_pct ?? "");
+
+    // Recuperar montos numéricos desde los strings "1.234 €" guardados.
+    const num = (s: any) => String(s ?? "").replace(/[^\d]/g, "");
+
+    setForm({
+      kind: "contrato",
+      sourceProposalId: propId,
+      templateId: template.id,
+      leadId: proposal.seller_lead_id || (lead?.id ?? ""),
+      buyerId: "",
+      lugar: String(ctx.lugar || "Sevilla"),
+      fecha: today,
+      owners,
+      sellers,
+      repEnabled: false,
+      repNombre: "",
+      repDni: "",
+      repCalidad: "",
+      inmDireccion: String(ctx["inmueble.direccion"] || ""),
+      inmTipo: String(ctx["inmueble.tipo"] || ""),
+      inmM2: String(ctx["inmueble.m2"] || ""),
+      inmM2Construidos: String(ctx["inmueble.m2_construidos"] || ""),
+      inmDatosRegistrales: String(ctx["inmueble.datos_registrales"] || ""),
+      inmAnexos: String(ctx["inmueble.anexos"] || ""),
+      inmRefCatastral: String(ctx["inmueble.referencia_catastral"] || ""),
+      cargas: String(ctx.cargas || "Ninguna"),
+      precio: num(ctx.precio),
+      honorariosPct,
+      fechaInicio: today,
+      fechaFin: "",
+      pagoInicial: num(ctx["pago.inicial"]),
+      pagoAmpliacion: num(ctx["pago.ampliacion"]),
+      pagoRestante: num(ctx["pago.restante"]),
+      plazoContrato: today,           // hoy: el contrato privado se firma hoy
+      plazoEscritura: "",              // a rellenar (la propuesta marcó un "plazo.escritura" como string formateado)
+      diasHabiles: "7",
+      notarioNombre: "",
+      notarioCiudad: "Sevilla",
+      notarioFechaEscritura: "",
+      notarioNumProtocolo: "",
+      registroNumero: "",
+      registroCiudad: "Sevilla",
+      ibanVendedor: "",
+      formaPagoAmpliacion: "transferencia bancaria",
+    });
+    toast.success("Contrato pre-rellenado desde la propuesta");
   };
 
   const patch = (partial: Partial<GenForm>) => setForm((f) => (f ? { ...f, ...partial } : f));
@@ -309,6 +432,51 @@ export default function DocumentsManager() {
         ...f.owners.filter((o) => EMAIL_RE.test(o.email)).map((o) => ({ name: o.nombre || "Comprador", email: o.email })),
         ...f.sellers.filter((s) => EMAIL_RE.test(s.email)).map((s) => ({ name: s.nombre || "Vendedor", email: s.email })),
       ];
+      // Guardar snapshots completos para que un futuro CONTRATO pueda autorrellenar partes.
+      (ctx as any).__owners = f.owners;
+      (ctx as any).__sellers = f.sellers;
+      return { ctx, recipients };
+    }
+
+    // ── Contrato privado de compraventa ──
+    if (f.kind === "contrato") {
+      const vendedoresFull = f.sellers
+        .filter((s) => s.nombre.trim())
+        .map((s, i) => `${i === 0 ? "De una parte (La Parte Vendedora):" : ""} D./Dña. ${s.nombre}${s.nif ? `, NIF ${s.nif}` : ""}, mayor de edad.`)
+        .join("\n") || "________";
+
+      const compradores = f.owners
+        .filter((o) => o.nombre.trim())
+        .map((o, i) => `${i === 0 ? "De otra parte (La Parte Compradora):" : ""} D./Dña. ${o.nombre}${o.dni ? `, NIF ${o.dni}` : ""}, mayor de edad${o.direccion ? `, con domicilio en ${o.direccion}` : ""}.`)
+        .join("\n") || "________";
+
+      const totalEntregado = (Number(f.pagoInicial) || 0) + (Number(f.pagoAmpliacion) || 0);
+
+      Object.assign(ctx, {
+        vendedores_full: vendedoresFull,
+        compradores,
+        "pago.inicial": fmtEuro(f.pagoInicial),
+        "pago.ampliacion": fmtEuro(f.pagoAmpliacion),
+        "pago.restante": fmtEuro(f.pagoRestante),
+        total_entregado: totalEntregado > 0 ? `${totalEntregado.toLocaleString("es-ES")} €` : "________",
+        "plazo.escritura": fmtDate(f.plazoEscritura),
+        "notario.nombre": f.notarioNombre || "________",
+        "notario.ciudad": f.notarioCiudad || "Sevilla",
+        "notario.fecha_escritura": fmtDate(f.notarioFechaEscritura),
+        "notario.num_protocolo": f.notarioNumProtocolo || "________",
+        "registro.numero": f.registroNumero || "________",
+        "registro.ciudad": f.registroCiudad || "Sevilla",
+        iban_vendedor: f.ibanVendedor || "________",
+        forma_pago_ampliacion: f.formaPagoAmpliacion || "transferencia bancaria",
+        honorarios_pct: Number(f.honorariosPct) > 0 ? String(Number(f.honorariosPct)) : "________",
+      });
+
+      // Firmantes: vendedores + compradores + asesor (Álvaro firma como mediador).
+      const recipients = [
+        ...f.sellers.filter((s) => EMAIL_RE.test(s.email)).map((s) => ({ name: s.nombre || "Vendedor", email: s.email })),
+        ...f.owners.filter((o) => EMAIL_RE.test(o.email)).map((o) => ({ name: o.nombre || "Comprador", email: o.email })),
+        { name: "Álvaro López Cuevas", email: "info@tuasesoralvaro.com" },
+      ];
       return { ctx, recipients };
     }
 
@@ -329,19 +497,21 @@ export default function DocumentsManager() {
     const template = templates.find((t) => t.id === form.templateId);
     const lead = sellerLeads.find((l) => l.id === form.leadId);
     if (!template) return toast.error("Plantilla no encontrada");
-    if (!form.owners.some((o) => o.nombre.trim())) return toast.error(form.kind === "propuesta" ? "Indica al menos un comprador" : "Indica al menos un propietario");
-    if (form.kind === "propuesta" && !form.sellers.some((s) => s.nombre.trim())) return toast.error("Indica al menos un vendedor");
+    if (!form.owners.some((o) => o.nombre.trim())) return toast.error(form.kind === "nota" ? "Indica al menos un propietario" : "Indica al menos un comprador");
+    if ((form.kind === "propuesta" || form.kind === "contrato") && !form.sellers.some((s) => s.nombre.trim())) return toast.error("Indica al menos un vendedor");
 
     const { ctx, recipients } = flattenForm(form);
     const text = mergeBody(template.body, ctx);
     const clientLabel = form.owners[0]?.nombre || (form.kind === "propuesta" ? "El comprador" : "La parte vendedora");
+    const sellerName = form.sellers?.[0]?.nombre;
+    const buyerName = form.owners?.[0]?.nombre;
     const html = renderBrandedHtml(
       {
         title: template.name,
         lugar: ctx.lugar,
         fecha: ctx.fecha,
         clientLabel,
-        ...docLayout(template.category, clientLabel),
+        ...docLayout(template.category, clientLabel, { sellerName, buyerName }),
       },
       text,
     );
@@ -424,13 +594,15 @@ export default function DocumentsManager() {
     const ctx = (gd.merged_data || {}) as Record<string, string>;
     const text = mergeBody(tpl.body, ctx);
     const clientLabel = ctx["comprador.nombre"] || ctx["vendedor.nombre"] || "La parte firmante";
+    const sellerName = (gd.merged_data as any)?.__sellers?.[0]?.nombre || ctx["vendedor.nombre"];
+    const buyerName = (gd.merged_data as any)?.__owners?.[0]?.nombre || ctx["comprador.nombre"];
     const html = renderBrandedHtml(
       {
         title: tpl.name,
         lugar: ctx.lugar,
         fecha: ctx.fecha,
         clientLabel,
-        ...docLayout(tpl.category, clientLabel),
+        ...docLayout(tpl.category, clientLabel, { sellerName, buyerName }),
       },
       text,
     );
@@ -508,7 +680,7 @@ export default function DocumentsManager() {
         <div className="space-y-6">
           <div className="bg-slate-900/40 border border-[#FBBF24]/20 rounded-2xl p-5 space-y-4">
             <div className="flex items-center gap-2 text-[#FBBF24] font-bold text-xs uppercase tracking-widest">
-              <Sparkles size={16} /> Generar desde lead vendedor
+              <Sparkles size={16} /> Generar documento
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -521,27 +693,72 @@ export default function DocumentsManager() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className={labelCls}>Lead vendedor</label>
-                <select value={genLeadId} onChange={(e) => setGenLeadId(e.target.value)} className={inputCls}>
-                  {sellerLeads.length === 0 && <option value="">Sin leads vendedores</option>}
-                  {sellerLeads.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}{l.preferences?.property_address ? ` — ${l.preferences.property_address}` : ""}</option>
-                  ))}
-                </select>
-              </div>
+              {(() => {
+                const sel = templates.find((t) => t.id === genTemplateId);
+                const isContract = sel ? detectKind(sel) === "contrato" : false;
+                if (isContract) {
+                  // Para contrato: elegir una PROPUESTA generada como origen.
+                  const proposalTplIds = templates
+                    .filter((t) => detectKind(t) === "propuesta")
+                    .map((t) => t.id);
+                  const proposals = generated
+                    .filter((g) => proposalTplIds.includes(g.template_id || ""))
+                    .map((g) => {
+                      const lead = sellerLeads.find((l) => l.id === g.seller_lead_id);
+                      const ctx = (g.merged_data || {}) as Record<string, any>;
+                      const buyer = ctx["comprador.nombre"] || "—";
+                      const direccion = ctx["inmueble.direccion"] || lead?.preferences?.property_address || "—";
+                      const fecha = new Date(g.created_at).toLocaleDateString("es-ES");
+                      return { id: g.id, label: `${direccion} · ${buyer} · ${fecha}` };
+                    });
+                  return (
+                    <div>
+                      <label className={labelCls}>Operación a formalizar (propuesta de origen)</label>
+                      <select value={genProposalId} onChange={(e) => setGenProposalId(e.target.value)} className={inputCls}>
+                        <option value="">{proposals.length === 0 ? "No hay propuestas generadas" : "Selecciona una propuesta"}</option>
+                        {proposals.map((p) => (
+                          <option key={p.id} value={p.id}>{p.label}</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-slate-500 mt-1">Se autorrellenarán vendedores, compradores, inmueble, precio, escalera de pagos y honorarios.</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div>
+                    <label className={labelCls}>Lead vendedor</label>
+                    <select value={genLeadId} onChange={(e) => setGenLeadId(e.target.value)} className={inputCls}>
+                      {sellerLeads.length === 0 && <option value="">Sin leads vendedores</option>}
+                      {sellerLeads.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}{l.preferences?.property_address ? ` — ${l.preferences.property_address}` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
             </div>
 
-            <button
-              onClick={openEditor}
-              disabled={templates.length === 0 || sellerLeads.length === 0}
-              className="flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 disabled:opacity-50 text-[#2C3E50] font-extrabold px-5 py-2.5 rounded-xl transition-all active:scale-95"
-            >
-              <FilePlus2 size={16} /> Revisar y completar datos
-            </button>
-            <p className="text-[11px] text-slate-500">
-              Se abrirá una página previa con todos los datos del lead autorrellenados y editables (DNI, dirección, varios propietarios, representación…) antes de generar el contrato.
-            </p>
+            {(() => {
+              const sel = templates.find((t) => t.id === genTemplateId);
+              const isContract = sel ? detectKind(sel) === "contrato" : false;
+              const disabled = templates.length === 0
+                || (isContract ? !genProposalId : sellerLeads.length === 0);
+              const hint = isContract
+                ? "El contrato se autorrellena desde la propuesta. Sólo añadirás los datos notariales (notario, registro, IBAN del vendedor, forma de pago)."
+                : "Se abrirá una página previa con todos los datos del lead autorrellenados y editables antes de generar el documento.";
+              return (
+                <>
+                  <button
+                    onClick={openEditor}
+                    disabled={disabled}
+                    className="flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 disabled:opacity-50 text-[#2C3E50] font-extrabold px-5 py-2.5 rounded-xl transition-all active:scale-95"
+                  >
+                    <FilePlus2 size={16} /> {isContract ? "Pre-rellenar contrato desde propuesta" : "Revisar y completar datos"}
+                  </button>
+                  <p className="text-[11px] text-slate-500">{hint}</p>
+                </>
+              );
+            })()}
           </div>
 
           {/* Documentos generados */}
@@ -647,20 +864,20 @@ export default function DocumentsManager() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] flex items-center gap-2">
-                    <Users size={14} /> {form.kind === "propuesta" ? "Compradores (Proponentes)" : "Propietarios"}
+                    <Users size={14} /> {form.kind === "nota" ? "Propietarios" : (form.kind === "contrato" ? "Compradores" : "Compradores (Proponentes)")}
                   </h4>
                   <button
                     onClick={() => patch({ owners: [...form.owners, emptyOwner()] })}
                     className="flex items-center gap-1.5 text-[11px] font-bold text-[#2C3E50] bg-[#FBBF24] hover:bg-yellow-500 px-2.5 py-1 rounded-lg transition-all"
                   >
-                    <UserPlus size={13} /> {form.kind === "propuesta" ? "Añadir comprador" : "Añadir propietario"}
+                    <UserPlus size={13} /> {form.kind === "nota" ? "Añadir propietario" : "Añadir comprador"}
                   </button>
                 </div>
 
                 {form.owners.map((o, idx) => (
                   <div key={idx} className="bg-[#0F172A]/60 border border-white/5 rounded-xl p-3 space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-bold text-slate-400">{form.kind === "propuesta" ? "Comprador" : "Propietario"} {idx + 1}{idx === 0 ? " (principal)" : ""}</span>
+                      <span className="text-[11px] font-bold text-slate-400">{form.kind === "nota" ? "Propietario" : "Comprador"} {idx + 1}{idx === 0 ? " (principal)" : ""}</span>
                       {form.owners.length > 1 && (
                         <button onClick={() => patch({ owners: form.owners.filter((_, i) => i !== idx) })} className="text-slate-500 hover:text-red-400 p-1">
                           <Trash2 size={13} />
@@ -678,8 +895,8 @@ export default function DocumentsManager() {
                 ))}
               </section>
 
-              {/* VENDEDORES (solo propuesta) */}
-              {form.kind === "propuesta" && (
+              {/* VENDEDORES (propuesta + contrato) */}
+              {(form.kind === "propuesta" || form.kind === "contrato") && (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] flex items-center gap-2">
@@ -745,36 +962,174 @@ export default function DocumentsManager() {
               {/* CONDICIONES */}
               <section className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24]">Condiciones</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className={labelCls}>Precio de venta (€)</label>
-                    <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Honorarios (%)</label>
-                    <input className={inputCls} type="number" step="0.1" placeholder="Ej: 2" value={form.honorariosPct} onChange={(e) => patch({ honorariosPct: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Lugar</label>
-                    <input className={inputCls} value={form.lugar} onChange={(e) => patch({ lugar: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Inicio del encargo</label>
-                    <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaInicio} onChange={(e) => patch({ fechaInicio: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Fin del encargo</label>
-                    <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaFin} onChange={(e) => patch({ fechaFin: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Fecha de firma</label>
-                    <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
-                  </div>
-                </div>
-                {Number(form.precio) > 0 && Number(form.honorariosPct) > 0 && (
-                  <p className="text-[11px] text-emerald-400 font-bold">
-                    Honorarios estimados: {(Number(form.precio) * (Number(form.honorariosPct) / 100)).toLocaleString("es-ES")} € + IVA
-                  </p>
+
+                {form.kind === "contrato" ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-3">
+                        <label className={labelCls}>Precio total (€)</label>
+                        <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>1 · Señal previa (€)</label>
+                        <input className={inputCls} type="number" value={form.pagoInicial} onChange={(e) => patch({ pagoInicial: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>2 · Ampliación arras (€)</label>
+                        <input className={inputCls} type="number" value={form.pagoAmpliacion} onChange={(e) => patch({ pagoAmpliacion: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>3 · Resto en escritura (€)</label>
+                        <input className={inputCls} type="number" value={form.pagoRestante} onChange={(e) => patch({ pagoRestante: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Honorarios asesor (%)</label>
+                        <input className={inputCls} type="number" step="0.1" value={form.honorariosPct} onChange={(e) => patch({ honorariosPct: e.target.value })} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className={labelCls}>IBAN del vendedor (para liberar la señal)</label>
+                        <input className={inputCls} placeholder="ES12 3456 7890 1234 5678 9012" value={form.ibanVendedor} onChange={(e) => patch({ ibanVendedor: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Forma de pago ampliación</label>
+                        <select className={inputCls} value={form.formaPagoAmpliacion} onChange={(e) => patch({ formaPagoAmpliacion: e.target.value })}>
+                          <option value="transferencia bancaria">Transferencia bancaria</option>
+                          <option value="cheque nominativo">Cheque nominativo</option>
+                          <option value="ingreso en efectivo">Ingreso en efectivo</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Límite escritura pública</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.plazoEscritura} onChange={(e) => patch({ plazoEscritura: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Lugar</label>
+                        <input className={inputCls} value={form.lugar} onChange={(e) => patch({ lugar: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Fecha de firma</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
+                      </div>
+                    </div>
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] mt-4">Datos notariales y registrales</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-2">
+                        <label className={labelCls}>Notario de la escritura original</label>
+                        <input className={inputCls} placeholder="D. Nombre Apellido" value={form.notarioNombre} onChange={(e) => patch({ notarioNombre: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Ciudad del notario</label>
+                        <input className={inputCls} value={form.notarioCiudad} onChange={(e) => patch({ notarioCiudad: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Fecha escritura original</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.notarioFechaEscritura} onChange={(e) => patch({ notarioFechaEscritura: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Nº protocolo</label>
+                        <input className={inputCls} value={form.notarioNumProtocolo} onChange={(e) => patch({ notarioNumProtocolo: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Nº Registro de la Propiedad</label>
+                        <input className={inputCls} value={form.registroNumero} onChange={(e) => patch({ registroNumero: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Ciudad del Registro</label>
+                        <input className={inputCls} value={form.registroCiudad} onChange={(e) => patch({ registroCiudad: e.target.value })} />
+                      </div>
+                    </div>
+                    {(() => {
+                      const tot = Number(form.precio) || 0;
+                      const sum = (Number(form.pagoInicial) || 0) + (Number(form.pagoAmpliacion) || 0) + (Number(form.pagoRestante) || 0);
+                      if (tot > 0 && sum > 0 && sum !== tot) {
+                        return <p className="text-[11px] text-amber-400 font-bold">⚠️ La suma de los pagos ({sum.toLocaleString("es-ES")} €) no cuadra con el precio total ({tot.toLocaleString("es-ES")} €).</p>;
+                      }
+                      return null;
+                    })()}
+                  </>
+                ) : form.kind === "nota" ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className={labelCls}>Precio de venta (€)</label>
+                        <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Honorarios (%)</label>
+                        <input className={inputCls} type="number" step="0.1" placeholder="Ej: 2" value={form.honorariosPct} onChange={(e) => patch({ honorariosPct: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Lugar</label>
+                        <input className={inputCls} value={form.lugar} onChange={(e) => patch({ lugar: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Inicio del encargo</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaInicio} onChange={(e) => patch({ fechaInicio: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Fin del encargo</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaFin} onChange={(e) => patch({ fechaFin: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Fecha de firma</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
+                      </div>
+                    </div>
+                    {Number(form.precio) > 0 && Number(form.honorariosPct) > 0 && (
+                      <p className="text-[11px] text-emerald-400 font-bold">
+                        Honorarios estimados: {(Number(form.precio) * (Number(form.honorariosPct) / 100)).toLocaleString("es-ES")} € + IVA
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-3">
+                        <label className={labelCls}>Precio total propuesto (€)</label>
+                        <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>1 · Señal inicial (€)</label>
+                        <input className={inputCls} type="number" placeholder="A la firma / custodia" value={form.pagoInicial} onChange={(e) => patch({ pagoInicial: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>2 · Ampliación arras (€)</label>
+                        <input className={inputCls} type="number" placeholder="En contrato privado" value={form.pagoAmpliacion} onChange={(e) => patch({ pagoAmpliacion: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>3 · Resto (€)</label>
+                        <input className={inputCls} type="number" placeholder="En escritura" value={form.pagoRestante} onChange={(e) => patch({ pagoRestante: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Límite contrato privado</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.plazoContrato} onChange={(e) => patch({ plazoContrato: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Límite escritura pública</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.plazoEscritura} onChange={(e) => patch({ plazoEscritura: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Días hábiles para aceptar</label>
+                        <input className={inputCls} type="number" value={form.diasHabiles} onChange={(e) => patch({ diasHabiles: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Lugar</label>
+                        <input className={inputCls} value={form.lugar} onChange={(e) => patch({ lugar: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Fecha de firma</label>
+                        <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
+                      </div>
+                    </div>
+                    {(() => {
+                      const tot = Number(form.precio) || 0;
+                      const sum = (Number(form.pagoInicial) || 0) + (Number(form.pagoAmpliacion) || 0) + (Number(form.pagoRestante) || 0);
+                      if (tot > 0 && sum > 0 && sum !== tot) {
+                        return <p className="text-[11px] text-amber-400 font-bold">⚠️ La suma de los pagos ({sum.toLocaleString("es-ES")} €) no cuadra con el precio total ({tot.toLocaleString("es-ES")} €).</p>;
+                      }
+                      return null;
+                    })()}
+                  </>
                 )}
               </section>
 
