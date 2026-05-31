@@ -4,6 +4,26 @@
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
 ## 📥 Peticiones Pendientes
+- ⏸️ **Documenso "Enviar a firmar"**: bloqueado por el límite mensual del plan GRATIS (consumido con pruebas de diagnóstico el 2026-05-30). Resuelto al pagar plan PRO el 2026-06-01. El código y los 4 workflows ya están listos para producción.
+
+## ✅ Workflows n8n — HSM templates cableadas [2026-05-31]
+Las 3 plantillas de Meta están **APROBADAS** (`bienvenida_nuevo_lead`, `nueva_propiedad_match`, `seguimiento_lead`, idioma `es`, categoría Marketing). Se actualizaron los 3 workflows de producción para enviar con `type:"template"` (supera la ventana 24h de Meta; antes fallaban siempre con código 131047).
+
+- `VnXhrEh2G8AeR0DT` **Seguimiento Leads Diario** → plantilla `seguimiento_lead` (1 var: lead_name).
+- `QikfXMJumWbpI3wL` **Notificacion Nuevo Lead** → plantilla `bienvenida_nuevo_lead` (2 vars: lead_name, location|"Sevilla").
+- `6E0AP0gqLUliPQtN` **Difusion Inteligente** → plantilla `nueva_propiedad_match` (7 vars en orden: nombre, título, dirección, precio_str, planta+ascensor, m²_str, habitaciones_str). El nodo "Separar Destinatarios" construye `property_floor_elevator` desde `floor`+`elevator`; si `floor` está vacío usa fallback "con ascensor"/"sin ascensor".
+- Endpoint `/api/n8n/diffusion/route.ts` actualizado para incluir `floor` y `elevator` en el payload (nuevos campos en `richPayload.property`).
+
+### ✅ Nuevo workflow `X2qbhCUWngf9qmJI` "Enviar Documento a Firmar (Documenso)"
+Webhook `POST /webhook/send-to-sign` recibe `{generatedDocumentId, advisorPhone?, docLabel?}` → llama a `/api/documents/send` del CRM (cableado con Documenso API v1 + campo de firma) → notifica a Álvaro por WhatsApp del éxito o del error. Sirve para los 6 tipos de documento (nota, propuesta, contrato, ficha, kyc, visita). Ya activo.
+
+**Verificación rechazada por Meta**: no afecta a estos workflows. Sólo bloquea el tier >1000 conversaciones/día y la tilde verde. Por debajo de ese tier el envío de plantillas aprobadas funciona normalmente.
+
+## ✅ Peticiones Completadas
+
+### ⏸️ ARCHIVADO — Workflows n8n por política 24h de Meta
+> Resuelto el 2026-05-31 al usar plantillas HSM aprobadas. Ver sección anterior.
+
 - ⏳ **Workflows n8n fallan en producción por política de 24h de Meta.** Test end-to-end del workflow `Notificacion Nuevo Lead` confirmó que Meta acepta el API call (200 OK con `wamid`) pero después marca `status: failed` con código `131047` "Re-engagement message" porque el destinatario está fuera de la ventana de 24h. Afecta a los 3 workflows (Bienvenida, Difusión, Seguimiento) — todos envían texto libre a destinatarios que típicamente no han escrito al bot recientemente. **Solución:** crear plantillas HSM aprobadas en Meta Business Manager y cambiar los workflows a `type: "template"`. Plantillas EN CREACIÓN por Álvaro al 2026-05-27.
   - **Nombres de plantilla acordados (usar EXACTAMENTE estos al cablear los workflows):**
     - `bienvenida_nuevo_lead` (MARKETING — Meta clasifica los mensajes de bienvenida como Marketing, NO Utility) → workflow `Notificacion Nuevo Lead` / nodo `WhatsApp Bienvenida`. Params: {{1}}=nombre, {{2}}=zona.

@@ -183,7 +183,11 @@ export async function POST(request: NextRequest) {
         address: property.features?.address,
         rooms: property.features?.rooms,
         baths: property.features?.baths,
-        sqm: property.features?.sqm
+        sqm: property.features?.sqm,
+        // Añadidos 2026-05-31 para alimentar la variable {{5}} (planta+ascensor)
+        // de la plantilla HSM `nueva_propiedad_match`.
+        floor: property.features?.floor,
+        elevator: property.features?.elevator,
       },
       filters: {
         priceMargin: price_margin,
