@@ -68,7 +68,7 @@ interface GenForm {
    *  compraventa (owners=compradores/proponentes + sellers=vendedores).
    *  "contrato" = Contrato privado (mismo modelo de partes que propuesta, con
    *  campos notariales adicionales; se pre-rellena desde una propuesta origen). */
-  kind: "nota" | "propuesta" | "contrato";
+  kind: "nota" | "propuesta" | "contrato" | "comprador";
   /** Sólo en contrato: id de la propuesta de origen que pre-rellenó el form. */
   sourceProposalId?: string;
   templateId: string;
@@ -98,6 +98,28 @@ interface GenForm {
   pagoInicial: string;
   pagoAmpliacion: string;
   pagoRestante: string;
+  // ── Documentos del comprador (Ficha 218/2005, KYC, Visita) ──
+  /** "ficha" | "kyc" | "visita" — sub-tipo del kind "comprador". */
+  buyerDocType?: "ficha" | "kyc" | "visita" | "";
+  // Ficha Informativa (Decreto 218/2005)
+  cuotaComunidad: string;
+  anyoConstruccion: string;
+  certLetra: string;
+  certConsumo: string;
+  certEmisiones: string;
+  fechaNotaSimple: string;
+  itpPct: string;
+  gastosNotariaPct: string;
+  // KYC (Ley 10/2010)
+  actividadProfesional: string;
+  titularidadTipo: "propia" | "tercero";
+  titularidadTerceroDetalle: string;
+  prpFlag: "no" | "si";
+  prpCargo: string;
+  origenFondos: "ahorros" | "hipoteca" | "venta_patrimonio" | "herencia" | "otros";
+  origenOtrosDetalle: string;
+  // Parte de Visita
+  fechaVisita: string;
   plazoContrato: string; // YYYY-MM-DD
   plazoEscritura: string; // YYYY-MM-DD
   diasHabiles: string;
@@ -188,7 +210,17 @@ export default function DocumentsManager() {
     const nam = template.name.toLowerCase();
     if (cat.includes("contrato") || nam.includes("contrato privado")) return "contrato";
     if (cat.includes("propuesta") || nam.includes("propuesta")) return "propuesta";
+    if (cat.includes("ficha") || cat.includes("kyc") || cat.includes("pbc") || cat.includes("titularidad") || cat.includes("visita")) return "comprador";
     return "nota";
+  };
+
+  /** Sub-tipo de documento del comprador (sirve para mostrar la sección correcta del form). */
+  const detectBuyerDocType = (template: DocumentTemplate): "ficha" | "kyc" | "visita" | "" => {
+    const c = `${template.category} ${template.name}`.toLowerCase();
+    if (c.includes("ficha")) return "ficha";
+    if (c.includes("visita")) return "visita";
+    if (c.includes("kyc") || c.includes("pbc") || c.includes("titularidad")) return "kyc";
+    return "";
   };
 
   // ─── PASO 1 → 2: abrir la página previa con datos autorrellenados ────────
@@ -198,6 +230,7 @@ export default function DocumentsManager() {
 
     const kind = detectKind(template);
     if (kind === "contrato") return openEditorFromProposal(template);
+    if (kind === "comprador") return openEditorBuyerDoc(template);
 
     const lead = sellerLeads.find((l) => l.id === genLeadId);
     if (!lead) return toast.error("Selecciona un lead vendedor");
@@ -256,6 +289,23 @@ export default function DocumentsManager() {
       registroCiudad: "Sevilla",
       ibanVendedor: "",
       formaPagoAmpliacion: "transferencia bancaria",
+      buyerDocType: "",
+      cuotaComunidad: "",
+      anyoConstruccion: "",
+      certLetra: "",
+      certConsumo: "",
+      certEmisiones: "",
+      fechaNotaSimple: "",
+      itpPct: "7",
+      gastosNotariaPct: "1.5",
+      actividadProfesional: "",
+      titularidadTipo: "propia",
+      titularidadTerceroDetalle: "",
+      prpFlag: "no",
+      prpCargo: "",
+      origenFondos: "ahorros",
+      origenOtrosDetalle: "",
+      fechaVisita: "",
     });
   };
 
@@ -342,8 +392,103 @@ export default function DocumentsManager() {
       registroCiudad: "Sevilla",
       ibanVendedor: "",
       formaPagoAmpliacion: "transferencia bancaria",
+      buyerDocType: "",
+      cuotaComunidad: "",
+      anyoConstruccion: "",
+      certLetra: "",
+      certConsumo: "",
+      certEmisiones: "",
+      fechaNotaSimple: "",
+      itpPct: "7",
+      gastosNotariaPct: "1.5",
+      actividadProfesional: "",
+      titularidadTipo: "propia",
+      titularidadTerceroDetalle: "",
+      prpFlag: "no",
+      prpCargo: "",
+      origenFondos: "ahorros",
+      origenOtrosDetalle: "",
+      fechaVisita: "",
     });
     toast.success("Contrato pre-rellenado desde la propuesta");
+  };
+
+  /**
+   * Apertura para DOCUMENTOS DEL COMPRADOR (Ficha 218/2005, KYC, Parte de Visita).
+   * Soporta dos orígenes:
+   *   - Si hay `genProposalId` → autorrelleno desde propuesta (compradores + inmueble + precio).
+   *   - Si no → arranca en blanco (sólo se prefija el lead vendedor si se eligió).
+   */
+  const openEditorBuyerDoc = (template: DocumentTemplate) => {
+    const sub = detectBuyerDocType(template);
+    const today = new Date().toISOString().slice(0, 10);
+    const propId = genProposalId;
+    const proposal = propId ? generated.find((g) => g.id === propId) : undefined;
+    const lead = sellerLeads.find((l) => l.id === (proposal?.seller_lead_id || genLeadId));
+    const ctx = (proposal?.merged_data || {}) as Record<string, any>;
+    const num = (s: any) => String(s ?? "").replace(/[^\d]/g, "");
+
+    // Comprador (firmante): de los __owners de la propuesta, o vacío.
+    const owners: OwnerInput[] = Array.isArray(ctx.__owners) && ctx.__owners.length > 0
+      ? ctx.__owners
+      : [{
+          nombre: String(ctx["comprador.nombre"] || ""),
+          dni: "",
+          telefono: "",
+          email: String(ctx["comprador.email"] || ""),
+          direccion: "",
+        }];
+
+    setForm({
+      kind: "comprador",
+      sourceProposalId: propId,
+      templateId: template.id,
+      leadId: lead?.id ?? "",
+      buyerId: "",
+      lugar: String(ctx.lugar || "Sevilla"),
+      fecha: today,
+      owners,
+      sellers: [],
+      repEnabled: false,
+      repNombre: "",
+      repDni: "",
+      repCalidad: "",
+      inmDireccion: String(ctx["inmueble.direccion"] || lead?.preferences?.property_address || ""),
+      inmTipo: String(ctx["inmueble.tipo"] || lead?.preferences?.property_type || ""),
+      inmM2: String(ctx["inmueble.m2"] || lead?.preferences?.sqm || ""),
+      inmM2Construidos: String(ctx["inmueble.m2_construidos"] || ""),
+      inmDatosRegistrales: String(ctx["inmueble.datos_registrales"] || ""),
+      inmAnexos: String(ctx["inmueble.anexos"] || ""),
+      inmRefCatastral: String(ctx["inmueble.referencia_catastral"] || ""),
+      cargas: String(ctx.cargas || "Ninguna"),
+      precio: num(ctx.precio),
+      honorariosPct: String(ctx.honorarios_pct ?? "2"),
+      fechaInicio: today,
+      fechaFin: "",
+      pagoInicial: "", pagoAmpliacion: "", pagoRestante: "",
+      plazoContrato: "", plazoEscritura: "", diasHabiles: "7",
+      notarioNombre: "", notarioCiudad: "Sevilla", notarioFechaEscritura: "",
+      notarioNumProtocolo: "", registroNumero: "", registroCiudad: "Sevilla",
+      ibanVendedor: "", formaPagoAmpliacion: "transferencia bancaria",
+      buyerDocType: sub,
+      cuotaComunidad: "",
+      anyoConstruccion: "",
+      certLetra: "",
+      certConsumo: "",
+      certEmisiones: "",
+      fechaNotaSimple: today,
+      itpPct: "7",
+      gastosNotariaPct: "1.5",
+      actividadProfesional: "",
+      titularidadTipo: "propia",
+      titularidadTerceroDetalle: "",
+      prpFlag: "no",
+      prpCargo: "",
+      origenFondos: "ahorros",
+      origenOtrosDetalle: "",
+      fechaVisita: today,
+    });
+    if (proposal) toast.success("Datos pre-rellenados desde la propuesta");
   };
 
   const patch = (partial: Partial<GenForm>) => setForm((f) => (f ? { ...f, ...partial } : f));
@@ -480,6 +625,58 @@ export default function DocumentsManager() {
       return { ctx, recipients };
     }
 
+    // ── Documentos del comprador (Ficha 218/2005 · KYC · Parte de Visita) ──
+    if (f.kind === "comprador") {
+      const buyer = f.owners[0] || emptyOwner();
+      const mark = (sel: boolean) => (sel ? "[X]" : "[ ]");
+      const fmtMoney = (n: number) => (n > 0 ? `${Math.round(n).toLocaleString("es-ES")} €` : "________");
+      const price = Number(f.precio) || 0;
+      const itp = price * ((Number(f.itpPct) || 0) / 100);
+      const gastos = price * ((Number(f.gastosNotariaPct) || 0) / 100);
+      const total = price + itp + gastos;
+
+      Object.assign(ctx, {
+        "comprador.nombre": buyer.nombre || "________",
+        "comprador.dni": buyer.dni || "________",
+        "comprador.email": buyer.email || "________",
+        // Ficha Informativa 218/2005
+        cuota_comunidad: f.cuotaComunidad || "________",
+        anyo_construccion: f.anyoConstruccion || "________",
+        "cert.letra": f.certLetra || "________",
+        "cert.consumo": f.certConsumo || "________",
+        "cert.emisiones": f.certEmisiones || "________",
+        fecha_nota_simple: fmtDate(f.fechaNotaSimple),
+        itp_pct: f.itpPct || "________",
+        itp_importe: fmtMoney(itp),
+        gastos_notaria_registro: fmtMoney(gastos),
+        total_estimado_comprador: fmtMoney(total),
+        "registro.ciudad": f.registroCiudad || "Sevilla",
+        // KYC
+        actividad_profesional: f.actividadProfesional || "________",
+        titularidad_propia: mark(f.titularidadTipo === "propia"),
+        titularidad_tercero: mark(f.titularidadTipo === "tercero"),
+        titularidad_tercero_detalle: f.titularidadTerceroDetalle || "________",
+        prp_no: mark(f.prpFlag === "no"),
+        prp_si: mark(f.prpFlag === "si"),
+        prp_cargo: f.prpCargo || "________",
+        origen_ahorros: mark(f.origenFondos === "ahorros"),
+        origen_hipoteca: mark(f.origenFondos === "hipoteca"),
+        origen_venta_patrimonio: mark(f.origenFondos === "venta_patrimonio"),
+        origen_herencia: mark(f.origenFondos === "herencia"),
+        origen_otros: mark(f.origenFondos === "otros"),
+        origen_otros_detalle: f.origenOtrosDetalle || "________",
+        // Parte de Visita
+        fecha_visita: fmtDate(f.fechaVisita),
+        // Heredados ya en ctx por la rama común: precio, inmueble.*, honorarios_pct
+      });
+
+      // Firmantes: sólo el comprador/visitante con email válido.
+      const recipients = EMAIL_RE.test(buyer.email)
+        ? [{ name: buyer.nombre || "Comprador", email: buyer.email }]
+        : [];
+      return { ctx, recipients };
+    }
+
     // ── Nota de encargo: firmantes = propietarios con email válido ──
     const recipients = f.owners
       .filter((o) => EMAIL_RE.test(o.email))
@@ -497,7 +694,12 @@ export default function DocumentsManager() {
     const template = templates.find((t) => t.id === form.templateId);
     const lead = sellerLeads.find((l) => l.id === form.leadId);
     if (!template) return toast.error("Plantilla no encontrada");
-    if (!form.owners.some((o) => o.nombre.trim())) return toast.error(form.kind === "nota" ? "Indica al menos un propietario" : "Indica al menos un comprador");
+    if (!form.owners.some((o) => o.nombre.trim())) {
+      const label = form.kind === "nota" ? "propietario"
+        : form.kind === "comprador" && form.buyerDocType === "visita" ? "visitante"
+        : "comprador";
+      return toast.error(`Indica al menos un ${label}`);
+    }
     if ((form.kind === "propuesta" || form.kind === "contrato") && !form.sellers.some((s) => s.nombre.trim())) return toast.error("Indica al menos un vendedor");
 
     const { ctx, recipients } = flattenForm(form);
@@ -695,35 +897,45 @@ export default function DocumentsManager() {
               </div>
               {(() => {
                 const sel = templates.find((t) => t.id === genTemplateId);
-                const isContract = sel ? detectKind(sel) === "contrato" : false;
-                if (isContract) {
-                  // Para contrato: elegir una PROPUESTA generada como origen.
-                  const proposalTplIds = templates
-                    .filter((t) => detectKind(t) === "propuesta")
-                    .map((t) => t.id);
-                  const proposals = generated
-                    .filter((g) => proposalTplIds.includes(g.template_id || ""))
-                    .map((g) => {
-                      const lead = sellerLeads.find((l) => l.id === g.seller_lead_id);
-                      const ctx = (g.merged_data || {}) as Record<string, any>;
-                      const buyer = ctx["comprador.nombre"] || "—";
-                      const direccion = ctx["inmueble.direccion"] || lead?.preferences?.property_address || "—";
-                      const fecha = new Date(g.created_at).toLocaleDateString("es-ES");
-                      return { id: g.id, label: `${direccion} · ${buyer} · ${fecha}` };
-                    });
+                const kind = sel ? detectKind(sel) : "nota";
+                // Listado de propuestas (para contrato y para documentos del comprador con autorrelleno opcional).
+                const proposalTplIds = templates.filter((t) => detectKind(t) === "propuesta").map((t) => t.id);
+                const proposals = generated.filter((g) => proposalTplIds.includes(g.template_id || "")).map((g) => {
+                  const lead = sellerLeads.find((l) => l.id === g.seller_lead_id);
+                  const ctx = (g.merged_data || {}) as Record<string, any>;
+                  const buyer = ctx["comprador.nombre"] || "—";
+                  const direccion = ctx["inmueble.direccion"] || lead?.preferences?.property_address || "—";
+                  const fecha = new Date(g.created_at).toLocaleDateString("es-ES");
+                  return { id: g.id, label: `${direccion} · ${buyer} · ${fecha}` };
+                });
+
+                if (kind === "contrato") {
                   return (
                     <div>
                       <label className={labelCls}>Operación a formalizar (propuesta de origen)</label>
                       <select value={genProposalId} onChange={(e) => setGenProposalId(e.target.value)} className={inputCls}>
                         <option value="">{proposals.length === 0 ? "No hay propuestas generadas" : "Selecciona una propuesta"}</option>
-                        {proposals.map((p) => (
-                          <option key={p.id} value={p.id}>{p.label}</option>
-                        ))}
+                        {proposals.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
                       </select>
                       <p className="text-[10px] text-slate-500 mt-1">Se autorrellenarán vendedores, compradores, inmueble, precio, escalera de pagos y honorarios.</p>
                     </div>
                   );
                 }
+
+                if (kind === "comprador") {
+                  // Para Ficha/KYC/Visita: opcional elegir una propuesta como origen del autorrelleno.
+                  return (
+                    <div>
+                      <label className={labelCls}>Propuesta de origen <span className="text-slate-500 font-normal">(opcional, autorrellena los datos)</span></label>
+                      <select value={genProposalId} onChange={(e) => setGenProposalId(e.target.value)} className={inputCls}>
+                        <option value="">— Generar en blanco —</option>
+                        {proposals.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
+                      </select>
+                      <p className="text-[10px] text-slate-500 mt-1">Si la eliges, se pre-rellena comprador, inmueble y precio. Si no, parte en blanco.</p>
+                    </div>
+                  );
+                }
+
                 return (
                   <div>
                     <label className={labelCls}>Lead vendedor</label>
@@ -740,12 +952,19 @@ export default function DocumentsManager() {
 
             {(() => {
               const sel = templates.find((t) => t.id === genTemplateId);
-              const isContract = sel ? detectKind(sel) === "contrato" : false;
+              const kind = sel ? detectKind(sel) : "nota";
               const disabled = templates.length === 0
-                || (isContract ? !genProposalId : sellerLeads.length === 0);
-              const hint = isContract
-                ? "El contrato se autorrellena desde la propuesta. Sólo añadirás los datos notariales (notario, registro, IBAN del vendedor, forma de pago)."
-                : "Se abrirá una página previa con todos los datos del lead autorrellenados y editables antes de generar el documento.";
+                || (kind === "contrato" ? !genProposalId : kind === "nota" || kind === "propuesta" ? sellerLeads.length === 0 : false);
+              const hint =
+                kind === "contrato"
+                  ? "El contrato se autorrellena desde la propuesta. Sólo añadirás los datos notariales (notario, registro, IBAN del vendedor, forma de pago)."
+                  : kind === "comprador"
+                    ? "Documento del comprador. Si has elegido una propuesta, se autorrellenan comprador e inmueble. Sólo añadirás los datos específicos del documento (ITP, cert. energética, KYC, fecha visita…)."
+                    : "Se abrirá una página previa con todos los datos del lead autorrellenados y editables antes de generar el documento.";
+              const btnLabel =
+                kind === "contrato" ? "Pre-rellenar contrato desde propuesta"
+                : kind === "comprador" ? "Preparar documento"
+                : "Revisar y completar datos";
               return (
                 <>
                   <button
@@ -753,7 +972,7 @@ export default function DocumentsManager() {
                     disabled={disabled}
                     className="flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 disabled:opacity-50 text-[#2C3E50] font-extrabold px-5 py-2.5 rounded-xl transition-all active:scale-95"
                   >
-                    <FilePlus2 size={16} /> {isContract ? "Pre-rellenar contrato desde propuesta" : "Revisar y completar datos"}
+                    <FilePlus2 size={16} /> {btnLabel}
                   </button>
                   <p className="text-[11px] text-slate-500">{hint}</p>
                 </>
@@ -864,7 +1083,13 @@ export default function DocumentsManager() {
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] flex items-center gap-2">
-                    <Users size={14} /> {form.kind === "nota" ? "Propietarios" : (form.kind === "contrato" ? "Compradores" : "Compradores (Proponentes)")}
+                    <Users size={14} /> {
+                      form.kind === "nota" ? "Propietarios"
+                      : form.kind === "comprador" && form.buyerDocType === "visita" ? "Visitante (firmante)"
+                      : form.kind === "comprador" ? "Comprador (firmante)"
+                      : form.kind === "contrato" ? "Compradores"
+                      : "Compradores (Proponentes)"
+                    }
                   </h4>
                   <button
                     onClick={() => patch({ owners: [...form.owners, emptyOwner()] })}
@@ -963,7 +1188,152 @@ export default function DocumentsManager() {
               <section className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24]">Condiciones</h4>
 
-                {form.kind === "contrato" ? (
+                {form.kind === "comprador" ? (
+                  <>
+                    {form.buyerDocType === "ficha" && (
+                      <>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24]">Ficha del inmueble (Decreto 218/2005)</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className={labelCls}>Año construcción</label>
+                            <input className={inputCls} type="number" placeholder="1985" value={form.anyoConstruccion} onChange={(e) => patch({ anyoConstruccion: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Cuota Comunidad (%)</label>
+                            <input className={inputCls} placeholder="1,25" value={form.cuotaComunidad} onChange={(e) => patch({ cuotaComunidad: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Fecha Nota Simple</label>
+                            <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaNotaSimple} onChange={(e) => patch({ fechaNotaSimple: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Cert. Energética: Letra</label>
+                            <select className={inputCls} value={form.certLetra} onChange={(e) => patch({ certLetra: e.target.value })}>
+                              <option value="">—</option>
+                              {["A","B","C","D","E","F","G"].map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelCls}>Consumo (kWh/m²)</label>
+                            <input className={inputCls} value={form.certConsumo} onChange={(e) => patch({ certConsumo: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Emisiones (kgCO₂/m²)</label>
+                            <input className={inputCls} value={form.certEmisiones} onChange={(e) => patch({ certEmisiones: e.target.value })} />
+                          </div>
+                        </div>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24] mt-4">Precio y desglose para el comprador</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="sm:col-span-3">
+                            <label className={labelCls}>Precio de venta (€)</label>
+                            <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>ITP (%) <span className="text-slate-500 font-normal">— Andalucía 7%</span></label>
+                            <input className={inputCls} type="number" step="0.1" value={form.itpPct} onChange={(e) => patch({ itpPct: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Notaría+Registro estimado (%) <span className="text-slate-500 font-normal">— ~1,5%</span></label>
+                            <input className={inputCls} type="number" step="0.1" value={form.gastosNotariaPct} onChange={(e) => patch({ gastosNotariaPct: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Fecha de firma</label>
+                            <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
+                          </div>
+                        </div>
+                        {Number(form.precio) > 0 && (
+                          <p className="text-[11px] text-emerald-400 font-bold">
+                            ITP estimado: {(Number(form.precio) * (Number(form.itpPct) || 0) / 100).toLocaleString("es-ES", { maximumFractionDigits: 0 })} € · Notaría+Registro: {(Number(form.precio) * (Number(form.gastosNotariaPct) || 0) / 100).toLocaleString("es-ES", { maximumFractionDigits: 0 })} € · <span className="text-amber-300">TOTAL comprador: {(Number(form.precio) * (1 + (Number(form.itpPct) || 0) / 100 + (Number(form.gastosNotariaPct) || 0) / 100)).toLocaleString("es-ES", { maximumFractionDigits: 0 })} €</span>
+                          </p>
+                        )}
+                      </>
+                    )}
+
+                    {form.buyerDocType === "kyc" && (
+                      <>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24]">Datos KYC del comprador (Ley 10/2010)</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className={labelCls}>Actividad profesional</label>
+                            <input className={inputCls} placeholder="Funcionario / Asalariado / Empresario…" value={form.actividadProfesional} onChange={(e) => patch({ actividadProfesional: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Fecha de firma</label>
+                            <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-white/5 rounded-xl p-3 space-y-2 mt-2">
+                          <label className="text-[11px] font-bold text-slate-400">Titularidad real</label>
+                          <div className="flex flex-wrap gap-3 text-sm">
+                            <label className="flex items-center gap-2"><input type="radio" name="tit" className="accent-[#FBBF24]" checked={form.titularidadTipo === "propia"} onChange={() => patch({ titularidadTipo: "propia" })} /> Por cuenta propia</label>
+                            <label className="flex items-center gap-2"><input type="radio" name="tit" className="accent-[#FBBF24]" checked={form.titularidadTipo === "tercero"} onChange={() => patch({ titularidadTipo: "tercero" })} /> Por cuenta de un tercero</label>
+                          </div>
+                          {form.titularidadTipo === "tercero" && (
+                            <input className={inputCls} placeholder="Nombre y NIF del tercero" value={form.titularidadTerceroDetalle} onChange={(e) => patch({ titularidadTerceroDetalle: e.target.value })} />
+                          )}
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-white/5 rounded-xl p-3 space-y-2">
+                          <label className="text-[11px] font-bold text-slate-400">Persona con Responsabilidad Pública (PRP)</label>
+                          <div className="flex flex-wrap gap-3 text-sm">
+                            <label className="flex items-center gap-2"><input type="radio" name="prp" className="accent-[#FBBF24]" checked={form.prpFlag === "no"} onChange={() => patch({ prpFlag: "no" })} /> NO desempeña</label>
+                            <label className="flex items-center gap-2"><input type="radio" name="prp" className="accent-[#FBBF24]" checked={form.prpFlag === "si"} onChange={() => patch({ prpFlag: "si" })} /> SÍ desempeña</label>
+                          </div>
+                          {form.prpFlag === "si" && (
+                            <input className={inputCls} placeholder="Cargo público" value={form.prpCargo} onChange={(e) => patch({ prpCargo: e.target.value })} />
+                          )}
+                        </div>
+
+                        <div className="bg-slate-900/40 border border-white/5 rounded-xl p-3 space-y-2">
+                          <label className="text-[11px] font-bold text-slate-400">Origen de los fondos</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm">
+                            {[
+                              { v: "ahorros", l: "Ahorros de rentas del trabajo" },
+                              { v: "hipoteca", l: "Financiación hipotecaria" },
+                              { v: "venta_patrimonio", l: "Venta de patrimonio propio" },
+                              { v: "herencia", l: "Herencia o donación" },
+                              { v: "otros", l: "Otros" },
+                            ].map(o => (
+                              <label key={o.v} className="flex items-center gap-2"><input type="radio" name="orig" className="accent-[#FBBF24]" checked={form.origenFondos === (o.v as any)} onChange={() => patch({ origenFondos: o.v as any })} /> {o.l}</label>
+                            ))}
+                          </div>
+                          {form.origenFondos === "otros" && (
+                            <input className={inputCls} placeholder="Especificar origen" value={form.origenOtrosDetalle} onChange={(e) => patch({ origenOtrosDetalle: e.target.value })} />
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {form.buyerDocType === "visita" && (
+                      <>
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24]">Datos de la visita</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="sm:col-span-2">
+                            <label className={labelCls}>Fecha de la visita</label>
+                            <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fechaVisita} onChange={(e) => patch({ fechaVisita: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Honorarios protegidos (%)</label>
+                            <input className={inputCls} type="number" step="0.1" value={form.honorariosPct} onChange={(e) => patch({ honorariosPct: e.target.value })} />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className={labelCls}>Precio del inmueble (€) — base de cálculo de la cláusula del 12 m</label>
+                            <input className={inputCls} type="number" value={form.precio} onChange={(e) => patch({ precio: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Lugar</label>
+                            <input className={inputCls} value={form.lugar} onChange={(e) => patch({ lugar: e.target.value })} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Fecha de firma</label>
+                            <input className={`${inputCls} [color-scheme:dark]`} type="date" value={form.fecha} onChange={(e) => patch({ fecha: e.target.value })} />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : form.kind === "contrato" ? (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div className="sm:col-span-3">

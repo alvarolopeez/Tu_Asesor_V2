@@ -244,6 +244,18 @@ export function docLayout(
 ): { signatures: SignSlot[]; acceptance?: AcceptanceBlock; variant: DocVariant } {
   const cat = (category || "").toLowerCase();
 
+  // Documentos del COMPRADOR: 1 sola firma (Ficha Informativa, KYC, Parte de Visita).
+  // Variante corporate (con marca) para transmitir confianza al comprador.
+  if (cat.includes("ficha")) {
+    return { variant: "corporate", signatures: [{ who: "El Comprador", sub: clientLabel || "Nombre y NIF · Firma" }] };
+  }
+  if (cat.includes("kyc") || cat.includes("pbc") || cat.includes("titularidad")) {
+    return { variant: "corporate", signatures: [{ who: "El Comprador", sub: clientLabel || "Nombre y NIF · Firma" }] };
+  }
+  if (cat.includes("visita")) {
+    return { variant: "corporate", signatures: [{ who: "El Visitante", sub: clientLabel || "Nombre y NIF · Firma" }] };
+  }
+
   if (cat.includes("contrato")) {
     // Contrato privado: 3 firmas — Vendedora, Compradora, Asesor mediador.
     // Variante visual "legal" (sobrio, serif, sin logo ni colores).
