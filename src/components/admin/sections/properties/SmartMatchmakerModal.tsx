@@ -15,7 +15,10 @@ interface SmartMatchmakerModalProps {
 
 const DEFAULT_PRICE_MARGIN = 10; // ± % de presupuesto
 const DEFAULT_GEO_RADIUS = 5;    // km
-const DEFAULT_N8N_WEBHOOK = "https://tu-n8n.tudominio.com/webhook/whatsapp-campaign";
+// URL real del webhook n8n "Difusion Inteligente - Smart Matchmaker" (workflow
+// 6E0AP0gqLUliPQtN). El placeholder anterior nunca apuntaba a un host real, por
+// eso el workflow tenía 0 ejecuciones. Fix 2026-06-01.
+const DEFAULT_N8N_WEBHOOK = "https://alvaroolopez.app.n8n.cloud/webhook/smart-diffusion";
 
 /**
  * Modal de difusión inteligente. Cruza la propiedad seleccionada con leads

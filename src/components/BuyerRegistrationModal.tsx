@@ -371,19 +371,34 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         if (updateError) throw updateError;
       } else {
         // Create new lead — let Supabase generate the UUID
-        const { error: insertError } = await supabase.from("leads").insert([
-          {
-            name: cleanName,
-            phone: cleanPhone,
-            email: cleanEmail,
-            type: "buyer",
-            status: "new",
-            source: "buyer_registration",
-            preferences,
-          },
-        ]);
+        const { data: inserted, error: insertError } = await supabase
+          .from("leads")
+          .insert([
+            {
+              name: cleanName,
+              phone: cleanPhone,
+              email: cleanEmail,
+              type: "buyer",
+              status: "new",
+              source: "buyer_registration",
+              preferences,
+            },
+          ])
+          .select("id")
+          .single();
 
         if (insertError) throw insertError;
+
+        // Dispara n8n para enviar el WhatsApp de bienvenida (HSM
+        // `bienvenida_nuevo_lead`). Fire-and-forget: si falla, el lead ya está
+        // creado y no queremos bloquear el formulario al usuario.
+        if (inserted?.id) {
+          fetch("/api/n8n/new-lead", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leadId: inserted.id }),
+          }).catch((err) => console.warn("[new-lead webhook] no se pudo disparar:", err));
+        }
       }
 
       // 2. Sincronización con buyers_demands en paralelo
