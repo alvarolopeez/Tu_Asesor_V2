@@ -13,6 +13,32 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
   - BLOQUEADO hasta que las 3 plantillas estén en estado "Aprobada" en Meta.
 ## ✅ Peticiones Completadas
 
+### ✅ [2026-05-31] Documentos del comprador (Ficha 218/2005, KYC, Parte de Visita) + Contrato privado
+
+**Sistema documental ampliado a 6 plantillas legales** con renderer compartido (`brandedDoc.ts`) y dos variantes visuales:
+- **corporate** (logo + navy + dorado) — Nota de encargo, Propuesta, Ficha 218/2005, KYC, Parte de Visita.
+- **legal** (serif Times, sin logo ni colores, REUNIDOS/MANIFIESTAN/ESTIPULACIONES centrados) — Contrato privado.
+
+**Nuevas plantillas en BD:**
+- `Contrato Privado de Compraventa` — 11 cláusulas, 3 firmas (Vendedora, Compradora, Asesor Mediador).
+- `Ficha Informativa y Nota Explicativa del Precio` (Decreto 218/2005) — 1 firma (Comprador), cálculo automático de ITP (default 7 %) y notaría+registro (default 1,5 %) sobre precio.
+- `Declaración de Titularidad Real y Origen de Fondos` (Ley 10/2010 PBC/FT) — 1 firma. Casillas como radio buttons (titularidad propia/tercero, PRP sí/no, origen fondos).
+- `Reconocimiento de Visita` — 1 firma (Visitante). Cláusula de protección de honorarios (12 meses, % configurable sobre precio de salida).
+
+**Sistema de autorrelleno desde propuesta** (la pieza más útil): al elegir plantilla `Contrato Privado` o cualquier "doc del comprador", el paso 1 muestra un selector de **propuesta de origen** en vez del "Lead vendedor". Pulsar "Pre-rellenar" copia compradores + vendedores + inmueble + precio + escalera de pagos + honorarios desde el `merged_data` de la propuesta (y de la nota de encargo del mismo seller_lead si hay). El usuario sólo añade los datos específicos del documento (notario/IBAN para contrato; ITP/cert. energética para ficha; KYC; fecha visita).
+
+**Implementación técnica:**
+- `brandedDoc.ts`: nuevo `DocVariant` + `renderLegalHtml`. `docLayout` extendido para contrato (3 firmas) y para los 3 docs del comprador (1 firma "El Comprador" / "El Visitante").
+- `documenso.ts/buildSimplePdf`: respeta `variant`, soporta hasta 3 firmas, tipografía Times para legal. **Fix**: cabecera con tamaño dinámico de título (de 15pt → 9.5pt mínimo) para evitar solape con títulos largos. **Fix**: sanitize WinAnsi ya no rompe el símbolo €.
+- `DocumentsManager.tsx`: nuevo `kind="comprador"` con sub-tipo `buyerDocType` ("ficha"/"kyc"/"visita"). Tres bloques de UI específicos en el modal.
+- Propuesta guarda `__owners`/`__sellers` en `merged_data` para reconstruir partes al autorrellenar contratos.
+- Fix de la propuesta de la sesión anterior: el bloque "Condiciones" del modal sólo pintaba la versión nota; ahora muestra plazos+escalera+días hábiles cuando es propuesta.
+
+**Pendiente (no bloqueante, fase posterior):**
+- Cableo a n8n del Parte de Visita: cuando la IA agende cita por WhatsApp, enviar al cliente un link de Documenso para firmar el reconocimiento de visita *antes* de entrar al piso. Requiere un endpoint público `/api/documents/visita-create` que reciba `{lead_comprador_id, property_id, fecha}` y devuelva la signing URL, más el nodo n8n correspondiente.
+
+Commits: `6779cef` (contrato), `0a08df7` (ficha+kyc+visita), `39ad245` (fix cabecera+€).
+
 ### ✅ [2026-05-30] Documentos legales con marca + FIX firma (Documenso 500)
 
 - ✅ **Nota de Encargo y Propuesta de Compraventa con identidad de marca** (navy `#0f172a` + dorado `#FBBF24`, logo, secciones numeradas, firmas). Render único compartido en `src/lib/brandedDoc.ts` (parser `parseDoc` + `renderBrandedHtml` + `docLayout` por categoría) usado por la vista previa (iframe) y por el PDF de firma (`buildSimplePdf` en `documenso.ts`, con logo embebido en `brandLogo.ts`). La propuesta lleva comprador+vendedor, escalera de 3 pagos, 2 plazos y bloque de **aceptación del vendedor** con doble firma. Plantillas en BD `document_templates` ('Nota de Encargo', 'Propuesta de compraventa') con el texto legal definitivo de Álvaro (honorarios flexibles `{{honorarios_pct}}`, cobro a éxito, no renovación automática).
