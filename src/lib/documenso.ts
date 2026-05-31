@@ -75,7 +75,16 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
   const top = H - 44;
   const bottom = 60;
   const maxW = W - MX * 2;
-  const sanitize = (s: string) => s.replace(/[^\x00-\xFF]/g, "?");
+  // WinAnsi (CP-1252) cubre ASCII + Latin-1 + algunos chars con codepoint Unicode
+  // >0xFF (€, smart quotes, etc.). El reemplazo simple por /[^\x00-\xFF]/ rompía
+  // el símbolo € (U+20AC) y lo convertía en "?". Lista blanca de extras:
+  const WINANSI_EXTRA = new Set("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ");
+  const sanitize = (s: string) => s.split("").map((c) => {
+    const code = c.charCodeAt(0);
+    if (code <= 0xFF) return c;
+    if (WINANSI_EXTRA.has(c)) return c;
+    return "?";
+  }).join("");
 
   let page = pdf.addPage([W, H]);
   let y = top;
@@ -146,8 +155,20 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
     if (logo) page.drawImage(logo, { x: MX, y: y - logoH, width: logoW, height: logoH });
     page.drawText(BRAND.name, { x: MX + logoW + 10, y: y - 13, size: 13, font: fontBold, color: C.navy });
     page.drawText(BRAND.tagline.toUpperCase(), { x: MX + logoW + 10, y: y - 25, size: 6.5, font, color: C.muted });
-    const tW = fontBold.widthOfTextAtSize(title, 15);
-    page.drawText(title, { x: W - MX - tW, y: y - 14, size: 15, font: fontBold, color: C.navy });
+    // Título a la derecha. Reducimos tamaño si no cabe en el ancho disponible
+    // (evita solape sobre el nombre de marca con títulos largos como
+    // "Ficha Informativa y Nota Explicativa del Precio").
+    const brandW = fontBold.widthOfTextAtSize(BRAND.name, 13);
+    const titleStartMin = MX + logoW + 10 + brandW + 22;
+    const titleMaxW = W - MX - titleStartMin;
+    const safeTitle = sanitize(title);
+    let tSize = 15;
+    let tW = fontBold.widthOfTextAtSize(safeTitle, tSize);
+    while (tW > titleMaxW && tSize > 9.5) {
+      tSize -= 0.5;
+      tW = fontBold.widthOfTextAtSize(safeTitle, tSize);
+    }
+    page.drawText(safeTitle, { x: W - MX - tW, y: y - 14, size: tSize, font: fontBold, color: C.navy });
     page.drawRectangle({ x: W - MX - 46, y: y + 4, width: 46, height: 2, color: C.gold });
     y -= logoH + 6;
     page.drawLine({ start: { x: MX, y }, end: { x: W - MX, y }, thickness: 0.8, color: C.line });
