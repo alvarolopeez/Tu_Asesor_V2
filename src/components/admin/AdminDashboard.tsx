@@ -35,7 +35,7 @@ import ReviewsManager from "./sections/ReviewsManager";
 import WarmLeadsManager from "./sections/WarmLeadsManager";
 import CalendarManager from "./sections/CalendarManager";
 import BuyersManager from "./sections/BuyersManager";
-import SellersManager from "./sections/SellersManager";
+import EncargosManager from "./sections/EncargosManager";
 import ChatManager from "./sections/ChatManager";
 import BlogManager from "./sections/BlogManager";
 import HeatmapManager from "./sections/HeatmapManager";
@@ -317,7 +317,7 @@ export default function AdminDashboard() {
             {activeTab === 'buyers' && <BuyersManager />}
 
             {/* 5. ENCARGOS (VENDEDORES EXCLUSIVOS) */}
-            {activeTab === 'sellers' && <SellersManager />}
+            {activeTab === 'sellers' && <EncargosManager />}
 
             {/* 6. VENDEDORES (WARM LEADS) */}
             {activeTab === 'warm_sellers' && <WarmLeadsManager leads={leads} />}

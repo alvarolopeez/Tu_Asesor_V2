@@ -41,6 +41,43 @@ export interface SellerActivityLog {
   created_at: string;
 }
 
+// ─── ENCARGOS (expediente de exclusiva) ──────────────
+// Tabla nueva (2026-06-03). Encargo = expediente jurídico/comercial.
+// Property es opcional y solo se rellena cuando se publica el inmueble.
+export type EncargoStatus = 'activo' | 'vendido' | 'caducado' | 'cancelado';
+export type EncargoDocumentKind = 'ibi' | 'comunidad' | 'energetica' | 'nota_simple' | 'otros';
+
+export interface Encargo {
+  id: string;
+  seller_lead_id: string | null;
+  nota_encargo_doc_id: string | null;
+  property_id: string | null;
+  direccion: string | null;
+  ref_catastral: string | null;
+  sqm: number | null;
+  rooms: number | null;
+  baths: number | null;
+  precio_captacion: number | null;
+  honorarios_pct: number | null;
+  fecha_firma: string | null; // ISO date
+  duracion_meses: number | null;
+  status: EncargoStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EncargoDocument {
+  id: string;
+  encargo_id: string;
+  kind: EncargoDocumentKind;
+  label: string | null;
+  file_url: string;
+  file_size_bytes: number | null;
+  mime_type: string | null;
+  uploaded_at: string;
+}
+
 // ─── PROPERTIES ───────────────────────────────────────
 export type PropertyStatus = 'active' | 'sold' | 'rented' | 'draft';
 

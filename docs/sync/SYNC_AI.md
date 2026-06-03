@@ -7,6 +7,41 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 - ⏸️ **Documenso "Enviar a firmar"**: bloqueado por el límite mensual del plan GRATIS (consumido con pruebas de diagnóstico el 2026-05-30). Resuelto al pagar plan PRO el 2026-06-01. El código y los 4 workflows ya están listos para producción.
 - ⚠️ **n8n `Difusion Inteligente` — credenciales HTTP Bearer**: tras el update v374fdb38 (2026-06-03) el MCP avisó "credentials skipped during auto-assignment" para los nodos `Enviar WhatsApp Meta` y `Log Difusion CRM`. Verificar manualmente en n8n UI que el credencial "Bearer Auth account" (id `s3YA5o57rEEdFw1W`) sigue atado a `Enviar WhatsApp Meta`. Si no, reabrir el nodo, seleccionar la credencial y re-publicar.
 
+## 🏗️ [2026-06-04] Refactor arquitectónico CRM — separación Vendedores / Encargos / Inmuebles / Documentos
+
+**Problema raíz**: el apartado "Encargos" (`SellersManager.tsx`) abría el `PropertyFormModal` de Inmuebles como falso "Subir encargo". Además los conceptos Vendedor / Encargo / Inmueble / Documento estaban mezclados, generando duplicación y confusión.
+
+**Decisiones tomadas (chat-conversación, brief 2026-06-03)**:
+1. **Vendedores** = solo leads en captación (`status != 'closed'`). Cuando se firma exclusiva, el lead pasa automáticamente a `status='closed'` y **desaparece** del módulo.
+2. **Encargos** = expediente jurídico/comercial completo. Tabla NUEVA `encargos` (no es Property). Vincula a un lead vendedor + Nota de Encargo firmada + anexos operativos (IBI, comunidad, energética, nota simple, otros con label libre). Es el ÚNICO sitio para hacer seguimiento del encargo durante la venta.
+3. **Inmuebles** = independiente, solo publicación web. Se vincula a un encargo opcionalmente vía `encargos.property_id`.
+4. **Documentos** = SIEMPRE el único punto de firma. Encargos no genera ni firma documentos: solo enlaza los que ya están firmados.
+
+**Cambios de schema (migración `create_encargos_tables_20260603`)**:
+- `encargos` (PK uuid, FK seller_lead_id → leads, FK nota_encargo_doc_id → generated_documents, FK property_id → properties, status enum activo|vendido|caducado|cancelado, datos jurídicos, RLS authenticated).
+- `encargo_documents` (PK uuid, FK encargo_id CASCADE, kind enum ibi|comunidad|energetica|nota_simple|otros, label, file_url, mime, RLS).
+- Columna `generated_documents.encargo_id` (FK SET NULL).
+- Bucket Storage `encargo-files` (privado, signed URLs, RLS authenticated).
+- Trigger `set_updated_at` (search_path=public,pg_temp).
+
+**Cambios de código**:
+- Nuevo `EncargosManager.tsx` (sustituye al obsoleto `SellersManager.tsx`, ahora eliminado). Tabs por status, KPIs, drawer "Expediente Digital" con tabs Resumen/Documentos/Actividad/Publicación.
+- Nuevo `EncargoFormModal.tsx` para "Añadir encargo" (selector lead + selector nota firmada + datos jurídicos + uploads).
+- Nuevos endpoints server-side: `POST /api/encargos`, `GET /api/encargos`, `PATCH /api/encargos/[id]`, `DELETE /api/encargos/[id]`. La auto-transición del lead (`status='closed'` ↔ revert) vive en el endpoint para ser atómica.
+- `WarmLeadsManager.tsx` filtrado a `status != 'closed'`. Tab "Encargos firmados" y badge "Encargo activo" (añadidos en T5 de la sesión anterior) ELIMINADOS — ya no aplican al nuevo modelo.
+- `EncargosFirmadosTable.tsx` eliminado (su rol pasa a EncargosManager).
+- Nuevos tipos en `src/types/index.ts`: `Encargo`, `EncargoStatus`, `EncargoDocument`, `EncargoDocumentKind`.
+- `AdminDashboard.tsx`: el tab `sellers` ahora renderiza `EncargosManager`.
+
+**Borrado de datos operativos** (solicitado por usuario para empezar pruebas con DB limpia):
+- Borrados: leads (24), buyers_demands (6), appointments (15), generated_documents (4), seller_activity_logs (8), buyer_activity_logs, properties (6), chatbot_conversations (9), chatbot_messages (43), web_visits (833), n8n_webhook_logs (147), tool_calculations, encargos, encargo_documents, offers, property_documents.
+- Mantenidos: `document_templates` (las 6 plantillas legales), `reviews` (1), `users`/auth, `posts`/`blog`.
+
+**Pendientes para próxima sesión**:
+- UI para vincular Nota de Encargo a un encargo ya existente (editar desde el drawer). El selector está en el create-modal pero no se reutiliza al editar.
+- UI para vincular `property_id` desde el tab "Publicación web" del drawer (hoy solo muestra el estado, no permite cambiarlo). Cuando se publica una property nueva en Inmuebles, ofrecerle el vínculo.
+- Mover los IBI/comunidad/etc del expediente a una sección "Documentos" dentro del propio drawer si se quiere subir tras creación (ya funciona, pero no testeado E2E).
+
 ## ✅ [2026-06-03] Bienvenida web pública + Fix difusión + Firma asesor + Descarga firmado + Encargos firmados
 
 **Resumen** (6 cambios cross-cutting empaquetados en un solo deploy):
