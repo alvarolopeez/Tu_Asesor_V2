@@ -36,6 +36,32 @@ export interface DocumensoRecipient {
   email: string;
 }
 
+/**
+ * Datos del asesor que firma SIEMPRE en primer lugar (signingOrder: 1) en
+ * los documentos donde su firma tiene valor jurídico (nota de encargo,
+ * propuesta, contrato privado, ficha 218/2005). Documenso enviará el email
+ * de firma a Álvaro PRIMERO; sólo al firmar él avanza al siguiente firmante.
+ *
+ * Se excluye en docs unilaterales del comprador (KYC, Parte de Visita): ahí
+ * el comprador firma solo.
+ */
+const ADVISOR_SIGNER: DocumensoRecipient = {
+  name: "Álvaro López Cuevas",
+  email: "info@tuasesoralvaro.com",
+};
+
+/**
+ * Decide si el asesor debe firmar primero según la categoría del documento.
+ * Categorías unilaterales del comprador (KYC, Parte de Visita) → NO asesor.
+ * Todo lo demás → SÍ asesor (signingOrder: 1).
+ */
+function shouldAdvisorSign(category?: string): boolean {
+  const c = (category || "").toLowerCase();
+  if (c.includes("kyc") || c.includes("pbc") || c.includes("titularidad")) return false;
+  if (c.includes("visita")) return false;
+  return true;
+}
+
 function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   // Documenso usa la API key directamente en Authorization (sin "Bearer").
   return { Authorization: API_TOKEN, ...extra };
@@ -311,6 +337,12 @@ export async function sendForSignature(opts: {
   title: string;
   pdfBytes: Uint8Array;
   recipients: DocumensoRecipient[];
+  /**
+   * Categoría de la plantilla (`document_templates.category`). Determina si
+   * Álvaro firma PRIMERO (signingOrder: 1) o no. Si se omite o no encaja en
+   * la lista de exclusiones de `shouldAdvisorSign`, se asume que SÍ firma.
+   */
+  documentCategory?: string;
 }): Promise<{ documentId: string }> {
   if (!isDocumensoConfigured()) {
     throw new Error("Documenso no está configurado (faltan DOCUMENSO_API_URL / DOCUMENSO_API_TOKEN).");
@@ -319,13 +351,28 @@ export async function sendForSignature(opts: {
     throw new Error("No hay destinatarios con email válido para enviar a firmar.");
   }
 
+  // Si la categoría no es unilateral del comprador (KYC / Visita), Álvaro
+  // firma PRIMERO. Documenso aplica `signingOrder` secuencialmente: el email
+  // al firmante N+1 sólo se envía después de que firme N.
+  // Filtramos duplicados por si el asesor ya estuviera explícitamente en
+  // recipients (por ej. añadido manualmente al guardar el documento).
+  const advisorSigns = shouldAdvisorSign(opts.documentCategory);
+  const advisorEmailLc = ADVISOR_SIGNER.email.toLowerCase();
+  const rest = opts.recipients.filter((r) => (r.email || "").toLowerCase() !== advisorEmailLc);
+  const orderedRecipients: DocumensoRecipient[] = advisorSigns
+    ? [ADVISOR_SIGNER, ...rest]
+    : rest;
+  if (orderedRecipients.length === 0) {
+    throw new Error("Tras filtrar duplicados, no quedan destinatarios para enviar a firmar.");
+  }
+
   // 1) Crear el documento (borrador) con título + destinatarios.
   const createRes = await fetch(`${API_URL}/documents`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       title: opts.title,
-      recipients: opts.recipients.map((r, i) => ({ name: r.name, email: r.email, role: "SIGNER", signingOrder: i + 1 })),
+      recipients: orderedRecipients.map((r, i) => ({ name: r.name, email: r.email, role: "SIGNER", signingOrder: i + 1 })),
     }),
   });
   if (!createRes.ok) {

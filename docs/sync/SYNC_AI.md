@@ -5,6 +5,24 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ## 📥 Peticiones Pendientes
 - ⏸️ **Documenso "Enviar a firmar"**: bloqueado por el límite mensual del plan GRATIS (consumido con pruebas de diagnóstico el 2026-05-30). Resuelto al pagar plan PRO el 2026-06-01. El código y los 4 workflows ya están listos para producción.
+- ⚠️ **n8n `Difusion Inteligente` — credenciales HTTP Bearer**: tras el update v374fdb38 (2026-06-03) el MCP avisó "credentials skipped during auto-assignment" para los nodos `Enviar WhatsApp Meta` y `Log Difusion CRM`. Verificar manualmente en n8n UI que el credencial "Bearer Auth account" (id `s3YA5o57rEEdFw1W`) sigue atado a `Enviar WhatsApp Meta`. Si no, reabrir el nodo, seleccionar la credencial y re-publicar.
+
+## ✅ [2026-06-03] Bienvenida web pública + Fix difusión + Firma asesor + Descarga firmado + Encargos firmados
+
+**Resumen** (6 cambios cross-cutting empaquetados en un solo deploy):
+
+1. **`appointmentService.ts`** — al crear un lead nuevo desde la web pública (agendar visita) ahora dispara el webhook n8n `new-lead` con el payload HSM `bienvenida_nuevo_lead`. Fire-and-forget + log de auditoría en `n8n_webhook_logs`. Antes este flujo NO disparaba ningún workflow → ningún cliente recibía la bienvenida si entraba por el calendario en vez del modal `BuyerRegistrationModal`.
+2. **Workflow `6E0AP0gqLUliPQtN` (Difusion Inteligente)** — fix root-cause + publicación. La versión saved tenía el Code node correcto (con `property_price_str` y `property_floor_elevator`) pero NO estaba publicada (la activa era la antigua, sin esos campos). Además el nodo `Log Difusion CRM` usaba `$json.property_title` que, tras pasar por `Enviar WhatsApp Meta`, ya era la respuesta de Meta → el CRM devolvía 400 "Missing lead_id or summary" y rompía el loop. Cambiado a `$('Separar Destinatarios').item.json.*` y publicada nueva versión `374fdb38-f915-483b-94b8-3e4960ec8f5b`.
+3. **Normalización de teléfonos en `leads`** — UPDATE en producción: todos los móviles ES con formato local (9 dígitos `^[679]\d{8}$`) y todos los `34\d{9}` sin `+` fueron normalizados a `+34…`. Meta a veces rechaza silenciosamente formatos no E.164 en HSM; ahora todos los destinatarios cumplen.
+4. **Firma secuencial del asesor (Documenso)** — `sendForSignature` ahora antepone `Álvaro López Cuevas <info@tuasesoralvaro.com>` con `signingOrder: 1` automáticamente para Nota de Encargo, Propuesta, Contrato, Ficha 218/2005. Lo excluye en KYC y Parte de Visita (docs unilaterales del comprador). La lógica vive en `shouldAdvisorSign(category)` dentro de `src/lib/documenso.ts`, y `route.ts /api/documents/send` ya pasa `template.category`.
+5. **Descarga del PDF firmado** — Nuevo endpoint `GET /api/documents/[id]/download` que proxea a Documenso v1 (`GET /documents/{id}/download`) y soporta tanto respuesta binaria como S3 prefirmada. Devuelve `attachment; filename="..."` con nombre limpio. En `DocumentsManager.tsx` aparece un botón verde "📥 Descargar firmado" sólo cuando `signature_status === 'completed'`.
+6. **Apartado Encargos enriquecido (Warm CRM)** — `WarmLeadsManager.tsx` ahora carga `generated_documents` de categoría Nota de Encargo + `signature_status='completed'` al montarse. Pinta un badge "Encargo activo desde DD/MM/YYYY" en cada fila de lead que tenga uno, más atajo de descarga. Y nuevo tab "Encargos firmados" dentro del mismo panel → renderiza `EncargosFirmadosTable.tsx` con KPIs (total, vencimiento ≤30 días, propiedades activas, honorarios esperados), filtros (búsqueda, ventana de vencimiento, sólo con propiedades activas) y acciones (descargar firmado, abrir drawer del vendedor).
+
+**Pendiente de verificación end-to-end por Álvaro** (no se puede testear desde el agente sin sandboxes reales):
+- Registrar una visita real desde la web pública → confirmar que `bienvenida_nuevo_lead` llega.
+- Lanzar una difusión real con Álvaro incluido → confirmar 12/12 envíos sin error 400 en Log CRM.
+- "Enviar a firmar" Nota de Encargo nueva → confirmar que el email de Documenso llega PRIMERO a `info@tuasesoralvaro.com`.
+- Tras firmar manualmente → confirmar que el botón "Descargar firmado" funciona y que el badge "Encargo activo" aparece en Warm CRM.
 
 ## ✅ Workflows n8n — HSM templates cableadas [2026-05-31]
 Las 3 plantillas de Meta están **APROBADAS** (`bienvenida_nuevo_lead`, `nueva_propiedad_match`, `seguimiento_lead`, idioma `es`, categoría Marketing). Se actualizaron los 3 workflows de producción para enviar con `type:"template"` (supera la ventana 24h de Meta; antes fallaban siempre con código 131047).

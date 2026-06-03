@@ -42,6 +42,8 @@ import {
 import toast from "react-hot-toast";
 import PropertyFormModal from "./properties/PropertyFormModal";
 import type { PropertyFormValues } from "./properties/types";
+import EncargosFirmadosTable, { type SignedEncargo } from "./EncargosFirmadosTable";
+import { Download } from "lucide-react";
 
 // ─── INTERFACES & HELPER TYPES ──────────────────────────────────────────
 interface WarmLeadsManagerProps {
@@ -119,6 +121,12 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
   // Promoción de lead → Encargo en exclusiva (reutiliza el form de Inmuebles)
   const [showPromoteForm, setShowPromoteForm] = useState(false);
 
+  // ─── Vista activa del panel + estado de encargos firmados ────────────────
+  // 'leads' = tabla histórica de vendedores warm.
+  // 'encargos' = tabla nueva (T5.2) con notas de encargo firmadas.
+  const [panelView, setPanelView] = useState<'leads' | 'encargos'>('leads');
+  const [signedEncargos, setSignedEncargos] = useState<SignedEncargo[]>([]);
+
   // ─── INITIALIZATION & SYNC ─────────────────────────────────────────────
   useEffect(() => {
     if (leads) {
@@ -138,6 +146,135 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
       }
     }
   }, [sellerLeads]);
+
+  // ─── Carga de Encargos firmados ─────────────────────────────────────────
+  // Se ejecuta cada vez que cambian los seller leads (porque al pintar
+  // badges en la tabla principal necesitamos resolver lead → encargo).
+  // Pipeline:
+  //   1) Plantillas "Nota de encargo" → ids.
+  //   2) generated_documents completed con esos template_id.
+  //   3) Properties activas vinculadas a esos seller_lead (vía leads.property_id).
+  //   4) Para cada doc: lead asociado + propiedades activas + comisión.
+  useEffect(() => {
+    if (!sellerLeads.length) {
+      setSignedEncargos([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        // 1) Templates de "Nota de encargo".
+        const { data: tpls, error: tplErr } = await supabase
+          .from('document_templates')
+          .select('id, name, category')
+          .ilike('category', '%encargo%');
+        if (tplErr) throw tplErr;
+        const encargoTplIds = (tpls || []).map((t: any) => t.id);
+        if (!encargoTplIds.length) {
+          if (!cancelled) setSignedEncargos([]);
+          return;
+        }
+
+        // 2) Documentos firmados de esas plantillas.
+        const { data: docs, error: docsErr } = await supabase
+          .from('generated_documents')
+          .select('id, seller_lead_id, template_id, documenso_id, signature_status, merged_data, updated_at, created_at')
+          .in('template_id', encargoTplIds)
+          .eq('signature_status', 'completed');
+        if (docsErr) throw docsErr;
+
+        // 3) Lookup vendedor + propiedad activa.
+        const sellersById = new Map<string, Lead>(sellerLeads.map(l => [l.id, l]));
+        const propIds = sellerLeads
+          .map(l => (l as any).property_id)
+          .filter((x: any): x is string => typeof x === 'string' && x.length > 0);
+        let activePropIdSet = new Set<string>();
+        if (propIds.length) {
+          const { data: props } = await supabase
+            .from('properties')
+            .select('id, status')
+            .in('id', propIds);
+          activePropIdSet = new Set(
+            (props || [])
+              .filter((p: any) => {
+                const st = (p.status || '').toLowerCase();
+                // Consideramos "activa" cualquier propiedad que no esté en
+                // estado terminal (sold/withdrawn/archived). El schema usa
+                // 'active' / 'sold' / 'paused' principalmente.
+                return !['sold', 'withdrawn', 'archived'].includes(st);
+              })
+              .map((p: any) => p.id),
+          );
+        }
+
+        // 4) Mapeo final → SignedEncargo[].
+        const mapped: SignedEncargo[] = (docs || []).map((d: any) => {
+          const md: Record<string, unknown> = d.merged_data || {};
+          const sellerLead = d.seller_lead_id ? sellersById.get(d.seller_lead_id) || null : null;
+          const propertyId = sellerLead ? (sellerLead as any).property_id : null;
+          const activeProps = propertyId && activePropIdSet.has(propertyId) ? 1 : 0;
+
+          // signed_at: aproximación = updated_at (cuando el webhook mapeó a completed)
+          const signedAtIso: string = d.updated_at || d.created_at;
+          const signedAt = new Date(signedAtIso);
+
+          // duracion_meses (jurídico, encargo en exclusiva) → fecha_fin.
+          // merged_data puede traerlo en varias claves; soportamos las
+          // generadas por el editor "Pre-rellenar":
+          const raw =
+            (md as any)["duracion_meses"] ??
+            (md as any)["duracion"] ??
+            (md as any)["plazo_meses"] ??
+            6;
+          const months = Number(raw) > 0 ? Number(raw) : 6;
+          const expiry = new Date(signedAt);
+          expiry.setMonth(expiry.getMonth() + months);
+
+          // Honorarios esperados = precio_referencia * pct/100 (IVA aparte).
+          const pctRaw =
+            (md as any)["honorarios_pct"] ??
+            (md as any)["honorarios"] ??
+            (md as any)["comision_pct"] ??
+            0;
+          const pct = Number(pctRaw) || 0;
+          const refRaw =
+            (md as any)["inmueble.precio_salida"] ??
+            (md as any)?.inmueble?.precio_salida ??
+            (md as any)["precio_valoracion"] ??
+            (sellerLead?.preferences as any)?.estimated_value ??
+            0;
+          const ref = Number(refRaw) || 0;
+          const expected_fee = ref > 0 && pct > 0 ? ref * (pct / 100) : 0;
+
+          return {
+            id: d.id,
+            seller_lead_id: d.seller_lead_id,
+            documenso_id: d.documenso_id,
+            signed_at: signedAtIso,
+            merged_data: md,
+            lead: sellerLead,
+            active_properties: activeProps,
+            expected_fee,
+            expiry_date: expiry,
+          };
+        });
+        if (!cancelled) setSignedEncargos(mapped);
+      } catch (err: any) {
+        console.error('[WarmLeads] No se pudieron cargar los encargos firmados:', err.message);
+        if (!cancelled) setSignedEncargos([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sellerLeads]);
+
+  // Lookup rápido por seller_lead para pintar el badge en la tabla principal.
+  const encargoBySellerId = React.useMemo(() => {
+    const m = new Map<string, SignedEncargo>();
+    for (const e of signedEncargos) {
+      if (e.seller_lead_id) m.set(e.seller_lead_id, e);
+    }
+    return m;
+  }, [signedEncargos]);
 
   // Handle opening drawer smoothly
   const openDrawer = (lead: Lead) => {
@@ -575,6 +712,37 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
 
       </div>
 
+      {/* ─── PANEL VIEW TABS ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 bg-[#1E293B]/40 border border-white/5 rounded-2xl p-1.5 backdrop-blur-md w-fit">
+        <button
+          onClick={() => setPanelView('leads')}
+          className={`text-xs font-bold px-4 py-2 rounded-xl transition-all ${
+            panelView === 'leads'
+              ? 'bg-[#FBBF24] text-[#2C3E50]'
+              : 'text-slate-300 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          Vendedores (Warm CRM)
+        </button>
+        <button
+          onClick={() => setPanelView('encargos')}
+          className={`text-xs font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2 ${
+            panelView === 'encargos'
+              ? 'bg-[#FBBF24] text-[#2C3E50]'
+              : 'text-slate-300 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          Encargos firmados
+          <span className={`text-[10px] font-extrabold rounded-full px-2 py-0.5 ${
+            panelView === 'encargos' ? 'bg-[#2C3E50]/20 text-[#2C3E50]' : 'bg-white/10 text-white'
+          }`}>{signedEncargos.length}</span>
+        </button>
+      </div>
+
+      {panelView === 'encargos' ? (
+        <EncargosFirmadosTable encargos={signedEncargos} onOpenLead={openDrawer} />
+      ) : (
+      <>
       {/* ─── SEARCH & FILTERS BAR ────────────────────────────────────────── */}
       <div className="bg-[#1E293B]/40 border border-white/5 p-6 rounded-2xl shadow-xl backdrop-blur-md space-y-4">
         <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4">
@@ -678,6 +846,10 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                   const prefs = getPreferences(lead);
                   const status = lead.status || 'new';
                   const conf = STATUS_CONFIG[status] || STATUS_CONFIG.new;
+                  // T5.1: Si este lead tiene una Nota de Encargo firmada, lo
+                  // marcamos con un badge "Encargo activo" debajo del estado
+                  // del funnel y mostramos un atajo de descarga del PDF firmado.
+                  const encargo = encargoBySellerId.get(lead.id);
 
                   return (
                     <tr 
@@ -729,6 +901,15 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                           <span className={`w-1.5 h-1.5 rounded-full ${conf.dot} animate-pulse`} />
                           {conf.label}
                         </span>
+                        {encargo && (
+                          <span
+                            className="mt-1.5 px-2 py-0.5 text-[10px] font-bold rounded border flex items-center gap-1 w-fit text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+                            title={`Documenso ID: ${encargo.documenso_id || '—'}`}
+                          >
+                            <CheckCircle size={10} />
+                            Encargo activo desde {new Date(encargo.signed_at).toLocaleDateString('es-ES')}
+                          </span>
+                        )}
                       </td>
 
                       {/* Date */}
@@ -739,15 +920,24 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                       {/* Actions */}
                       <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
-                          <button 
+                          {encargo && (
+                            <a
+                              href={`/api/documents/${encargo.id}/download`}
+                              className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-300 hover:text-white border border-emerald-500/20 transition-all hover:scale-105"
+                              title={`Descargar Nota de Encargo firmada (Documenso ${encargo.documenso_id || '—'})`}
+                            >
+                              <Download size={14} />
+                            </a>
+                          )}
+                          <button
                             onClick={() => openDrawer(lead)}
                             className="p-2 rounded-lg bg-white/5 hover:bg-[#FBBF24]/10 text-slate-300 hover:text-[#FBBF24] border border-white/5 transition-all hover:scale-105"
                             title="Gestionar Ficha Vendedor"
                           >
                             <Eye size={14} />
                           </button>
-                          
-                          <button 
+
+                          <button
                             onClick={() => handleDeleteLead(lead.id)}
                             className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all hover:scale-105"
                             title="Eliminar Lead"
@@ -764,6 +954,8 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* ─── LATERAL SLIDE-IN DRAWER (SellersDrawer) ─────────────────────── */}
       {selectedLead && (

@@ -90,6 +90,66 @@ export async function bookPublicAppointment(
       }
 
       leadId = newLead.id
+
+      // 1.b Disparar n8n para enviar la plantilla HSM `bienvenida_nuevo_lead`
+      //     (workflow `Notificacion Nuevo Lead`, id QikfXMJumWbpI3wL).
+      //     Mismo patrón que BuyerRegistrationModal pero aquí lo hacemos
+      //     server-side (este servicio ya corre en el servidor): no podemos
+      //     usar una URL relativa, así que llamamos al webhook de n8n con su
+      //     URL pública y registramos un log de auditoría en `n8n_webhook_logs`.
+      //     Fire-and-forget: si n8n falla NO bloqueamos la creación de la cita.
+      //     @added 2026-06-03 — fix: la web pública insertaba leads
+      //     source='web_public' desde aquí sin disparar el workflow de
+      //     bienvenida, por eso no llegaban WhatsApp a clientes nuevos que
+      //     agendaban directamente (sin pasar por BuyerRegistrationModal).
+      try {
+        const newLeadWebhookUrl =
+          process.env.N8N_NEW_LEAD_WEBHOOK_URL ||
+          'https://alvaroolopez.app.n8n.cloud/webhook/new-lead'
+        const welcomePayload = {
+          data: {
+            lead_id: leadId,
+            name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail || '',
+            source: 'web_public',
+            preferences: { location: 'Sevilla' },
+          },
+        }
+        // Lanzamos en background sin await para no demorar la respuesta al
+        // usuario; pero el `void` evita warnings de promesa flotante.
+        void (async () => {
+          try {
+            const res = await fetch(newLeadWebhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(welcomePayload),
+            })
+            await supabaseAdmin.from('n8n_webhook_logs').insert({
+              webhook_name: 'new_lead_welcome',
+              source: 'appointment_service',
+              payload: welcomePayload,
+              response_status: res.status,
+              error_message: res.ok ? null : `n8n webhook respondió ${res.statusText}`,
+            })
+          } catch (whErr) {
+            const msg = whErr instanceof Error ? whErr.message : String(whErr)
+            console.warn('[AppointmentService][n8n new-lead] webhook falló:', msg)
+            await supabaseAdmin.from('n8n_webhook_logs').insert({
+              webhook_name: 'new_lead_welcome',
+              source: 'appointment_service',
+              payload: welcomePayload,
+              response_status: 0,
+              error_message: `HTTP error: ${msg}`,
+            })
+          }
+        })()
+      } catch (triggerErr) {
+        console.warn(
+          '[AppointmentService][n8n new-lead] no se pudo disparar:',
+          triggerErr,
+        )
+      }
     }
 
     // 2. Insertar la cita en appointments

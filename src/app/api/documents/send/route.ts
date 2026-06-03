@@ -107,7 +107,16 @@ export async function POST(req: NextRequest) {
     const buyerName = (merged as any).__owners?.[0]?.nombre || ctx["comprador.nombre"];
     const layout = docLayout(template.category, clientLabel, { sellerName, buyerName });
     const pdfBytes = await buildSimplePdf(template.name || "Documento", text, layout);
-    const { documentId } = await sendForSignature({ title: template.name || "Documento", pdfBytes, recipients });
+    const { documentId } = await sendForSignature({
+      title: template.name || "Documento",
+      pdfBytes,
+      recipients,
+      // La firma del asesor (Álvaro) se prepend AUTOMÁTICAMENTE como
+      // signingOrder: 1 dentro de `sendForSignature`, salvo en documentos
+      // unilaterales del comprador (KYC / Parte de Visita), donde la
+      // categoría dispara la exclusión.
+      documentCategory: template.category,
+    });
 
     await supabaseAdmin
       .from("generated_documents")

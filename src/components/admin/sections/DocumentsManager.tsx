@@ -15,6 +15,7 @@ import {
   Clock,
   UserPlus,
   Users,
+  Download,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -1018,6 +1019,15 @@ export default function DocumentsManager() {
                           >
                             {sendingId === g.id ? "Enviando…" : "Enviar a firmar"}
                           </button>
+                        )}
+                        {g.signature_status === "completed" && (
+                          <a
+                            href={`/api/documents/${g.id}/download`}
+                            className="text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-500 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
+                            title="Descargar el PDF firmado desde Documenso"
+                          >
+                            <Download size={12} /> Descargar firmado
+                          </a>
                         )}
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${st.cls}`}>{st.label}</span>
                       </div>
