@@ -112,8 +112,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Ejecutar algoritmo de coincidencia (Smart Matchmaker) seguro en servidor
-    const propLat = property.features?.latitude;
-    const propLng = property.features?.longitude;
+    // Las coordenadas viven en el jsonb `features` y pueden venir como string;
+    // las forzamos a número para que la geometría (Haversine / point-in-polygon)
+    // no opere sobre strings. (#5: endurecido 2026-06-04.)
+    const propLatRaw = property.features?.latitude;
+    const propLngRaw = property.features?.longitude;
+    const propLatNum = Number(propLatRaw);
+    const propLngNum = Number(propLngRaw);
+    const propLat = Number.isFinite(propLatNum) ? propLatNum : undefined;
+    const propLng = Number.isFinite(propLngNum) ? propLngNum : undefined;
     const propPrice = Number(property.price);
     const propType = property.features?.propertyType;
     const propRooms = Number(property.features?.rooms || 0);

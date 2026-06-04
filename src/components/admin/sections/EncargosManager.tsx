@@ -380,6 +380,12 @@ function EncargoDrawer({ encargo, onClose, onChange }: { encargo: EncargoRow; on
   const [appointments, setAppointments] = useState<any[]>([]);
   const [vinculatedDocs, setVinculatedDocs] = useState<any[]>([]);
 
+  // ── Publicación web (#6): vincular property + métricas ──
+  const [availableProperties, setAvailableProperties] = useState<any[]>([]);
+  const [linkedProperty, setLinkedProperty] = useState<any | null>(null);
+  const [propMetrics, setPropMetrics] = useState<{ visits: number; appointments: number } | null>(null);
+  const [linking, setLinking] = useState(false);
+
   // Form editable (resumen)
   const [direccion, setDireccion] = useState(encargo.direccion || "");
   const [refCat, setRefCat] = useState(encargo.ref_catastral || "");
@@ -417,10 +423,54 @@ function EncargoDrawer({ encargo, onClose, onChange }: { encargo: EncargoRow; on
           .eq("lead_id", encargo.seller_lead_id)
           .order("scheduled_at", { ascending: false });
         if (!cancelled) setAppointments(data || []);
+      } else if (tab === "publicacion") {
+        // Lista de inmuebles para el selector de vínculo.
+        const { data: props } = await supabase
+          .from("properties")
+          .select("id, title, status, images, features")
+          .order("created_at", { ascending: false });
+        if (!cancelled) setAvailableProperties(props || []);
+
+        if (encargo.property_id) {
+          const linked = (props || []).find((p: any) => p.id === encargo.property_id) || null;
+          if (!cancelled) setLinkedProperty(linked);
+          // Métricas del inmueble vinculado:
+          //   visitas web = web_visits cuyo page_path contiene el id (misma
+          //   convención que el panel de Operaciones).
+          //   citas = appointments de esa propiedad.
+          const [visitsRes, apptsRes] = await Promise.all([
+            supabase.from("web_visits").select("page_path"),
+            supabase.from("appointments").select("id").eq("property_id", encargo.property_id),
+          ]);
+          const visits = ((visitsRes.data as { page_path: string }[]) || [])
+            .filter((v) => v.page_path?.includes(encargo.property_id as string)).length;
+          if (!cancelled) setPropMetrics({ visits, appointments: (apptsRes.data || []).length });
+        } else {
+          if (!cancelled) { setLinkedProperty(null); setPropMetrics(null); }
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [tab, encargo.id, encargo.seller_lead_id]);
+  }, [tab, encargo.id, encargo.seller_lead_id, encargo.property_id]);
+
+  // Vincular / desvincular el inmueble publicado (#6).
+  const setLinkedPropertyId = async (propertyId: string | null) => {
+    setLinking(true);
+    try {
+      const res = await fetch(`/api/encargos/${encargo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ property_id: propertyId }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Error");
+      toast.success(propertyId ? "Inmueble vinculado al encargo" : "Inmueble desvinculado");
+      await onChange();
+    } catch (err: any) {
+      toast.error(err.message || "No se pudo actualizar el vínculo");
+    } finally {
+      setLinking(false);
+    }
+  };
 
   const saveResumen = async () => {
     setSaving(true);
@@ -706,17 +756,66 @@ function EncargoDrawer({ encargo, onClose, onChange }: { encargo: EncargoRow; on
           )}
 
           {tab === "publicacion" && (
-            <div className="space-y-3">
-              {encargo.property_id ? (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
-                  <p className="text-sm font-bold text-emerald-300">Inmueble publicado en la web</p>
-                  <p className="text-[11px] text-slate-300 mt-1">property_id: <code className="text-[10px]">{encargo.property_id}</code></p>
-                  <p className="text-[11px] text-slate-400 mt-2">La ficha pública se gestiona desde el apartado Inmuebles.</p>
-                </div>
+            <div className="space-y-4">
+              {encargo.property_id && linkedProperty ? (
+                <>
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-emerald-300">Inmueble vinculado</p>
+                        <p className="text-xs text-white font-semibold mt-1">{linkedProperty.title}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Estado: {linkedProperty.status} · ref {String(encargo.property_id).slice(0, 8)}</p>
+                      </div>
+                      <button
+                        onClick={() => void setLinkedPropertyId(null)}
+                        disabled={linking}
+                        className="text-[11px] font-bold text-rose-300 bg-rose-500/10 hover:bg-rose-500 hover:text-white border border-rose-500/30 px-3 py-1.5 rounded-lg disabled:opacity-50"
+                      >
+                        Desvincular
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Métricas del inmueble (web_visits + citas) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-[#1E293B]/60 border border-white/5 rounded-xl p-4">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Visitas web</span>
+                      <span className="text-2xl font-extrabold text-sky-400 mt-1 block">{propMetrics?.visits ?? "—"}</span>
+                    </div>
+                    <div className="bg-[#1E293B]/60 border border-white/5 rounded-xl p-4">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Citas agendadas</span>
+                      <span className="text-2xl font-extrabold text-[#FBBF24] mt-1 block">{propMetrics?.appointments ?? "—"}</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Las visitas web se cuentan por las páginas cuya ruta incluye el id del inmueble (misma fuente que el panel de Operaciones). La ficha pública se edita en el apartado Inmuebles.
+                  </p>
+                </>
               ) : (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
-                  <p className="text-sm font-bold text-amber-300">Sin publicar en web</p>
-                  <p className="text-[11px] text-slate-300 mt-1">Cuando estés listo, crea el inmueble en el apartado Inmuebles y vincúlalo desde aquí (próximamente).</p>
+                <div className="space-y-3">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+                    <p className="text-sm font-bold text-amber-300">Sin inmueble vinculado</p>
+                    <p className="text-[11px] text-slate-300 mt-1">
+                      Vincula aquí el anuncio publicado en la web para ver sus métricas (visitas y citas) dentro del expediente. Crea el inmueble en el apartado Inmuebles si aún no existe.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Vincular inmueble publicado</label>
+                    <select
+                      defaultValue=""
+                      disabled={linking}
+                      onChange={(e) => { if (e.target.value) void setLinkedPropertyId(e.target.value); }}
+                      className="w-full bg-[#1E293B] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#FBBF24]"
+                    >
+                      <option value="">— Selecciona un inmueble —</option>
+                      {availableProperties.map((p) => (
+                        <option key={p.id} value={p.id}>{p.title} ({p.status})</option>
+                      ))}
+                    </select>
+                    {availableProperties.length === 0 && (
+                      <p className="text-[11px] text-slate-500 mt-1">No hay inmuebles. Crea uno en el apartado Inmuebles.</p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
