@@ -10,6 +10,29 @@ export interface PdfLayout {
 }
 
 /**
+ * Caja de firma calculada por `buildSimplePdf`: dónde dibujó realmente cada
+ * línea de firma. Coordenadas en PORCENTAJE de página (0-100) con origen
+ * arriba-izquierda, que es como Documenso ancla los campos. Se usa para que
+ * el campo SIGNATURE caiga JUSTO sobre la línea del PDF (fix #1).
+ */
+export interface SignatureBox {
+  /** Página 1-based donde está la firma. */
+  page: number;
+  xPct: number;
+  yPct: number;
+  wPct: number;
+  hPct: number;
+  /** Etiqueta del firmante (p.ej. "El Asesor") — solo informativa. */
+  who: string;
+}
+
+export interface BuiltPdf {
+  bytes: Uint8Array;
+  /** Cajas de firma en orden de dibujo (firmas principales y luego aceptación). */
+  signatureBoxes: SignatureBox[];
+}
+
+/**
  * Cliente mínimo de Documenso Cloud (Fase 4c).
  *
  * ✅ Usa la API v1 (verificada end-to-end contra la cuenta real el 2026-05-30:
@@ -85,7 +108,7 @@ const C = {
  * previa HTML, de modo que el PDF firmado y la previsualización son coherentes.
  * pdf-lib + Helvetica (WinAnsi cubre acentos y €) → serverless-safe.
  */
-export async function buildSimplePdf(title: string, body: string, layout: PdfLayout = {}): Promise<Uint8Array> {
+export async function buildSimplePdf(title: string, body: string, layout: PdfLayout = {}): Promise<BuiltPdf> {
   const variant: DocVariant = layout.variant ?? "corporate";
   const pdf = await PDFDocument.create();
   // Para la variante "legal" usamos Times (serif) para acercarnos al papel
@@ -115,6 +138,8 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
   let page = pdf.addPage([W, H]);
   let y = top;
   let pageNo = 0;
+  // Cajas de firma capturadas al dibujar (fix #1: anclar campos sobre la línea).
+  const signatureBoxes: SignatureBox[] = [];
 
   const drawFooter = (p: PDFPage) => {
     if (variant === "legal") {
@@ -279,6 +304,21 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
       page.drawLine({ start: { x: x0, y: lineY }, end: { x: x1, y: lineY }, thickness: 0.8, color: lineColor });
       page.drawText(sanitize(s.who.toUpperCase()), { x: x0, y: lineY - 11, size: 8, font: fontBold, color: labelColor });
       if (s.sub) page.drawText(sanitize(s.sub), { x: x0, y: lineY - 21, size: 7.4, font, color: subColor });
+
+      // Captura de la caja de firma para anclar el campo de Documenso JUSTO
+      // encima de la línea. La firma manuscrita va sobre la línea, así que el
+      // recuadro arranca en la propia línea (lineY) y sube ~26 pt.
+      const boxH = 26;                       // alto del campo en pt
+      const boxW = Math.min(colW * 0.82, 150); // un poco más estrecho que la línea
+      const boxTopPdf = lineY + boxH;        // borde superior en coords pdf (origen abajo)
+      signatureBoxes.push({
+        page: pageNo + 1,                    // Documenso usa páginas 1-based
+        xPct: (x0 / W) * 100,
+        yPct: ((H - boxTopPdf) / H) * 100,   // distancia desde el borde superior
+        wPct: (boxW / W) * 100,
+        hPct: (boxH / H) * 100,
+        who: s.who,
+      });
     });
     y = lineY - 30;
   };
@@ -326,7 +366,7 @@ export async function buildSimplePdf(title: string, body: string, layout: PdfLay
   para("Documento firmado digitalmente mediante Documenso · validez legal eIDAS.", { size: 7.2, color: C.muted });
 
   drawFooter(page);
-  return pdf.save();
+  return { bytes: await pdf.save(), signatureBoxes };
 }
 
 /**
@@ -343,6 +383,12 @@ export async function sendForSignature(opts: {
    * la lista de exclusiones de `shouldAdvisorSign`, se asume que SÍ firma.
    */
   documentCategory?: string;
+  /**
+   * Cajas de firma calculadas por `buildSimplePdf` (fix #1). Si se pasan, los
+   * campos SIGNATURE se anclan sobre la línea real del PDF en vez de en
+   * posiciones fijas aproximadas.
+   */
+  signatureBoxes?: SignatureBox[];
 }): Promise<{ documentId: string }> {
   if (!isDocumensoConfigured()) {
     throw new Error("Documenso no está configurado (faltan DOCUMENSO_API_URL / DOCUMENSO_API_TOKEN).");
@@ -367,12 +413,17 @@ export async function sendForSignature(opts: {
   }
 
   // 1) Crear el documento (borrador) con título + destinatarios.
+  //    meta.signingOrder = "SEQUENTIAL" (fix #2): Documenso envía el email al
+  //    firmante N+1 SOLO cuando firma N. Combinado con signingOrder por
+  //    recipient (1,2,3...) garantiza que Álvaro firma PRIMERO y el cliente
+  //    después — ya no se manda a los dos a la vez.
   const createRes = await fetch(`${API_URL}/documents`, {
     method: "POST",
     headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       title: opts.title,
       recipients: orderedRecipients.map((r, i) => ({ name: r.name, email: r.email, role: "SIGNER", signingOrder: i + 1 })),
+      meta: { signingOrder: "SEQUENTIAL" },
     }),
   });
   if (!createRes.ok) {
@@ -404,26 +455,59 @@ export async function sendForSignature(opts: {
 
   // 3) Crear un campo de FIRMA por cada destinatario. Documenso rechaza el
   //    envío si algún firmante no tiene al menos un campo de firma
-  //    ("Signers must have at least one signature field"). Colocamos el campo
-  //    en la última página (donde está el bloque de firmas del PDF de marca),
-  //    en columnas alternas para no solaparse cuando hay varios firmantes.
+  //    ("Signers must have at least one signature field").
+  //
+  //    Fix #1: en vez de posiciones fijas aproximadas (que caían lejos de la
+  //    línea), anclamos cada campo sobre la línea de firma REAL que dibujó
+  //    `buildSimplePdf`. Mapeo: al asesor le asignamos la caja cuya etiqueta
+  //    contiene "asesor"/"mediador"; al resto, las cajas restantes en orden.
   const pageCount = (await PDFDocument.load(opts.pdfBytes)).getPageCount();
+  const boxPool: SignatureBox[] = [...(opts.signatureBoxes || [])];
+
+  const takeBoxFor = (recipient: DocumensoRecipient): SignatureBox | null => {
+    if (boxPool.length === 0) return null;
+    const isAdvisor = (recipient.email || "").toLowerCase() === advisorEmailLc;
+    if (isAdvisor) {
+      const idx = boxPool.findIndex((b) => /asesor|mediador/i.test(b.who));
+      if (idx >= 0) return boxPool.splice(idx, 1)[0];
+    }
+    return boxPool.shift() || null;
+  };
+
   for (let i = 0; i < createdRecipients.length; i++) {
     const recipientId = createdRecipients[i]?.recipientId;
     if (!recipientId) continue;
-    const col = i % 2; // 0 = izquierda, 1 = derecha
-    const row = Math.floor(i / 2);
+    const box = takeBoxFor(orderedRecipients[i]);
+
+    // Posición: caja real si existe; si no, fallback apilado (último recurso).
+    let pageNumber: number, pageX: number, pageY: number, pageWidth: number, pageHeight: number;
+    if (box) {
+      pageNumber = box.page;
+      pageX = box.xPct;
+      pageY = box.yPct;
+      pageWidth = box.wPct;
+      pageHeight = box.hPct;
+    } else {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      pageNumber = pageCount;
+      pageX = 12 + col * 45;
+      pageY = Math.min(88, 82 - row * 10);
+      pageWidth = 28;
+      pageHeight = 6;
+    }
+
     const fieldRes = await fetch(`${API_URL}/documents/${documentId}/fields`, {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         recipientId,
         type: "SIGNATURE",
-        pageNumber: pageCount,
-        pageX: 12 + col * 45,
-        pageY: Math.min(88, 82 - row * 10),
-        pageWidth: 28,
-        pageHeight: 6,
+        pageNumber,
+        pageX,
+        pageY,
+        pageWidth,
+        pageHeight,
       }),
     });
     if (!fieldRes.ok) {
