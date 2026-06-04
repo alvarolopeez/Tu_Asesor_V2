@@ -382,7 +382,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
               email: cleanEmail,
               type: "buyer",
               status: "new",
-              source: "buyer_registration",
+              source: "Formulario Comprador",
               preferences,
             },
           ])

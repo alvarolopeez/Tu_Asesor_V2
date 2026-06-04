@@ -96,7 +96,7 @@ export async function bookPublicAppointment(
           email: cleanEmail,
           type: 'buyer',
           status: 'new',
-          source: 'web_public',
+          source: 'Reserva Web',
           property_id: data.propertyId // Inmueble por el que se interesó inicialmente
         }])
         .select('id')

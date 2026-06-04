@@ -142,7 +142,7 @@ export default function RentabilidadPage() {
         name: formData.nombre,
         phone: formData.telefono,
         type: 'buyer',
-        source: 'rentabilidad'
+        source: 'Calculadora Rentabilidad'
       },
       {
         tool_type: 'rentabilidad',

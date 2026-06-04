@@ -119,7 +119,7 @@ export default function ValoracionPage() {
           phone: formData.phone,
           email: formData.email,
           type: 'seller',
-          source: 'valoracion',
+          source: 'Calculadora Valoración',
           preferences: {
             property_address: addressFull,
             property_type: formData.propertyType,

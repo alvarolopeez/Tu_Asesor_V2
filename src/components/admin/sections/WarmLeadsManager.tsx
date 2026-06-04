@@ -42,6 +42,7 @@ import {
 import toast from "react-hot-toast";
 import PropertyFormModal from "./properties/PropertyFormModal";
 import type { PropertyFormValues } from "./properties/types";
+import { displaySource, LEAD_SOURCE_OPTIONS } from "@/lib/leadSources";
 
 // ─── INTERFACES & HELPER TYPES ──────────────────────────────────────────
 interface WarmLeadsManagerProps {
@@ -81,14 +82,8 @@ const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; dot: str
   'lost': { label: 'Inactivo / Perdido', color: 'text-slate-400 border-slate-500/20', dot: 'bg-slate-400', bg: 'bg-slate-500/10' }
 };
 
-const SOURCE_OPTIONS = [
-  'Calculadora Valoración',
-  'Calculadora Plusvalía',
-  'Paula WhatsApp',
-  'Meta Ads',
-  'Alta Manual',
-  'Formulario Web'
-];
+// Orígenes canónicos centralizados (fix #7).
+const SOURCE_OPTIONS = LEAD_SOURCE_OPTIONS;
 
 const PROPERTY_TYPES = ["Piso", "Casa", "Ático", "Dúplex", "Chalet", "Local", "Oficina", "Suelo", "Cualquiera"];
 
@@ -723,7 +718,7 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
                       {/* Source */}
                       <td className="py-4 px-6">
                         <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[10px] font-bold border border-blue-500/15 uppercase">
-                          {lead.source || 'Formulario'}
+                          {displaySource(lead.source)}
                         </span>
                       </td>
 

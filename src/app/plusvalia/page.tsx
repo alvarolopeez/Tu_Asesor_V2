@@ -175,7 +175,7 @@ export default function PlusvaliaPage() {
         name: formData.nombre,
         phone: formData.telefono,
         type: 'seller',
-        source: taxType === 'municipal' ? 'plusvalia' : 'plusvalia_fiscal'
+        source: 'Calculadora Plusvalía'
       },
       {
         tool_type: taxType === 'municipal' ? 'plusvalia' : 'plusvalia_fiscal',
