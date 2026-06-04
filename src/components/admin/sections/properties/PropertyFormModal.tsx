@@ -12,6 +12,7 @@ import {
   AVAILABLE_DAYS,
   AVAILABLE_HOURS,
 } from "./types";
+import AddressAutocomplete from "./AddressAutocomplete";
 
 interface PropertyFormModalProps {
   /** Propiedad en edición. `null` = modo creación. */
@@ -84,10 +85,13 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
   const [activeConfigDay, setActiveConfigDay] = useState<string>("Lunes");
   const [daySchedules, setDaySchedules] = useState<Record<string, string[]>>({ ...DEFAULT_DAY_SCHEDULES });
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<PropertyFormValues>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<PropertyFormValues>({
     resolver: zodResolver(propertySchema) as Resolver<PropertyFormValues, any>,
     defaultValues: FORM_DEFAULTS,
   });
+
+  // Valor actual de la dirección, para alimentar el autocompletado en edición.
+  const addressValue = watch("address");
 
   // Cada vez que cambia la propiedad en edición, rellenar / resetear el formulario.
   useEffect(() => {
@@ -191,21 +195,16 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
         setUploadedPlan(publicUrl);
       }
     } catch (err: any) {
-      console.warn("Storage upload failed or bucket properties unconfigured. Using preview URL fallback:", err);
-
-      const file = files[0];
-      const objectUrl = URL.createObjectURL(file);
-
+      // NO usamos fallback a URL.createObjectURL: ese `blob:` es temporal y
+      // moría al recargar, dejando fotos/vídeos "fantasma" que desaparecían
+      // de la web y del CRM (bug 2026-06). Si el Storage falla, avisamos y NO
+      // guardamos nada roto — el usuario reintenta.
+      console.error("[PropertyFormModal] Storage upload falló:", err?.message || err);
       toast.dismiss(loadingToast);
-      toast.success(`Carga completada (Vista Previa Local habilitada)`);
-
-      if (type === 'image') {
-        setUploadedImages(prev => [...prev, objectUrl]);
-      } else if (type === 'video') {
-        setUploadedVideo(objectUrl);
-      } else {
-        setUploadedPlan(objectUrl);
-      }
+      toast.error(
+        `No se pudo subir el archivo a Storage: ${err?.message || "error desconocido"}. ` +
+        `Revisa tu conexión e inténtalo de nuevo.`,
+      );
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -227,13 +226,23 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
         ? (publishedAt || new Date().toISOString())
         : publishedAt;
 
+      // Defensa: nunca persistir URLs `blob:` (temporales de preview local).
+      // Si alguna se coló, la descartamos para no guardar imágenes rotas.
+      const persistableImages = uploadedImages.filter((u) => !u.startsWith("blob:"));
+      const safeVideo = uploadedVideo && !uploadedVideo.startsWith("blob:") ? uploadedVideo : undefined;
+      const safePlan = uploadedPlan && !uploadedPlan.startsWith("blob:") ? uploadedPlan : undefined;
+      if (persistableImages.length !== uploadedImages.length || (uploadedVideo && !safeVideo) || (uploadedPlan && !safePlan)) {
+        toast.error("Hay archivos que no se subieron correctamente (vista previa local). Vuelve a subirlos antes de guardar.");
+        return;
+      }
+
       const dbPayload = {
         title,
         description,
         price,
         status,
         published_at: finalPublishedAt,
-        images: uploadedImages,
+        images: persistableImages,
         features: {
           propertyType: featData.propertyType,
           rooms: featData.rooms,
@@ -253,8 +262,8 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
             slots: Array.from(new Set(Object.values(daySchedules).flat())).sort(),
             schedule: daySchedules
           } : undefined,
-          video_url: uploadedVideo || undefined,
-          plan_url: uploadedPlan || undefined,
+          video_url: safeVideo,
+          plan_url: safePlan,
         }
       };
 
@@ -400,10 +409,18 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Dirección Exacta</label>
-                <input
-                  {...register("address")}
-                  className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all text-sm"
-                  placeholder="Calle, Número, Piso y Ciudad"
+                {/* Campo registrado oculto: AddressAutocomplete escribe en él via setValue. */}
+                <input type="hidden" {...register("address")} />
+                <AddressAutocomplete
+                  defaultValue={addressValue}
+                  onTextChange={(text) => setValue("address", text, { shouldValidate: true })}
+                  onSelect={(addr, lat, lon) => {
+                    setValue("address", addr, { shouldValidate: true });
+                    setValue("latitude", lat, { shouldValidate: true });
+                    setValue("longitude", lon, { shouldValidate: true });
+                    toast.success("Dirección y coordenadas autocompletadas");
+                  }}
+                  placeholder="Empieza a escribir la dirección (autocompleta y rellena el GPS)"
                 />
                 {errors.address && <span className="text-red-400 text-xs mt-1 block">{errors.address.message}</span>}
               </div>
