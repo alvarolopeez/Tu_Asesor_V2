@@ -1,7 +1,27 @@
 "use server"
 
 import { createClient } from '@supabase/supabase-js'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { sendWhatsAppTemplate } from '@/lib/whatsapp'
+import { normalizeEsPhone } from '@/lib/phone'
+
+/**
+ * Plantillas HSM que deben existir/aprobarse en Meta para que estos avisos se
+ * entreguen FUERA de la ventana de 24 h (un cliente que reserva por la web no
+ * ha escrito al bot, así que el texto libre se rechaza con 131047).
+ *
+ *   • `confirmacion_visita_cliente` (idioma es) — al CLIENTE.
+ *       {{1}} = nombre del cliente
+ *       {{2}} = título/inmueble de la visita
+ *       {{3}} = fecha y hora (texto ya formateado, ej. "12/06/2026 17:00")
+ *   • `aviso_alvaro` (idioma es, categoría Utility) — al ASESOR (Álvaro).
+ *       {{1}} = texto libre del aviso (una sola variable, reutilizable)
+ *
+ * Mientras Meta no las apruebe, los envíos devuelven false y se loguean, pero
+ * NO rompen la creación de la cita.
+ */
+const TPL_CONFIRM_VISITA = 'confirmacion_visita_cliente'
+const TPL_AVISO_ALVARO = 'aviso_alvaro'
+const ADVISOR_PHONE = process.env.ADVISOR_WHATSAPP_PHONE || ''
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -42,7 +62,9 @@ export async function bookPublicAppointment(
   data: PublicAppointmentData
 ): Promise<AppointmentResult> {
   try {
-    const cleanPhone = data.leadPhone.trim().replace(/\s+/g, '')
+    // Normalizamos a E.164 español (+34…) para que el lead quede con un
+    // formato consistente y los envíos de WhatsApp (plantillas) no fallen.
+    const cleanPhone = normalizeEsPhone(data.leadPhone)
     const cleanEmail = data.leadEmail?.trim().toLowerCase() || null
     const cleanName = data.leadName.trim()
 
@@ -182,7 +204,11 @@ export async function bookPublicAppointment(
       }
     }
 
-    // 3. Notificación de Reserva por WhatsApp
+    // 3. Notificaciones por WhatsApp (PLANTILLAS HSM).
+    //    El cliente acaba de reservar desde la web → está FUERA de la ventana
+    //    de 24 h de Meta, así que el texto libre se rechaza (131047). Usamos
+    //    plantillas aprobadas. Fire-and-forget: si fallan (o aún no están
+    //    aprobadas) NO rompemos la reserva, ya creada.
     try {
       const dateObj = new Date(data.scheduledAt)
       const formattedDate = dateObj.toLocaleString('es-ES', {
@@ -194,16 +220,24 @@ export async function bookPublicAppointment(
         minute: '2-digit'
       })
 
-      let whatsappMessage = ''
-      if (!isNewLead) {
-        // Caso A (Cliente ya registrado previamente)
-        whatsappMessage = `¡Hola ${cleanName}! 👋 Te confirmo que has reservado con éxito tu cita para visitar el inmueble *${data.propertyTitle}* el día ${formattedDate}.\n\nÁlvaro se pondrá en contacto contigo muy pronto para confirmar los detalles. ¡Que tengas un excelente día! 😊`
-      } else {
-        // Caso B (Cliente nuevo)
-        whatsappMessage = `¡Hola ${cleanName}! 👋 Cita confirmada para visitar el inmueble *${data.propertyTitle}* el día ${formattedDate}.\n\nPara preparar mejor tu visita, Álvaro te llamará pronto para hacerte unas preguntas muy breves sobre tus condiciones de compra.\n\nSi lo prefieres, puedes ahorrar tiempo y rellenar tu perfil de comprador directamente en nuestro formulario oficial a través del siguiente enlace: https://tuasesoralvaro.com/comprar?register=true\n\n¡Muchas gracias y nos vemos pronto! 😊`
-      }
+      // 3.a Confirmación al CLIENTE (plantilla confirmacion_visita_cliente).
+      void sendWhatsAppTemplate(
+        cleanPhone,
+        TPL_CONFIRM_VISITA,
+        [cleanName, data.propertyTitle, formattedDate],
+        { normalize: true, logTag: '[AppointmentService][HSM cliente]' },
+      )
 
-      await sendWhatsAppMessage(cleanPhone, whatsappMessage, { normalize: true, logTag: '[AppointmentService][WhatsApp]' })
+      // 3.b Aviso al ASESOR (Álvaro) con la plantilla genérica aviso_alvaro.
+      if (ADVISOR_PHONE) {
+        const aviso = `Nueva reserva de visita: ${cleanName} (${cleanPhone}) para "${data.propertyTitle}" el ${formattedDate}.`
+        void sendWhatsAppTemplate(
+          ADVISOR_PHONE,
+          TPL_AVISO_ALVARO,
+          [aviso],
+          { normalize: true, logTag: '[AppointmentService][HSM asesor]' },
+        )
+      }
     } catch (wsError) {
       console.error('[AppointmentService] Error al enviar WhatsApp:', wsError)
     }

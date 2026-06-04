@@ -86,3 +86,72 @@ export async function sendWhatsAppMessage(
     return false;
   }
 }
+
+/**
+ * Envía un mensaje de PLANTILLA HSM aprobada por WhatsApp Cloud API.
+ *
+ * Necesario para contactar a destinatarios FUERA de la ventana de 24 h de
+ * Meta (p.ej. confirmaciones de reserva online o avisos al asesor): Meta
+ * rechaza el texto libre con código 131047, pero acepta plantillas aprobadas.
+ *
+ * @param templateName  nombre EXACTO de la plantilla aprobada en Meta.
+ * @param bodyParams    valores en orden para las variables {{1}}, {{2}}, ...
+ * @param languageCode  código de idioma de la plantilla (por defecto "es").
+ *
+ * Devuelve `true` si Meta responde 2xx. Si la plantilla aún no está aprobada,
+ * Meta devuelve error y se registra (no rompe el flujo del caller).
+ */
+export async function sendWhatsAppTemplate(
+  to: string,
+  templateName: string,
+  bodyParams: string[] = [],
+  options: SendWhatsAppOptions & { languageCode?: string } = {}
+): Promise<boolean> {
+  const { normalize = false, logTag = '[WhatsApp HSM]', languageCode = 'es' } = options;
+
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+    console.warn(`${logTag} ⚠️ Credenciales WhatsApp no configuradas. Plantilla no enviada.`);
+    return false;
+  }
+
+  const recipient = normalize ? normalizePhone(to) : to;
+  const components = bodyParams.length > 0
+    ? [{ type: 'body', parameters: bodyParams.map((text) => ({ type: 'text', text: String(text) })) }]
+    : [];
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${PHONE_NUMBER_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipient,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: languageCode },
+            ...(components.length > 0 ? { components } : {}),
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(`${logTag} Error Meta (plantilla ${templateName}):`, response.status, errorBody);
+      return false;
+    }
+
+    console.log(`${logTag} ✅ Plantilla ${templateName} enviada a ${recipient}`);
+    return true;
+  } catch (error) {
+    console.error(`${logTag} Error de red:`, error);
+    return false;
+  }
+}

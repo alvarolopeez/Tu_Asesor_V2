@@ -5,6 +5,7 @@ import { X, ChevronRight, ChevronLeft, Check, Home, MapPin, Calculator, CreditCa
 import { supabase } from "@/lib/supabase";
 import dynamic from "next/dynamic";
 import { VALIDATION } from "@/lib/constants";
+import { normalizeEsPhone } from "@/lib/phone";
 
 const BuyerMap = dynamic(() => import("./BuyerMap"), { ssr: false });
 
@@ -321,7 +322,8 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
     setError(null);
 
     try {
-      const cleanPhone = formData.phone.trim().replace(/\s+/g, '');
+      // E.164 español (+34…) para que la bienvenida HSM y la difusión no fallen.
+      const cleanPhone = normalizeEsPhone(formData.phone);
       const cleanName = `${formData.firstName} ${formData.lastName}`.trim();
       const cleanEmail = formData.email?.trim().toLowerCase() || null;
 
