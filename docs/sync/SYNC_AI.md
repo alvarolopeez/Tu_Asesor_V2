@@ -4,7 +4,29 @@
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
 ## 📥 Peticiones Pendientes
+- 🔴 **ACCIÓN ÁLVARO — crear 2 plantillas HSM en Meta** (necesarias para que el aviso de reserva online se entregue, #9):
+  - `confirmacion_visita_cliente` (idioma `es`) → al cliente. Variables: `{{1}}` nombre, `{{2}}` inmueble, `{{3}}` fecha y hora.
+  - `aviso_alvaro` (idioma `es`, categoría **Utility**) → al asesor. Variable única: `{{1}}` texto libre del aviso. Reutilizable para todos los avisos al asesor (reserva, escalación, Documenso).
+  - Hasta que Meta las apruebe, esos envíos fallan en silencio (no rompen la reserva). El código ya está cableado.
 - ⏸️ **Documenso "Enviar a firmar"**: bloqueado por el límite mensual del plan GRATIS (consumido con pruebas de diagnóstico el 2026-05-30). Resuelto al pagar plan PRO el 2026-06-01. El código y los 4 workflows ya están listos para producción.
+
+## ✅ [2026-06-04] 9 fallos de QA corregidos (5 tandas)
+
+Sesión de fixes tras pruebas de Álvaro. Causa raíz verificada en código/datos antes de tocar nada.
+
+1. **#8 Fotos/vídeos desaparecían** — el bucket Storage `properties` NO existía → cada subida caía al fallback `URL.createObjectURL` (blob temporal) que moría al recargar. Creado bucket `properties` (público, policies read público + write authenticated). Eliminado el fallback blob; guarda en onSubmit que descarta blobs residuales.
+2. **#4 Autocompletado de dirección** — nuevo `AddressAutocomplete` (Nominatim/OSM, gratis, sin key). Rellena dirección + lat/lng al elegir sugerencia. Sustituye el tecleo manual de GPS.
+3. **#1 Firmas Documenso mal colocadas** — `buildSimplePdf` ahora devuelve `{ bytes, signatureBoxes }` con las coordenadas REALES de cada línea de firma (% de página, origen arriba-izq). `sendForSignature` ancla los campos sobre la línea; mapeo asesor→línea "asesor/mediador".
+4. **#2 Firma no secuencial** — añadido `meta.signingOrder:"SEQUENTIAL"` en `POST /documents` (verificado en OpenAPI v1). Con `signingOrder` por recipient (asesor=1), Documenso envía al cliente solo cuando Álvaro firma.
+5. **#3 Bienvenida no llegaba** — la versión ACTIVA del workflow `Notificacion Nuevo Lead` (QikfXMJumWbpI3wL) era la vieja con `type:"text"` (rechazada fuera de 24h). PUBLICADA la versión HSM `bienvenida_nuevo_lead` (activeVersion `cb0bae70`).
+6. **Teléfonos** — nuevo `src/lib/phone.ts` `normalizeEsPhone` (→ `+34…`), aplicado al crear leads en BuyerRegistrationModal y appointmentService.
+7. **#9 Reserva online** — sustituido el WhatsApp texto-libre (siempre rechazado) por plantillas HSM (`sendWhatsAppTemplate` nuevo). appointmentService normaliza tel + auto-crea comprador + envía `confirmacion_visita_cliente` (cliente) y `aviso_alvaro` (asesor). Requiere las 2 plantillas (ver arriba).
+8. **#7 Origen de lead** — nuevo `src/lib/leadSources.ts` con etiquetas canónicas + `displaySource()`. Inserts en valoración/plusvalía/rentabilidad/comprador/reserva normalizados; WarmLeadsManager los muestra legibles (legacy traducido al vuelo).
+9. **#6 Vincular inmueble↔encargo + métricas** — en el drawer del encargo (tab Publicación web) se vincula/desvincula el `property_id` y se muestran métricas (visitas web por page_path + citas).
+10. **#5 Comprador no salía en difusión** — era dato de prueba (buscaba Piso, inmueble era Casa → filtro de tipo descarta, correcto). Mantenido estricto. De paso endurecido el parseo de lat/lng del inmueble (venían como string en el jsonb).
+
+**Migración aplicada**: bucket Storage `properties`. **n8n**: workflow bienvenida publicado.
+**Pendiente verificación E2E por Álvaro** (no testeable desde agente): firmas reales en Documenso, entrega WhatsApp tras aprobar plantillas, subida de fotos en prod.
 - ⚠️ **n8n `Difusion Inteligente` — credenciales HTTP Bearer**: tras el update v374fdb38 (2026-06-03) el MCP avisó "credentials skipped during auto-assignment" para los nodos `Enviar WhatsApp Meta` y `Log Difusion CRM`. Verificar manualmente en n8n UI que el credencial "Bearer Auth account" (id `s3YA5o57rEEdFw1W`) sigue atado a `Enviar WhatsApp Meta`. Si no, reabrir el nodo, seleccionar la credencial y re-publicar.
 
 ## 🏗️ [2026-06-04] Refactor arquitectónico CRM — separación Vendedores / Encargos / Inmuebles / Documentos
