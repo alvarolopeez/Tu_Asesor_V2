@@ -23,6 +23,12 @@ import { supabase } from '@/lib/supabase';
 
 const N8N_API_KEY = process.env.N8N_API_KEY || '';
 
+// Reglas del seguimiento automático (consensuadas con Álvaro 2026-06-06).
+// Si cambian: tocar SOLO estos valores, no la lógica del SELECT.
+const FOLLOWUP_INACTIVITY_DAYS = 60; // un lead entra al envío si lleva >=60d sin contacto
+const FOLLOWUP_COOLDOWN_DAYS   = 90; // tras recibir un seguimiento, no vuelve a recibir otro hasta pasados 90d
+const FOLLOWUP_DAILY_CAP       = 20; // máximo de seguimientos enviados por ejecución del cron
+
 function validateApiKey(request: NextRequest): boolean {
   const apiKey = request.headers.get('x-api-key');
   return apiKey === N8N_API_KEY;
@@ -265,6 +271,65 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
+      // ─── Pendientes de Seguimiento (Cron L-V 9:00) ───
+      // Devuelve hasta FOLLOWUP_DAILY_CAP leads compradores que:
+      //  · llevan ≥ FOLLOWUP_INACTIVITY_DAYS sin actualización,
+      //  · NO han recibido seguimiento en los últimos FOLLOWUP_COOLDOWN_DAYS,
+      //  · están abiertos (status ≠ closed/lost), y tienen teléfono válido.
+      // Marca last_followup_at = NOW() ANTES de devolver para no
+      // reincidir aunque el envío Meta luego falle (mejor perder 1 ciclo que
+      // entrar en bucle). Si Meta cae sistemáticamente, se ve en n8n_webhook_logs.
+      case 'get_pending_followups': {
+        const inactivityCutoff = new Date(Date.now() - FOLLOWUP_INACTIVITY_DAYS * 86_400_000).toISOString();
+        const cooldownCutoff   = new Date(Date.now() - FOLLOWUP_COOLDOWN_DAYS   * 86_400_000).toISOString();
+
+        const { data: candidates, error: selErr } = await supabase
+          .from('leads')
+          .select('id, name, phone, last_followup_at, updated_at')
+          .eq('type', 'buyer')
+          .not('status', 'in', '(closed,lost)')
+          .not('phone', 'is', null)
+          .lte('updated_at', inactivityCutoff)
+          .or(`last_followup_at.is.null,last_followup_at.lte.${cooldownCutoff}`)
+          .order('last_followup_at', { ascending: true, nullsFirst: true })
+          .order('updated_at', { ascending: true })
+          .limit(FOLLOWUP_DAILY_CAP);
+
+        if (selErr) {
+          return NextResponse.json({ error: selErr.message }, { status: 500 });
+        }
+
+        const leads = (candidates || []).filter(l => !!l.phone?.trim());
+
+        if (leads.length > 0) {
+          const ids = leads.map(l => l.id);
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from('leads')
+            .update({ last_followup_at: nowIso })
+            .in('id', ids);
+        }
+
+        // Forma que espera el nodo "Separar Leads" del workflow:
+        //   leads[i] = { id, name, phone, days_since_contact? }
+        return NextResponse.json({
+          leads: leads.map(l => ({
+            id: l.id,
+            name: l.name,
+            phone: l.phone,
+            days_since_contact: l.updated_at
+              ? Math.floor((Date.now() - new Date(l.updated_at).getTime()) / 86_400_000)
+              : null,
+          })),
+          count: leads.length,
+          rules: {
+            inactivity_days: FOLLOWUP_INACTIVITY_DAYS,
+            cooldown_days:   FOLLOWUP_COOLDOWN_DAYS,
+            daily_cap:       FOLLOWUP_DAILY_CAP,
+          },
+        });
+      }
+
       // ─── Acción desconocida ─────────────────────────
       default:
         return NextResponse.json(
@@ -277,6 +342,7 @@ export async function POST(request: NextRequest) {
               'get_properties',
               'log_interaction',
               'send_chatbot_response',
+              'get_pending_followups',
             ],
           },
           { status: 400 }

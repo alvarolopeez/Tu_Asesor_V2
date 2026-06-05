@@ -3,6 +3,26 @@
 
 Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a la automatización de WhatsApp o N8N, deben reportarlo aquí para que el Agente IA ajuste los flujos.
 
+---
+
+### 2026-06-06 — Activación del seguimiento automático L-V 9:00
+
+El workflow `Seguimiento Leads Diario` (`VnXhrEh2G8AeR0DT`) llamaba al endpoint `/api/webhooks/n8n` con `action: "get_pending_followups"`, pero esa acción NO estaba implementada — devolvía 400 "Unknown action". Por eso 0 leads habían recibido seguimiento desde el origen del proyecto.
+
+**Implementado:**
+- Migración Supabase `add_last_followup_at_to_leads`: nueva columna `leads.last_followup_at TIMESTAMPTZ` + índice parcial filtrado por `type='buyer' AND status NOT IN ('closed','lost')`.
+- Acción `get_pending_followups` en `src/app/api/webhooks/n8n/route.ts`.
+
+**Reglas (consensuadas con Álvaro):**
+- Inactividad: lead entra si `updated_at <= NOW() - 60 días`.
+- Cooldown: tras recibir un seguimiento, no vuelve a entrar en 90 días.
+- Tope diario: máximo 20 leads por ejecución del cron.
+- Filtros: `type='buyer'`, `status NOT IN ('closed','lost')`, `phone NOT NULL`.
+
+**Importante**: el endpoint marca `last_followup_at = NOW()` ANTES de devolver la lista. Si Meta luego falla, el lead pierde un ciclo pero no entra en bucle. Detectable vía `n8n_webhook_logs`.
+
+**No requiere cambios en n8n** — el workflow ya hace la llamada correctamente.
+
 ## 📥 Peticiones Pendientes
 - 🔴 **ACCIÓN ÁLVARO — crear 2 plantillas HSM en Meta** (necesarias para que el aviso de reserva online se entregue, #9):
   - `confirmacion_visita_cliente` (idioma `es`) → al cliente. Variables: `{{1}}` nombre, `{{2}}` inmueble, `{{3}}` fecha y hora.
