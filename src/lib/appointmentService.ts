@@ -14,7 +14,10 @@ import { normalizeEsPhone } from '@/lib/phone'
  *       {{2}} = título/inmueble de la visita
  *       {{3}} = fecha y hora (texto ya formateado, ej. "12/06/2026 17:00")
  *   • `aviso_alvaro` (idioma es, categoría Utility) — al ASESOR (Álvaro).
- *       {{1}} = texto libre del aviso (una sola variable, reutilizable)
+ *       {{1}} = título corto del aviso (ej. "Nueva reserva de visita")
+ *       {{2}} = detalle del aviso (línea separada por · con datos clave)
+ *       Plantilla genérica reutilizable: vale para reservas, escalaciones,
+ *       Documenso, etc. El pie "— CRM Tu Asesor Álvaro" lo añade la plantilla.
  *
  * Mientras Meta no las apruebe, los envíos devuelven false y se loguean, pero
  * NO rompen la creación de la cita.
@@ -229,12 +232,15 @@ export async function bookPublicAppointment(
       )
 
       // 3.b Aviso al ASESOR (Álvaro) con la plantilla genérica aviso_alvaro.
+      //     Estructura: {{1}} título corto + {{2}} detalle (línea con `·`).
+      //     La plantilla añade su propio pie "— CRM Tu Asesor Álvaro".
       if (ADVISOR_PHONE) {
-        const aviso = `Nueva reserva de visita: ${cleanName} (${cleanPhone}) para "${data.propertyTitle}" el ${formattedDate}.`
+        const avisoTitulo = 'Nueva reserva de visita'
+        const avisoDetalle = `${cleanName} · ${cleanPhone} · "${data.propertyTitle}" · ${formattedDate}`
         void sendWhatsAppTemplate(
           ADVISOR_PHONE,
           TPL_AVISO_ALVARO,
-          [aviso],
+          [avisoTitulo, avisoDetalle],
           { normalize: true, logTag: '[AppointmentService][HSM asesor]' },
         )
       }
