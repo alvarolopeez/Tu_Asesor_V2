@@ -1,4 +1,4 @@
-import { Printer, TrendingDown } from "lucide-react";
+import { Printer, TrendingDown, Sparkles } from "lucide-react";
 import type { PropertyRow } from "../types";
 import type { SelectedMetrics, PriceDropEstimate } from "./operacionesUtils";
 
@@ -13,6 +13,8 @@ interface PropertyReportSelectorProps {
   priceDrop?: PriceDropEstimate;
   /** Abre la vista previa del dossier PDF. */
   onPrint: () => void;
+  /** Abre el modal con el análisis IA del inmueble (T7 brief #002). */
+  onGenerateAIReport: () => void;
 }
 
 const CONFIDENCE_STYLE: Record<string, string> = {
@@ -32,8 +34,20 @@ export default function PropertyReportSelector({
   platformAvgDays,
   priceDrop,
   onPrint,
+  onGenerateAIReport,
 }: PropertyReportSelectorProps) {
-  const { selectedViews, selectedDays, selectedPrice, selectedValuation, valuationDiffPct, correlationRating, correlationColor, isPublished } = metrics;
+  const {
+    selectedViews,
+    selectedPhysicalCompleted,
+    selectedPhysicalPending,
+    selectedDays,
+    selectedPrice,
+    selectedValuation,
+    valuationDiffPct,
+    correlationRating,
+    correlationColor,
+    isPublished,
+  } = metrics;
 
   return (
     <div className="bg-[#1E293B]/85 backdrop-blur-md p-6 rounded-2xl border border-[#FBBF24]/30 shadow-xl">
@@ -76,9 +90,18 @@ export default function PropertyReportSelector({
                 <span className="text-slate-400">Días Publicada</span>
                 <span className="font-bold text-white">{isPublished ? `${selectedDays} días` : "Sin publicar"}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Visitas Totales</span>
+              <div className="flex justify-between pb-1 border-b border-white/5">
+                <span className="text-slate-400">Visitas Web</span>
                 <span className="font-bold text-white">{selectedViews} visitas</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Visitas Físicas</span>
+                <span className="font-bold text-white">
+                  {selectedPhysicalCompleted} completadas
+                  {selectedPhysicalPending > 0 && (
+                    <span className="ml-1 text-amber-300">(+{selectedPhysicalPending} pendientes)</span>
+                  )}
+                </span>
               </div>
             </div>
           </div>
@@ -117,12 +140,20 @@ export default function PropertyReportSelector({
               <p className="text-[10px] text-slate-500 mt-1">Desviación respecto a Valoración de Mercado</p>
             </div>
 
-            <button
-              onClick={onPrint}
-              className="w-full mt-4 py-2 bg-[#FBBF24] hover:bg-[#FBBF24]/90 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
-            >
-              <Printer size={14} /> Generar Informe PDF
-            </button>
+            <div className="space-y-2 mt-4">
+              <button
+                onClick={onPrint}
+                className="w-full py-2 bg-[#FBBF24] hover:bg-[#FBBF24]/90 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
+              >
+                <Printer size={14} /> Generar Informe PDF
+              </button>
+              <button
+                onClick={onGenerateAIReport}
+                className="w-full py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-200 hover:text-white border border-violet-400/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
+              >
+                <Sparkles size={14} /> Generar análisis IA
+              </button>
+            </div>
           </div>
 
           {/* ─── ESTIMACIÓN DE BAJADA DE PRECIO (heurística) ─────────────── */}

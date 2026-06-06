@@ -98,7 +98,7 @@ export default function CaptacionReportModal({
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-3 text-slate-600">Visitas Totales</td>
+                  <td className="px-4 py-3 text-slate-600">Visitas Web</td>
                   <td className="px-4 py-3 text-right text-slate-900 font-bold">{selectedViews} visitas</td>
                   <td className="px-4 py-3 text-right text-slate-500">{platformAvgViews} visitas</td>
                   <td className={`px-4 py-3 text-right font-bold ${selectedViews >= platformAvgViews ? "text-green-600" : "text-orange-600"}`}>
@@ -127,8 +127,13 @@ export default function CaptacionReportModal({
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <p className="text-slate-500 font-semibold">Visitas Físicas Realizadas</p>
                 <p className="text-base font-bold text-slate-950">
-                  {appointments.filter(appt => appt.property_id === selectedProperty.id && appt.type === 'visita').length} visitas
+                  {appointments.filter(a => a.property_id === selectedProperty.id && a.type === 'visita' && a.status === 'completed').length} completadas
                 </p>
+                {appointments.filter(a => a.property_id === selectedProperty.id && a.type === 'visita' && a.status === 'pending').length > 0 && (
+                  <p className="text-[10px] text-amber-600 font-semibold mt-0.5">
+                    +{appointments.filter(a => a.property_id === selectedProperty.id && a.type === 'visita' && a.status === 'pending').length} pendientes
+                  </p>
+                )}
               </div>
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                 <p className="text-slate-500 font-semibold">Comentarios / Interacciones</p>
