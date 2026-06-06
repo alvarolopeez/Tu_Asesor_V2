@@ -26,6 +26,7 @@ import BuyersBreakdown from "./operaciones/BuyersBreakdown";
 import PropertyViewsRanking from "./operaciones/PropertyViewsRanking";
 import PropertyReportSelector from "./operaciones/PropertyReportSelector";
 import CaptacionReportModal from "./operaciones/CaptacionReportModal";
+import AIReportModal from "./operaciones/AIReportModal";
 
 /**
  * Pestaña "Operaciones" del dashboard admin.
@@ -47,6 +48,7 @@ export default function OperacionesTab() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
   const [sevillaSearchQuery, setSevillaSearchQuery] = useState("");
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [showAIReport, setShowAIReport] = useState(false);
 
   useEffect(() => {
     fetchOperacionesData();
@@ -102,10 +104,22 @@ export default function OperacionesTab() {
   const buyerLeads = leads.filter((l) => l.type === "buyer");
   const sellerLeads = leads.filter((l) => l.type === "seller");
 
-  // Visitas reales por propiedad (web_visits cuyo page_path contiene el id)
+  // Visitas web por propiedad (web_visits cuyo page_path contiene el id)
   const visitsByProperty: Record<string, number> = {};
+  // Visitas físicas (appointments) por propiedad, separadas por status.
+  // Solo `completed` cuenta como cierre real; `pending` se muestra aparte
+  // para no inflar el informe con visitas que aún no han ocurrido.
+  // @added 2026-06-06 brief #002 T3.
+  const physicalCompletedByProperty: Record<string, number> = {};
+  const physicalPendingByProperty: Record<string, number> = {};
   for (const p of properties) {
     visitsByProperty[p.id] = webVisits.filter(v => v.page_path?.includes(p.id)).length;
+    physicalCompletedByProperty[p.id] = appointments.filter(
+      a => a.property_id === p.id && a.status === 'completed'
+    ).length;
+    physicalPendingByProperty[p.id] = appointments.filter(
+      a => a.property_id === p.id && a.status === 'pending'
+    ).length;
   }
 
   // Valoración de referencia por propiedad: lead vinculado → fallback feature.
@@ -132,9 +146,13 @@ export default function OperacionesTab() {
   const selectedDays = selectedProperty ? daysOnMarket(selectedProperty) : null;
   const selectedVisits = selectedProperty ? (visitsByProperty[selectedProperty.id] ?? 0) : 0;
   const selectedValuation = selectedProperty ? (valuationByProperty[selectedProperty.id] ?? 0) : 0;
+  const selectedPhysicalCompleted = selectedProperty ? (physicalCompletedByProperty[selectedProperty.id] ?? 0) : 0;
+  const selectedPhysicalPending = selectedProperty ? (physicalPendingByProperty[selectedProperty.id] ?? 0) : 0;
   const selectedMetrics = computeSelectedMetrics(selectedProperty, {
     days: selectedDays,
     views: selectedVisits,
+    physicalCompleted: selectedPhysicalCompleted,
+    physicalPending: selectedPhysicalPending,
     valuation: selectedValuation,
   });
 
@@ -187,7 +205,17 @@ export default function OperacionesTab() {
         platformAvgDays={platformAvgDays}
         priceDrop={priceDrop}
         onPrint={() => setShowPrintModal(true)}
+        onGenerateAIReport={() => setShowAIReport(true)}
       />
+
+      {/* Análisis IA del inmueble (T7 brief #002) */}
+      {showAIReport && selectedProperty && (
+        <AIReportModal
+          propertyId={selectedProperty.id}
+          propertyTitle={selectedProperty.title}
+          onClose={() => setShowAIReport(false)}
+        />
+      )}
 
       {/* PDF Export Overlay modal template */}
       {showPrintModal && selectedProperty && (

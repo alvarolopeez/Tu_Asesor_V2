@@ -2,6 +2,11 @@ import { supabase } from '@/lib/supabase';
 import type { ChatbotEngineResponse, ChatChannel } from '@/types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import {
+  getInterviewState,
+  handleInterviewStep,
+  tryHandleScheduleVisit,
+} from './scheduling';
 
 /**
  * Motor del Chatbot — Orquesta la generación de respuestas.
@@ -40,6 +45,24 @@ interface EngineInput {
  * Gestiona historial, contexto y delegación al LLM o fallback.
  */
 export async function processMessage(input: EngineInput): Promise<ChatbotEngineResponse> {
+  // 0. Si la conversación está en medio de la entrevista pre-cita (T4),
+  //    interpretamos el mensaje como respuesta a la pregunta actual y
+  //    cortocircuitamos el LLM. La entrevista es una máquina de estados
+  //    determinista — el LLM no aporta nada y arriesga a desorientarse.
+  //    @added 2026-06-06 brief #002 T4
+  const interview = await getInterviewState(input.conversationId).catch(() => null);
+  if (interview) {
+    const hookRes = await handleInterviewStep(interview, input.message, input.conversationId);
+    return {
+      response: hookRes.response,
+      intent: hookRes.intent === 'ESCALATE' ? 'ESCALATE' : 'schedule_visit',
+      confidence: 0.95,
+      data_extracted: {},
+      conversation_id: input.conversationId,
+      should_escalate: hookRes.shouldEscalate,
+    };
+  }
+
   // 1. Recuperar historial de la conversación (últimos 10 mensajes)
   const history = await getConversationHistory(input.conversationId, 10);
 
@@ -62,6 +85,39 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     default:
       // Fallback: detección por keywords (Fase 1)
       result = keywordFallback(input.message, input.conversationId);
+  }
+
+  // 4. Si el LLM detectó schedule_visit, dejamos que el módulo de scheduling
+  //    valide disponibilidad real, lance entrevista si toca o cree cita.
+  //    Si tryHandleScheduleVisit devuelve null, conservamos la respuesta
+  //    del LLM (todavía estaba pidiendo el teléfono, p.ej.).
+  if (result.intent === 'schedule_visit') {
+    const hookRes = await tryHandleScheduleVisit({
+      conversationId: input.conversationId,
+      leadName: input.leadContext?.name,
+      leadPhone: input.leadContext?.phone,
+      userMessage: input.message,
+      extracted: {
+        name: result.data_extracted?.name ?? null,
+        phone: result.data_extracted?.phone ?? null,
+        preferred_date: result.data_extracted?.preferred_date ?? null,
+        property_interest: result.data_extracted?.property_interest ?? null,
+      },
+    }).catch((err) => {
+      console.error('[engine] tryHandleScheduleVisit error:', err);
+      return null;
+    });
+
+    if (hookRes) {
+      result = {
+        response: hookRes.response,
+        intent: hookRes.intent === 'ESCALATE' ? 'ESCALATE' : 'schedule_visit',
+        confidence: 0.9,
+        data_extracted: result.data_extracted,
+        conversation_id: input.conversationId,
+        should_escalate: hookRes.shouldEscalate,
+      };
+    }
   }
 
   return result;

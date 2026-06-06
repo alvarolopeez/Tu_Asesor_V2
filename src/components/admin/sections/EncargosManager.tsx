@@ -380,6 +380,18 @@ function EncargoDrawer({ encargo, onClose, onChange }: { encargo: EncargoRow; on
   const [appointments, setAppointments] = useState<any[]>([]);
   const [vinculatedDocs, setVinculatedDocs] = useState<any[]>([]);
 
+  // Timeline mixto de la tab actividad (T6 brief #002).
+  // Cada item es un evento normalizado para renderizar cronológico.
+  type TimelineEvent = {
+    id: string;
+    when: string;                                            // ISO
+    kind: 'visita' | 'nota' | 'documento' | 'estado';
+    title: string;
+    detail?: string | null;
+    status?: 'pending' | 'completed' | 'cancelled' | 'other';
+  };
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+
   // ── Publicación web (#6): vincular property + métricas ──
   const [availableProperties, setAvailableProperties] = useState<any[]>([]);
   const [linkedProperty, setLinkedProperty] = useState<any | null>(null);
@@ -416,13 +428,105 @@ function EncargoDrawer({ encargo, onClose, onChange }: { encargo: EncargoRow; on
           .select("id, template_id, signature_status, documenso_id, created_at")
           .eq("encargo_id", encargo.id);
         if (!cancelled) setVinculatedDocs(docs || []);
-      } else if (tab === "actividad" && encargo.seller_lead_id) {
-        const { data } = await supabase
-          .from("appointments")
-          .select("*")
-          .eq("lead_id", encargo.seller_lead_id)
-          .order("scheduled_at", { ascending: false });
-        if (!cancelled) setAppointments(data || []);
+      } else if (tab === "actividad") {
+        // Timeline mixto (T6 brief #002):
+        //   • Visitas: por seller_lead_id Y por property_id (citas de los
+        //     compradores que vinieron a ver este inmueble también cuentan).
+        //   • Notas/actividad del comprador relacionadas con el property_id
+        //     del encargo.
+        //   • Documentos generados (propuestas, contratos, KYC...) atados
+        //     al encargo.
+        //   • Cambios de estado del propio encargo: usamos created_at +
+        //     updated_at del encargo como dos eventos (creación + último
+        //     cambio) cuando son distintos.
+        const apptFilter = encargo.property_id
+          ? `lead_id.eq.${encargo.seller_lead_id ?? '00000000-0000-0000-0000-000000000000'},property_id.eq.${encargo.property_id}`
+          : `lead_id.eq.${encargo.seller_lead_id ?? '00000000-0000-0000-0000-000000000000'}`;
+
+        const [apptsRes, notesRes, docsRes] = await Promise.all([
+          supabase
+            .from('appointments')
+            .select('*')
+            .or(apptFilter)
+            .order('scheduled_at', { ascending: false }),
+          encargo.property_id
+            ? supabase
+                .from('buyer_activity_logs')
+                .select('*')
+                .eq('property_id', encargo.property_id)
+                .order('event_date', { ascending: false })
+            : Promise.resolve({ data: [] as any[] }),
+          supabase
+            .from('generated_documents')
+            .select('id, signature_status, created_at, template_id, document_templates(name)')
+            .eq('encargo_id', encargo.id)
+            .order('created_at', { ascending: false }),
+        ]);
+
+        const apptsData = (apptsRes.data as any[]) || [];
+        if (!cancelled) setAppointments(apptsData);
+
+        const events: TimelineEvent[] = [];
+
+        apptsData.forEach((a) => {
+          const rawStatus = (a.status as string) || 'pending';
+          const status: TimelineEvent['status'] =
+            rawStatus === 'completed' || rawStatus === 'pending' || rawStatus === 'cancelled'
+              ? rawStatus
+              : 'other';
+          events.push({
+            id: `appt-${a.id}`,
+            when: a.scheduled_at,
+            kind: 'visita',
+            title: a.title || `Visita (${a.type || 'visita'})`,
+            detail: a.notes || null,
+            status,
+          });
+        });
+
+        ((notesRes as any).data as any[] || []).forEach((n) => {
+          events.push({
+            id: `note-${n.id}`,
+            when: n.event_date,
+            kind: 'nota',
+            title: n.title || `${n.event_type || 'Nota'}`,
+            detail: n.notes,
+          });
+        });
+
+        ((docsRes.data as any[]) || []).forEach((d) => {
+          const tplName = (d as any).document_templates?.name || `Documento ${String(d.id).slice(0, 6)}`;
+          events.push({
+            id: `doc-${d.id}`,
+            when: d.created_at,
+            kind: 'documento',
+            title: `${tplName}`,
+            detail: `Estado de firma: ${d.signature_status || 'pendiente'}`,
+            status: d.signature_status === 'completed' ? 'completed' : 'pending',
+          });
+        });
+
+        // Evento "Encargo creado" y, si el updated_at es posterior y el
+        // status no es 'activo', un evento de cambio de estado.
+        events.push({
+          id: `enc-created-${encargo.id}`,
+          when: encargo.created_at,
+          kind: 'estado',
+          title: 'Encargo creado',
+          detail: `Status: ${encargo.status}`,
+        });
+        if (encargo.updated_at && encargo.updated_at !== encargo.created_at && encargo.status !== 'activo') {
+          events.push({
+            id: `enc-update-${encargo.id}`,
+            when: encargo.updated_at,
+            kind: 'estado',
+            title: `Encargo → ${encargo.status}`,
+            detail: 'Último cambio de estado registrado.',
+          });
+        }
+
+        events.sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime());
+        if (!cancelled) setTimeline(events);
       } else if (tab === "publicacion") {
         // Lista de inmuebles para el selector de vínculo.
         const { data: props } = await supabase
@@ -737,19 +841,51 @@ function EncargoDrawer({ encargo, onClose, onChange }: { encargo: EncargoRow; on
 
           {tab === "actividad" && (
             <div className="space-y-3">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5"><Calendar size={12} /> Visitas y citas</h3>
-              {appointments.length === 0 ? (
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <Calendar size={12} /> Timeline del expediente
+              </h3>
+              <p className="text-[10px] text-slate-500">
+                Visitas, anotaciones, documentos firmados y cambios de estado en orden cronológico.
+              </p>
+              {timeline.length === 0 ? (
                 <p className="text-[11px] text-slate-500 italic">Sin actividad registrada.</p>
               ) : (
                 <ul className="space-y-2">
-                  {appointments.map((ap) => (
-                    <li key={ap.id} className="bg-[#1E293B]/40 border border-white/5 rounded-xl px-3 py-2">
-                      <p className="text-xs text-white font-semibold">{ap.title || "Cita"}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {fmtDate(ap.scheduled_at)} · {ap.status || "—"}
-                      </p>
-                    </li>
-                  ))}
+                  {timeline.map((ev) => {
+                    const iconMap = { visita: '📅', nota: '📝', documento: '📄', estado: '🔄' } as const;
+                    const statusBadge =
+                      ev.status === 'pending'
+                        ? { cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30', label: 'Pendiente', strike: false }
+                        : ev.status === 'completed'
+                        ? { cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30', label: 'Completada', strike: false }
+                        : ev.status === 'cancelled'
+                        ? { cls: 'bg-slate-500/15 text-slate-400 border-slate-500/30', label: 'Cancelada', strike: true }
+                        : null;
+                    return (
+                      <li
+                        key={ev.id}
+                        className={`bg-[#1E293B]/40 border border-white/5 rounded-xl px-3 py-2 ${statusBadge?.strike ? 'opacity-60' : ''}`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-base leading-tight">{iconMap[ev.kind]}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className={`text-xs text-white font-semibold ${statusBadge?.strike ? 'line-through' : ''}`}>{ev.title}</p>
+                              {statusBadge && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider rounded-full border px-1.5 py-0.5 ${statusBadge.cls}`}>
+                                  {statusBadge.label}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">{fmtDate(ev.when)}</p>
+                            {ev.detail && (
+                              <p className="text-[11px] text-slate-300 mt-1 whitespace-pre-line line-clamp-3">{ev.detail}</p>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

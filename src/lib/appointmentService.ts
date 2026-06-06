@@ -177,6 +177,68 @@ export async function bookPublicAppointment(
       }
     }
 
+    // 1.c UPSERT en `buyers_demands` para que el comprador aparezca en la
+    //     pestaña "Pedidos" del CRM (BuyersManager.tsx lee SOLO de esa
+    //     tabla; antes de este fix, la reserva web solo insertaba en
+    //     `leads` y el comprador desaparecía de Pedidos al recargar).
+    //     @added 2026-06-06 brief #002 T2 — replica el patrón exacto de
+    //     BuyerRegistrationModal.tsx. Se ejecuta SIEMPRE (no solo cuando
+    //     el lead es nuevo) porque puede existir un lead sin su demand.
+    //     Fire-and-soft: si falla NO rompe la reserva ya creada.
+    try {
+      const { data: existingBuyers } = await supabaseAdmin
+        .from('buyers_demands')
+        .select('id')
+        .eq('phone', cleanPhone)
+        .limit(1)
+
+      if (existingBuyers && existingBuyers.length > 0) {
+        await supabaseAdmin
+          .from('buyers_demands')
+          .update({
+            name: cleanName,
+            email: cleanEmail,
+            status: 'Búsqueda activa',
+            updated_at: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
+          })
+          .eq('id', existingBuyers[0].id)
+      } else {
+        const { data: newBuyer } = await supabaseAdmin
+          .from('buyers_demands')
+          .insert([{
+            name: cleanName,
+            phone: cleanPhone,
+            email: cleanEmail,
+            max_budget: 0,
+            min_budget: 0,
+            min_sqm: 0,
+            status: 'Búsqueda activa',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
+          }])
+          .select('id')
+          .single()
+
+        if (newBuyer?.id) {
+          await supabaseAdmin
+            .from('buyer_activity_logs')
+            .insert([{
+              buyer_id: newBuyer.id,
+              event_type: 'IA WhatsApp',
+              title: 'Reserva de visita desde la web',
+              notes: `Reservó visita al inmueble "${data.propertyTitle}". Perfil completo pendiente (lo recopilará el bot o Álvaro).`,
+              event_date: new Date().toISOString(),
+              property_id: data.propertyId,
+            }])
+        }
+      }
+    } catch (bdErr) {
+      const msg = bdErr instanceof Error ? bdErr.message : String(bdErr)
+      console.warn('[AppointmentService] buyers_demands upsert falló:', msg)
+    }
+
     // 2. Insertar la cita en appointments
     const appointmentTitle = `Visita: ${data.propertyTitle}`
     const appointmentNotes = data.notes 

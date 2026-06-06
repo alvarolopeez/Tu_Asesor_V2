@@ -5,6 +5,50 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-06 — Brief #002 ejecutado (7 tareas, Operaciones reales + bot que agenda + timeline encargo + IA report)
+
+**T1. Limpieza de baselines fake en Operaciones** (`operacionesUtils.ts`)
+- `SEVILLA_BARRIOS_BASELINE` vaciada (era 18 barrios inventados: Triana 48, Nervión 42, etc.).
+- `growthBaseline = [120, 131, 145, 156, 168, 184]` eliminada — el acumulado mensual ahora es solo `cumulativeDbCount` real.
+- `computeBuyerProfiles`: contadores arrancan en 0. Se mantienen heurísticas SOLO sobre datos declarados (no charCode % 3). Lee también `paymentMethod`/`mortgageStatus` del formulario comprador.
+
+**T2. Reserva web crea `buyers_demands`** (`appointmentService.ts`)
+- `bookPublicAppointment` ahora hace UPSERT en `buyers_demands` con los datos básicos + log en `buyer_activity_logs`. Replica el patrón de `BuyerRegistrationModal.tsx`. Fire-and-soft: si falla NO rompe la reserva.
+
+**T3. Visitas físicas separadas por status** (`OperacionesTab.tsx` + `operacionesUtils.ts` + `PropertyReportSelector.tsx` + `CaptacionReportModal.tsx`)
+- `SelectedMetrics` añade `selectedPhysicalCompleted` y `selectedPhysicalPending`.
+- Informe ahora muestra "Web: X · Físicas: Y completadas (+Z pendientes)". El PDF también.
+
+**T4. Bot que agenda con verificación + entrevista de 3 preguntas** (`chatbot/engine.ts` + nuevo `chatbot/scheduling.ts` + `systemPrompt.md`)
+- Nuevo módulo `src/lib/chatbot/scheduling.ts` con la máquina de estados (interview_state persistido en `chatbot_conversations.metadata`).
+- Verifica `properties.features.visitable_slots` (shape `[{date, slots[]}]`). Si vacío → `should_escalate=true` con mensaje de aviso a Álvaro. Si hora ocupada → ofrece slots libres del día. Si día sin huecos → ofrece otros días.
+- Lead nuevo → lanza entrevista de 3 preguntas (ahorros / financiación / vivienda-inversión), parsea respuestas con regex/keywords, UPSERT en `buyers_demands` + crea `appointments` con status='pending', type='visita', 30 min.
+- Lead ya conocido → crea cita directa sin entrevista.
+- `systemPrompt.md` actualizado: el LLM NUNCA confirma cita por su cuenta, devuelve `preferred_date` en ISO y deja la lógica al sistema.
+
+**T5. Cita del bot visible en CRM** — Verificado por inspección: `CalendarManager` (filtra por `scheduled_at` semana), `OperacionesTab` (incluida en T3), `EncargoDrawer.actividad` (incluido en T6 — ahora consulta también por `property_id`).
+
+**T6. Tab "Actividad" del encargo → timeline mixto** (`EncargosManager.tsx`)
+- Query reescrita: appointments por `lead_id OR property_id`, `buyer_activity_logs` por `property_id`, `generated_documents` por `encargo_id`, eventos sintéticos de creación/cambio del encargo.
+- Render con iconos por tipo (📅 visita, 📝 nota, 📄 documento, 🔄 estado) y badges de status (Pendiente amarillo / Completada verde / Cancelada gris tachado). Orden descendente por fecha.
+
+**T7. Endpoint `POST /api/properties/[id]/ai-report` + modal frontend** (nuevos: `api/properties/[id]/ai-report/route.ts` + `dashboard/operaciones/AIReportModal.tsx`)
+- Recopila SERVER-SIDE: property, days_on_market, appointments por status + notas, propuestas/contratos firmados, web_visits, comparables (price ±15% + misma zona). Llama Gemini Flash con prompt que prohíbe inventar y exige declarar datos faltantes.
+- Hook `idealistaData` reservado pero no usado todavía.
+- Botón "🤖 Generar análisis IA" en `PropertyReportSelector` (junto al Informe PDF).
+
+**Verificación**:
+- `npm run build` VERDE (TypeScript OK, 31 rutas).
+- `gitnexus_detect_changes` reporta 60 símbolos touched, 10 procesos afectados — todos los del scope del brief.
+- T4/T7 dependen de `GEMINI_API_KEY` en Netlify; sin ella el bot cae al keyword fallback y el endpoint AI-report devuelve 502 con mensaje claro.
+
+**Pendiente E2E por Álvaro**:
+- Inmueble con `visitable_slots` configurados + mensaje del bot pidiendo visita a hora libre/ocupada/sin slots.
+- Botón "Generar análisis IA" sobre un inmueble con datos reales.
+- Verificar que tras reserva web aparezca el comprador en pestaña Pedidos.
+
+---
+
 ### 2026-06-06 — Activación del seguimiento automático L-V 9:00
 
 El workflow `Seguimiento Leads Diario` (`VnXhrEh2G8AeR0DT`) llamaba al endpoint `/api/webhooks/n8n` con `action: "get_pending_followups"`, pero esa acción NO estaba implementada — devolvía 400 "Unknown action". Por eso 0 leads habían recibido seguimiento desde el origen del proyecto.

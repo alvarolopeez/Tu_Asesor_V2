@@ -68,26 +68,13 @@ export interface SevillaDemandItem {
   avgBudget: number;
 }
 
-const SEVILLA_BARRIOS_BASELINE = [
-  { zone: "Triana", count: 48, totalBudget: 48 * 280000 },
-  { zone: "Nervión", count: 42, totalBudget: 42 * 310000 },
-  { zone: "Los Remedios", count: 35, totalBudget: 35 * 390000 },
-  { zone: "Centro / Alfalfa", count: 31, totalBudget: 31 * 340000 },
-  { zone: "Sevilla Este", count: 29, totalBudget: 29 * 210000 },
-  { zone: "Macarena", count: 24, totalBudget: 24 * 160000 },
-  { zone: "Viapol / San Bernardo", count: 22, totalBudget: 22 * 290000 },
-  { zone: "Dos Hermanas", count: 38, totalBudget: 38 * 180000 },
-  { zone: "Alcalá de Guadaíra", count: 30, totalBudget: 30 * 150000 },
-  { zone: "Tomares", count: 28, totalBudget: 28 * 270000 },
-  { zone: "Mairena del Aljarafe", count: 26, totalBudget: 26 * 240000 },
-  { zone: "Utrera", count: 19, totalBudget: 19 * 145000 },
-  { zone: "Camas", count: 18, totalBudget: 18 * 130000 },
-  { zone: "Bormujos", count: 15, totalBudget: 15 * 185000 },
-  { zone: "Montequinto", count: 14, totalBudget: 14 * 205000 },
-  { zone: "Gelves", count: 12, totalBudget: 12 * 165000 },
-  { zone: "Espartinas", count: 10, totalBudget: 10 * 220000 },
-  { zone: "San José de la Rinconada", count: 9, totalBudget: 9 * 140000 },
-];
+/**
+ * Sin baselines: la demanda por barrio se calcula EXCLUSIVAMENTE a partir
+ * de leads reales de BD. Las cifras inventadas anteriores (Triana 48,
+ * Nervión 42, etc.) mentían en el informe — fuera.
+ * @cleanup 2026-06-06 brief #002 T1
+ */
+const SEVILLA_BARRIOS_BASELINE: { zone: string; count: number; totalBudget: number }[] = [];
 
 /** Normaliza el campo `zonas` (array | string | ausente) de un lead a string[]. */
 function leadZones(b: LeadRow): string[] {
@@ -184,12 +171,12 @@ export function computeGrowth(buyerLeads: LeadRow[]): GrowthDatum[] {
     }
   });
 
-  const growthBaseline = [120, 131, 145, 156, 168, 184];
+  // Sin baseline ficticia: el "total" acumulado es solo lo que hay en BD.
+  // @cleanup 2026-06-06 brief #002 T1 — antes se sumaba [120,131,145,156,168,184].
   let cumulativeDbCount = 0;
-
-  return growthMonths.map((m, idx) => {
+  return growthMonths.map((m) => {
     cumulativeDbCount += m.dbCount;
-    return { ...m, total: growthBaseline[idx] + cumulativeDbCount };
+    return { ...m, total: cumulativeDbCount };
   });
 }
 
@@ -206,53 +193,44 @@ export interface BuyerProfiles {
 }
 
 export function computeBuyerProfiles(buyerLeads: LeadRow[]): BuyerProfiles {
-  let sinEstudioCount = 32;
-  let estudioHechoCount = 45;
-  let preconcedidaCount = 63;
-  let contadoCount = 40;
+  // Contadores reales. Antes arrancaban en cifras inventadas (32/45/63/40 y
+  // 126/54) y aplicaban heurísticas pseudo-aleatorias (charCode % 3) cuando
+  // el lead no tenía el campo — eso inflaba el informe con humo.
+  // @cleanup 2026-06-06 brief #002 T1 — solo cuenta lo que el lead declara.
+  let sinEstudioCount = 0;
+  let estudioHechoCount = 0;
+  let preconcedidaCount = 0;
+  let contadoCount = 0;
 
-  let habitualCount = 126;
-  let inversionCount = 54;
+  let habitualCount = 0;
+  let inversionCount = 0;
 
   buyerLeads.forEach((b) => {
-    const finProfile = b.preferences?.perfil_financiero;
-    if (finProfile === "sin_estudio") {
+    const prefs = (b.preferences || {}) as Record<string, unknown>;
+
+    // Perfil financiero — admite tanto la clave nueva (`perfil_financiero`)
+    // como las que el formulario público del comprador ya rellena
+    // (`paymentMethod` + `mortgageStatus`). El bot (T4) escribirá la nueva.
+    const finProfile = prefs.perfil_financiero as string | undefined;
+    const paymentMethod = prefs.paymentMethod as string | undefined;
+    const mortgageStatus = prefs.mortgageStatus as string | undefined;
+
+    if (finProfile === "sin_estudio" || mortgageStatus === "Necesito estudio") {
       sinEstudioCount += 1;
     } else if (finProfile === "estudio_hecho") {
       estudioHechoCount += 1;
-    } else if (finProfile === "preconcedida") {
+    } else if (finProfile === "preconcedida" || mortgageStatus === "Preconcedida") {
       preconcedidaCount += 1;
-    } else if (finProfile === "contado") {
+    } else if (finProfile === "contado" || paymentMethod === "Al contado") {
       contadoCount += 1;
-    } else {
-      const isDerived = b.preferences?.financiera_derivado === true;
-      const budget = Number(b.preferences?.presupuesto_max || 0);
-
-      if (isDerived) {
-        sinEstudioCount += 1;
-      } else if (budget >= 700000) {
-        contadoCount += 1;
-      } else {
-        const lastChar = b.id ? b.id.charCodeAt(b.id.length - 1) : 0;
-        const mod = lastChar % 3;
-        if (mod === 0) estudioHechoCount += 1;
-        else if (mod === 1) preconcedidaCount += 1;
-        else contadoCount += 1;
-      }
     }
+    // Sin dato → no se cuenta. Mejor 0 que adivinar.
 
-    const tipoCompra = b.preferences?.tipo_compra;
+    const tipoCompra = prefs.tipo_compra as string | undefined;
     if (tipoCompra === "habitual") {
       habitualCount += 1;
     } else if (tipoCompra === "inversion") {
       inversionCount += 1;
-    } else {
-      const lastChar = b.id ? b.id.charCodeAt(b.id.length - 1) : 0;
-      if (lastChar % 2 === 0) {
-        habitualCount += 1;
-      } else {
-        inversionCount += 1;
-      }
     }
   });
 
@@ -305,6 +283,10 @@ export function computePropertyViews(
 // ─── 7. Métricas de la propiedad seleccionada ────────────────
 export interface SelectedMetrics {
   selectedViews: number;
+  /** Visitas físicas con status='completed'. Solo estas cuentan como cierre. */
+  selectedPhysicalCompleted: number;
+  /** Visitas físicas con status='pending'. Aún no realizadas. */
+  selectedPhysicalPending: number;
   selectedDays: number;
   selectedPrice: number;
   selectedValuation: number;
@@ -316,16 +298,20 @@ export interface SelectedMetrics {
 }
 
 /**
- * @param opts.days       días reales en mercado (desde published_at). null = sin publicar.
- * @param opts.views      visitas reales (desde web_visits).
- * @param opts.valuation  valoración de referencia (lead vinculado → fallback feature).
+ * @param opts.days                       días reales en mercado (desde published_at). null = sin publicar.
+ * @param opts.views                      visitas web reales (desde web_visits).
+ * @param opts.physicalCompleted          visitas físicas con status='completed' (de appointments).
+ * @param opts.physicalPending            visitas físicas con status='pending' (de appointments).
+ * @param opts.valuation                  valoración de referencia (lead vinculado → fallback feature).
  */
 export function computeSelectedMetrics(
   selectedProperty: PropertyRow | undefined,
-  opts?: { days?: number | null; views?: number; valuation?: number },
+  opts?: { days?: number | null; views?: number; physicalCompleted?: number; physicalPending?: number; valuation?: number },
 ): SelectedMetrics {
   const realDays = opts?.days !== undefined ? opts.days : (selectedProperty ? daysOnMarket(selectedProperty) : null);
   const selectedViews = opts?.views ?? 0;
+  const selectedPhysicalCompleted = opts?.physicalCompleted ?? 0;
+  const selectedPhysicalPending = opts?.physicalPending ?? 0;
   const selectedDays = realDays ?? 0;
   const isPublished = realDays !== null;
   const selectedPrice = selectedProperty ? Number(selectedProperty.price || 0) : 0;
@@ -355,6 +341,8 @@ export function computeSelectedMetrics(
 
   return {
     selectedViews,
+    selectedPhysicalCompleted,
+    selectedPhysicalPending,
     selectedDays,
     selectedPrice,
     selectedValuation,
