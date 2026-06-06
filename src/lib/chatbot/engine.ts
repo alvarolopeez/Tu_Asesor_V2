@@ -90,8 +90,10 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
   // 4. Si el LLM detectó schedule_visit, dejamos que el módulo de scheduling
   //    valide disponibilidad real, lance entrevista si toca o cree cita.
   //    Si tryHandleScheduleVisit devuelve null, conservamos la respuesta
-  //    del LLM (todavía estaba pidiendo el teléfono, p.ej.).
+  //    del LLM (típico en widget web sin teléfono: el LLM aún lo está pidiendo).
+  //    Si LANZA error, ESCALAMOS (no dejamos al LLM mentir "le paso a Álvaro").
   if (result.intent === 'schedule_visit') {
+    let hookErrored = false;
     const hookRes = await tryHandleScheduleVisit({
       conversationId: input.conversationId,
       leadName: input.leadContext?.name,
@@ -105,6 +107,7 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
       },
     }).catch((err) => {
       console.error('[engine] tryHandleScheduleVisit error:', err);
+      hookErrored = true;
       return null;
     });
 
@@ -116,6 +119,17 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
         data_extracted: result.data_extracted,
         conversation_id: input.conversationId,
         should_escalate: hookRes.shouldEscalate,
+      };
+    } else if (hookErrored) {
+      // Bug técnico → escalar de verdad. Mejor que el LLM finja gestionarlo.
+      result = {
+        response:
+          'He tenido un problema técnico al consultar la disponibilidad. Aviso a Álvaro para que te confirme la visita personalmente.',
+        intent: 'ESCALATE',
+        confidence: 0.5,
+        data_extracted: result.data_extracted,
+        conversation_id: input.conversationId,
+        should_escalate: true,
       };
     }
   }
