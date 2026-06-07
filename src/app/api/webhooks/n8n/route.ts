@@ -330,6 +330,69 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // ─── Follow-ups de visita pendientes (FIX-G brief #002) ─────────
+      // Devuelve conversaciones de chatbot cuyo `metadata.followup_visit`
+      // tiene `pending_until <= NOW()` y `sent != true`. El workflow n8n
+      // que lo consume manda un WhatsApp libre (la conversación está dentro
+      // de 24h: el cliente acaba de hablar con el bot) preguntando si quiere
+      // agendar visita. Antes de devolver, marcamos `sent=true` para evitar
+      // duplicados aunque Meta luego falle.
+      case 'get_pending_visit_followups': {
+        const nowIso = new Date().toISOString();
+
+        // Filtro horario 10:00-21:00 Madrid (FIX HIGH UX #10 review).
+        // Si estamos fuera de ese horario, NO devolvemos ningún follow-up:
+        // el cron volverá a ejecutarse, los pendientes se mantienen.
+        const madridHour = Number(
+          new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Europe/Madrid',
+            hour: '2-digit', hour12: false,
+          }).format(new Date())
+        );
+        if (madridHour < 10 || madridHour >= 21) {
+          return NextResponse.json({ count: 0, followups: [], skipped_reason: 'out_of_hours_madrid' });
+        }
+
+        const { data: convos, error: selErr } = await supabase
+          .from('chatbot_conversations')
+          .select('id, wa_phone_number, metadata, lead_id')
+          .eq('channel', 'whatsapp')
+          .eq('status', 'active')
+          .not('wa_phone_number', 'is', null)
+          .limit(50);
+
+        if (selErr) {
+          return NextResponse.json({ error: selErr.message }, { status: 500 });
+        }
+
+        const candidates = (convos || []).filter((c: any) => {
+          const f = c.metadata?.followup_visit;
+          if (!f || f.sent === true) return false;
+          if (!f.pending_until) return false;
+          return f.pending_until <= nowIso;
+        });
+
+        // Marcar como sent ANTES de devolver. Si Meta luego falla, queda
+        // el log — preferible perder un follow-up a entrar en bucle.
+        for (const c of candidates) {
+          const meta = (c as any).metadata || {};
+          const newMeta = { ...meta, followup_visit: { ...meta.followup_visit, sent: true, sent_at: nowIso } };
+          await supabase
+            .from('chatbot_conversations')
+            .update({ metadata: newMeta })
+            .eq('id', c.id);
+        }
+
+        return NextResponse.json({
+          count: candidates.length,
+          followups: candidates.map((c: any) => ({
+            conversation_id: c.id,
+            phone: c.wa_phone_number,
+            lead_id: c.lead_id,
+          })),
+        });
+      }
+
       // ─── Acción desconocida ─────────────────────────
       default:
         return NextResponse.json(
@@ -343,6 +406,7 @@ export async function POST(request: NextRequest) {
               'log_interaction',
               'send_chatbot_response',
               'get_pending_followups',
+              'get_pending_visit_followups',
             ],
           },
           { status: 400 }

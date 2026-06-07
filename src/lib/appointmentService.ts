@@ -1,8 +1,9 @@
 "use server"
 
 import { createClient } from '@supabase/supabase-js'
-import { sendWhatsAppTemplate } from '@/lib/whatsapp'
+import { sendWhatsAppMessage, sendWhatsAppTemplate } from '@/lib/whatsapp'
 import { normalizeEsPhone } from '@/lib/phone'
+import { startInterviewFromWebBooking, shortZoneFromAddress } from '@/lib/chatbot/scheduling'
 
 /**
  * Plantillas HSM que deben existir/aprobarse en Meta para que estos avisos se
@@ -269,11 +270,61 @@ export async function bookPublicAppointment(
       }
     }
 
-    // 3. Notificaciones por WhatsApp (PLANTILLAS HSM).
-    //    El cliente acaba de reservar desde la web → está FUERA de la ventana
-    //    de 24 h de Meta, así que el texto libre se rechaza (131047). Usamos
-    //    plantillas aprobadas. Fire-and-forget: si fallan (o aún no están
-    //    aprobadas) NO rompemos la reserva, ya creada.
+    // 3. Notificaciones por WhatsApp.
+    //    Estrategia (FIX HIGH UX #5 + TZ #6 del review adversarial):
+    //
+    //    Caso A — el cliente YA tiene conversación WhatsApp activa con Paula:
+    //      el HSM `confirmacion_visita_cliente` se OMITE (estaría dentro de
+    //      la ventana 24h y duplicaría textualmente el push libre que sigue).
+    //      Solo enviamos UN mensaje libre con el texto adecuado al outcome
+    //      (entrevista arrancada / perfil ya completo / ya hay entrevista
+    //      en curso / spoofing bloqueado).
+    //
+    //    Caso B — el cliente NO tiene conversación activa con Paula:
+    //      enviamos el HSM clásico (única vía dentro/fuera de 24h) — sin
+    //      empujón adicional.
+    //
+    //    En AMBOS casos: aviso a Álvaro con la plantilla `aviso_alvaro`.
+    //    Fire-and-forget en cada subllamada.
+
+    // Recuperamos zona y outcome antes de elegir camino.
+    let propertyZone: string | null = null
+    let bookingOutcome:
+      | { kind: 'no_conversation' }
+      | { kind: 'spoofing_blocked'; conversationId: string }
+      | { kind: 'already_has_interview'; conversationId: string }
+      | { kind: 'already_has_demand'; conversationId: string }
+      | { kind: 'started'; conversationId: string }
+      = { kind: 'no_conversation' }
+
+    try {
+      const { data: prop } = await supabaseAdmin
+        .from('properties')
+        .select('features')
+        .eq('id', data.propertyId)
+        .single()
+      const features = (prop?.features as Record<string, any>) || {}
+      propertyZone = shortZoneFromAddress(features.address as string | undefined)
+    } catch {
+      // no zone — el bot caerá a formato sin zona, no rompe.
+    }
+
+    if (leadId) {
+      try {
+        bookingOutcome = await startInterviewFromWebBooking({
+          phone: cleanPhone,
+          leadName: cleanName,
+          leadId,
+          propertyId: data.propertyId,
+          propertyTitle: data.propertyTitle,
+          propertyZone,
+          scheduledAt: data.scheduledAt,
+        })
+      } catch (bookErr) {
+        console.warn('[AppointmentService] No se pudo encadenar entrevista:', bookErr)
+      }
+    }
+
     try {
       const dateObj = new Date(data.scheduledAt)
       const formattedDate = dateObj.toLocaleString('es-ES', {
@@ -284,21 +335,68 @@ export async function bookPublicAppointment(
         hour: '2-digit',
         minute: '2-digit'
       })
+      const propLabel = propertyZone
+        ? `${data.propertyTitle}, en ${propertyZone}`
+        : data.propertyTitle
 
-      // 3.a Confirmación al CLIENTE (plantilla confirmacion_visita_cliente).
-      void sendWhatsAppTemplate(
-        cleanPhone,
-        TPL_CONFIRM_VISITA,
-        [cleanName, data.propertyTitle, formattedDate],
-        { normalize: true, logTag: '[AppointmentService][HSM cliente]' },
-      )
+      const hasActiveConvo = bookingOutcome.kind !== 'no_conversation'
 
-      // 3.b Aviso al ASESOR (Álvaro) con la plantilla genérica aviso_alvaro.
-      //     Estructura: {{1}} título corto + {{2}} detalle (línea con `·`).
-      //     La plantilla añade su propio pie "— CRM Tu Asesor Álvaro".
+      // 3.a Mensaje al cliente.
+      if (!hasActiveConvo) {
+        // Sin conversación previa → plantilla HSM clásica.
+        void sendWhatsAppTemplate(
+          cleanPhone,
+          TPL_CONFIRM_VISITA,
+          [cleanName, data.propertyTitle, formattedDate],
+          { normalize: true, logTag: '[AppointmentService][HSM cliente]' },
+        )
+      } else {
+        // Tenemos conversación activa → texto libre adaptado al outcome.
+        // (En `started`, el push ya se ha insertado en chatbot_messages por
+        //  startInterviewFromWebBooking. Aquí enviamos por WhatsApp para
+        //  que llegue al móvil del cliente.)
+        switch (bookingOutcome.kind) {
+          case 'started':
+            void sendWhatsAppMessage(
+              cleanPhone,
+              `¡Hola ${cleanName}! Soy Paula 👋, la asesora virtual de Álvaro. ` +
+              `Acabas de reservar tu visita a "${propLabel}" para ${formattedDate} 🎉. ` +
+              `Para que la prepare a tu medida, ¿me ayudas con 3 datos rápidos? ` +
+              `Si prefieres no responder, no pasa nada — él te contactará antes de la cita igualmente. ` +
+              `💰 La primera: ¿qué ahorros aportarías a la compra? (una cifra aproximada vale).`,
+              { logTag: '[AppointmentService][push started]' },
+            )
+            break
+          case 'already_has_demand':
+            void sendWhatsAppMessage(
+              cleanPhone,
+              `🎉 ¡${cleanName}! Tu visita a "${propLabel}" está reservada para ${formattedDate}. ` +
+              `Álvaro te confirmará por aquí antes de la cita. ¿Algo más en lo que pueda ayudarte?`,
+              { logTag: '[AppointmentService][push has-demand]' },
+            )
+            break
+          case 'already_has_interview':
+            void sendWhatsAppMessage(
+              cleanPhone,
+              `🎉 ¡${cleanName}! He registrado también tu visita a "${propLabel}" para ${formattedDate}. ` +
+              `Sigamos con las preguntas que teníamos pendientes para terminar tu perfil.`,
+              { logTag: '[AppointmentService][push interview-active]' },
+            )
+            break
+          case 'spoofing_blocked':
+            // No mandamos NADA al cliente (puede ser víctima). Solo a Álvaro.
+            console.warn('[AppointmentService] spoofing_blocked — no push to client')
+            break
+        }
+      }
+
+      // 3.b Aviso al ASESOR (Álvaro). Diferenciamos fuente para que distinga
+      //     de un solo vistazo si fue chatbot o reserva web. FIX LOW UX.
       if (ADVISOR_PHONE) {
-        const avisoTitulo = 'Nueva reserva de visita'
-        const avisoDetalle = `${cleanName} · ${cleanPhone} · "${data.propertyTitle}" · ${formattedDate}`
+        const avisoTitulo = bookingOutcome.kind === 'spoofing_blocked'
+          ? '⚠️ Reserva web sospechosa (tel ya en uso por otro lead)'
+          : 'Nueva visita reservada (web)'
+        const avisoDetalle = `${cleanName} · ${cleanPhone} · "${propLabel}" · ${formattedDate}`
         void sendWhatsAppTemplate(
           ADVISOR_PHONE,
           TPL_AVISO_ALVARO,

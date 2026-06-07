@@ -6,6 +6,9 @@ import {
   getInterviewState,
   handleInterviewStep,
   tryHandleScheduleVisit,
+  scheduleVisitFollowup,
+  clearVisitFollowup,
+  clearInterviewStateFromEngine,
 } from './scheduling';
 
 /**
@@ -45,6 +48,10 @@ interface EngineInput {
  * Gestiona historial, contexto y delegación al LLM o fallback.
  */
 export async function processMessage(input: EngineInput): Promise<ChatbotEngineResponse> {
+  // -1. El cliente acaba de escribir → si tenía un follow-up programado,
+  //     lo cancelamos para no enviar el ping de 30 min redundante. FIX-G.
+  void clearVisitFollowup(input.conversationId).catch(() => {});
+
   // 0. Si la conversación está en medio de la entrevista pre-cita (T4),
   //    interpretamos el mensaje como respuesta a la pregunta actual y
   //    cortocircuitamos el LLM. La entrevista es una máquina de estados
@@ -52,6 +59,23 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
   //    @added 2026-06-06 brief #002 T4
   const interview = await getInterviewState(input.conversationId).catch(() => null);
   if (interview) {
+    // FIX HIGH #4 (security review): keyword de salida.
+    // Si el cliente pide hablar con un humano o cancelar, NO seguimos en la
+    // entrevista. Limpiamos el estado y escalamos.
+    const lowerMsg = input.message.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const escapeRegex = /\b(cancelar|cancela|hablar\s*con\s*alvaro|hablar\s*con\s*una\s*persona|humano|persona\s*real|olvida\s*la\s*cita|me\s*da\s*igual|paro\s*la\s*cita)\b/;
+    if (escapeRegex.test(lowerMsg)) {
+      await clearInterviewStateFromEngine(input.conversationId);
+      return {
+        response: 'Sin problema. Aviso a Álvaro y te contacta él personalmente cuanto antes. 🙌',
+        intent: 'ESCALATE',
+        confidence: 0.95,
+        data_extracted: {},
+        conversation_id: input.conversationId,
+        should_escalate: true,
+      };
+    }
+
     const hookRes = await handleInterviewStep(interview, input.message, input.conversationId);
     return {
       response: hookRes.response,
@@ -87,7 +111,18 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
       result = keywordFallback(input.message, input.conversationId);
   }
 
-  // 4. Si el LLM detectó schedule_visit, dejamos que el módulo de scheduling
+  // 4. Si el LLM detectó ask_price y la respuesta contiene un link público,
+  //    marcamos un follow-up para preguntarle si quiere visita.
+  //    FIX HIGH UX #10 (review adversarial): subimos delay a 3h (no 30 min,
+  //    que era spam). El filtro de horario 10-21 Madrid lo hace el endpoint
+  //    cron `get_pending_visit_followups`.
+  if (result.intent === 'ask_price' && /tuasesoralvaro\.com\/comprar/.test(result.response)) {
+    void scheduleVisitFollowup(input.conversationId, 180).catch((err) => {
+      console.warn('[engine] scheduleVisitFollowup falló:', err);
+    });
+  }
+
+  // 5. Si el LLM detectó schedule_visit, dejamos que el módulo de scheduling
   //    valide disponibilidad real, lance entrevista si toca o cree cita.
   //    Si tryHandleScheduleVisit devuelve null, conservamos la respuesta
   //    del LLM (típico en widget web sin teléfono: el LLM aún lo está pidiendo).
@@ -152,10 +187,36 @@ async function getConversationHistory(conversationId: string, limit: number) {
   return data || [];
 }
 
+const PUBLIC_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://tuasesoralvaro.com';
+
+/**
+ * Extrae una zona corta y legible desde `features.address`.
+ * Address típico: "Calle Goya, Utrera, Sevilla, Andalucía, 41710, España"
+ *   → "Utrera, Sevilla"
+ * Si el address es directamente un barrio sevillano ("Triana, Sevilla, …")
+ *   → "Triana, Sevilla".
+ * Si no hay address válido, devuelve null y el bot omite la zona.
+ */
+function shortZoneFromAddress(address?: string | null): string | null {
+  if (!address || typeof address !== 'string') return null;
+  const parts = address.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  // Saltamos la calle (primer fragmento) y nos quedamos con los dos siguientes
+  // descartando "Andalucía"/"España"/códigos postales.
+  const out: string[] = [];
+  for (let i = 1; i < parts.length && out.length < 2; i++) {
+    const p = parts[i];
+    if (/^\d{4,5}$/.test(p)) continue;             // CP
+    if (/^(Andaluc[ií]a|Espa[ñn]a)$/i.test(p)) continue;
+    out.push(p);
+  }
+  return out.length > 0 ? out.join(', ') : null;
+}
+
 async function getActiveProperties() {
   const { data } = await supabase
     .from('properties')
-    .select('title, description, price, features')
+    .select('id, title, description, price, features')
     .eq('status', 'active')
     .limit(10);
 
@@ -164,8 +225,57 @@ async function getActiveProperties() {
   }
 
   return data
-    .map((p, i) => `${i + 1}. ${p.title} — ${p.price?.toLocaleString('es-ES')}€ — ${p.description || 'Sin descripción'}`)
-    .join('\n');
+    .map((p, i) => {
+      const features = (p.features || {}) as Record<string, any>;
+      const zone = shortZoneFromAddress(features.address);
+      const sqm = features.sqm;
+      const rooms = features.rooms;
+      const url = `${PUBLIC_SITE_URL}/comprar?p=${p.id}`;
+      const headline = zone
+        ? `${p.title} (${zone})`
+        : p.title;
+      const price = p.price?.toLocaleString('es-ES') + '€';
+      const specs = [
+        rooms ? `${rooms} hab` : null,
+        sqm ? `${sqm} m²` : null,
+        features.elevator === true ? 'con ascensor' : (features.elevator === false ? 'sin ascensor' : null),
+      ].filter(Boolean).join(' · ');
+      return `${i + 1}. ${headline} — ${price}${specs ? ' · ' + specs : ''}\n   Ficha: ${url}\n   ${p.description || ''}`.trim();
+    })
+    .join('\n\n');
+}
+
+/**
+ * Devuelve los próximos 7 días en castellano con fecha dd/mm/yyyy y nombre
+ * del día — esencial para que el LLM (Gemini Flash, cutoff 2024) no calcule
+ * "el próximo martes" según su training data sino según la fecha real.
+ */
+function buildTodayContext(): { today: string; tomorrow: string; next7: string } {
+  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+  function ymdInMadrid(d: Date): string {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Madrid',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(d);
+  }
+  function humanFromYmd(ymd: string): string {
+    const [y, m, dd] = ymd.split('-').map(Number);
+    const dow = new Date(Date.UTC(y, m - 1, dd, 12)).getUTCDay();
+    return `${days[dow]} ${String(dd).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+  }
+  const now = new Date();
+  const todayYmd = ymdInMadrid(now);
+  const next7Lines: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now.getTime() + i * 86_400_000);
+    next7Lines.push(`- ${humanFromYmd(ymdInMadrid(d))}`);
+  }
+  const tomorrow = new Date(now.getTime() + 86_400_000);
+  return {
+    today: humanFromYmd(todayYmd),
+    tomorrow: humanFromYmd(ymdInMadrid(tomorrow)),
+    next7: next7Lines.join('\n'),
+  };
 }
 
 function buildSystemPrompt(propertiesContext: string, history: Array<{ role: string; content: string }>) {
@@ -186,7 +296,12 @@ function buildSystemPrompt(propertiesContext: string, history: Array<{ role: str
     .map(m => `${m.role === 'user' ? 'Cliente' : 'Asistente'}: ${m.content}`)
     .join('\n');
 
+  const todayCtx = buildTodayContext();
+
   return systemPrompt
+    .replace('{{TODAY}}', todayCtx.today)
+    .replace('{{TOMORROW}}', todayCtx.tomorrow)
+    .replace('{{NEXT_7_DAYS}}', todayCtx.next7)
     .replace('{{PROPERTIES_CONTEXT}}', propertiesContext)
     .replace('{{CONVERSATION_HISTORY}}', historyText || '(Primera interacción)');
 }
