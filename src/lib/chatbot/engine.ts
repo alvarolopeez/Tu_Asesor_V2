@@ -337,6 +337,21 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
       preferred_name: cleaned,
       pending_name_resolution: null,
     }).catch((err) => console.warn('[engine] patch preferred_name failed:', err));
+    // T5.1: también persistir en leads.preferences (sobrevive a expiración de conversación)
+    const leadInfoForPrefs = await getConversationLeadInfo(input.conversationId).catch(() => null);
+    if (leadInfoForPrefs?.leadId) {
+      const { data: leadRow } = await supabase
+        .from('leads')
+        .select('preferences')
+        .eq('id', leadInfoForPrefs.leadId)
+        .single();
+      const currentPrefs = (leadRow?.preferences as Record<string, unknown>) || {};
+      const { error: prefUpdateErr } = await supabase
+        .from('leads')
+        .update({ preferences: { ...currentPrefs, preferred_name: cleaned } })
+        .eq('id', leadInfoForPrefs.leadId);
+      if (prefUpdateErr) console.warn('[engine] update leads.preferences failed:', prefUpdateErr);
+    }
   }
 
   // 4. Si el LLM detectó ask_price y la respuesta contiene un link público,
