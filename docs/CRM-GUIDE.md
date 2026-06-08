@@ -60,6 +60,8 @@ erDiagram
     leads ||--o{ chatbot_conversations : "lead_id"
     leads ||--o{ generated_documents : "seller_lead_id"
 
+    leads ||--o{ buyers_demands : "lead_id (nullable)"
+
     buyers_demands ||--o{ buyer_activity_logs : "buyer_id"
     buyers_demands ||--o{ generated_documents : "buyer_id"
     buyers_demands ||--o{ offers : "buyer_id"
@@ -77,7 +79,7 @@ erDiagram
     chatbot_conversations ||--o{ ai_interactions : "session_id"
 ```
 
-> ⚠️ **Relación ausente crítica**: `buyers_demands` **no tiene FK a `leads`**. Son entidades paralelas vinculadas conceptualmente por phone/name. Ver Sección 6.
+> ✅ **Ola 5 R9 (2026-06-08)**: `buyers_demands` ahora tiene `lead_id uuid REFERENCES leads(id) ON DELETE SET NULL` con índice. Backfill aplicado (2/2 filas). Los writers `scheduling.ts` y `appointmentService.ts` ya rellenan el campo. `BuyerRegistrationModal.tsx` pendiente (prioridad baja, columna nullable).
 
 ### Stack tecnológico
 
@@ -147,7 +149,7 @@ erDiagram
 - `src/lib/phone.ts` — normalización E.164 (`normalizeEsPhone`)
 
 **Zonas frágiles**:
-- `buyers_demands` no tiene FK a `leads` — la pestaña "Pedidos" puede no mostrar compradores si solo existe su `leads` sin el `buyers_demands` correspondiente.
+- ~~`buyers_demands` no tiene FK a `leads`~~ — **resuelto en Ola 5 R9**: columna `lead_id` añadida con backfill. `BuyerRegistrationModal.tsx` aún no rellena `lead_id` (pendiente, no bloqueante).
 - WarmLeadsManager filtra `status != 'closed'` — leads promovidos a encargo (status='closed') desaparecen del módulo.
 - ZoneSelectorPremium es el componente más grande del área; revisar si tiene dead code antes de modificar.
 
@@ -525,16 +527,16 @@ Esfuerzo: XS | Impacto: LOW
 
 ### Refactors opcionales (largo plazo)
 
-**[R8] DocumentsManager split**
-Esfuerzo: L | Impacto: MED
-- 1604 LOC con lógica de templates, generación, preview, envío y descarga mezcladas
-- Patrón: carpeta `documents/` siguiendo `properties/` (PropertiesManager split es el modelo)
+**[R8] DocumentsManager split** ✅ *Implementado Ola 5 (2026-06-08)*
+~~Esfuerzo: L | Impacto: MED~~
+- ~~1604 LOC con lógica de templates, generación, preview, envío y descarga mezcladas~~
+- Split completado: `DocumentsManager.types.ts` (151 l) + `DocumentsManager.utils.ts` (46 l) + `DocumentsManager.tsx` (1469 l)
 
-**[R9] FK buyers_demands → leads**
-Esfuerzo: M | Impacto: HIGH
-- Añadir `lead_id uuid REFERENCES leads(id)` en `buyers_demands`
-- Migración con backfill por phone matching
-- Eliminaría el principal gap arquitectural del sistema
+**[R9] FK buyers_demands → leads** ✅ *Implementado Ola 5 (2026-06-08)*
+~~Esfuerzo: M | Impacto: HIGH~~
+- `lead_id uuid REFERENCES leads(id) ON DELETE SET NULL` añadida con índice
+- Backfill aplicado: 2/2 filas enlazadas por phone matching
+- `scheduling.ts` y `appointmentService.ts` ya escriben `lead_id`; `BuyerRegistrationModal.tsx` pendiente (nullable, no bloqueante)
 
 **[R10] Tipo de cita 'llamada'**
 Esfuerzo: S | Impacto: LOW
@@ -575,7 +577,7 @@ Esfuerzo: S | Impacto: LOW
 
 ### Gotchas críticos — leer antes de tocar cualquier área
 
-1. **`buyers_demands` NO tiene FK a `leads`** — entidades paralelas vinculadas por phone/name. Joins son manuales. No asumir que un `buyers_demands` tiene siempre un `leads` correspondiente.
+1. **`buyers_demands` tiene `lead_id` nullable** (Ola 5 R9) — la FK existe pero no todas las filas la tienen rellenada (`BuyerRegistrationModal.tsx` aún no la escribe). Hacer siempre `LEFT JOIN` y no asumir que `lead_id` es NOT NULL.
 
 2. **`ai_interactions.lead_id` es NOT NULL** — no insertar en esta tabla sin `lead_id` conocido o el INSERT falla con constraint violation.
 

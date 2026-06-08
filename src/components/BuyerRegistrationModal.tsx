@@ -351,6 +351,9 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
         preferredZones,
       };
 
+      // ID del lead (existente o recién creado) — se propaga a buyers_demands como FK nullable.
+      let resolvedLeadId: string | null = null;
+
       // 1. Sincronización con leads
       const { data: existingLeads } = await supabase
         .from("leads")
@@ -371,6 +374,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
           .eq("id", existingLeads[0].id);
 
         if (updateError) throw updateError;
+        resolvedLeadId = existingLeads[0].id;
       } else {
         // Create new lead — let Supabase generate the UUID
         const { data: inserted, error: insertError } = await supabase
@@ -390,6 +394,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
           .single();
 
         if (insertError) throw insertError;
+        resolvedLeadId = inserted?.id ?? null;
 
         // Dispara n8n para enviar el WhatsApp de bienvenida (HSM
         // `bienvenida_nuevo_lead`). Fire-and-forget: si falla, el lead ya está
@@ -427,6 +432,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
             funding_type: formData.paymentMethod,
             savings_contribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
             status: "Búsqueda activa",
+            ...(resolvedLeadId ? { lead_id: resolvedLeadId } : {}),
             updated_at: new Date().toISOString(),
             last_activity_at: new Date().toISOString()
           })
@@ -468,6 +474,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
               funding_type: formData.paymentMethod,
               savings_contribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
               status: "Búsqueda activa",
+              ...(resolvedLeadId ? { lead_id: resolvedLeadId } : {}),
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
               last_activity_at: new Date().toISOString()
