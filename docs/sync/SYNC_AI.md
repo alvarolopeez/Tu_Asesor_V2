@@ -5,6 +5,63 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-08 — Ola 3: hardening anti-inyección del chatbot Paula
+
+**Sin cambios de schema ni infra.** Solo cambios en `src/lib/chatbot/engine.ts` y `src/lib/chatbot/systemPrompt.md`:
+
+- Sprint A: función `sanitizeForPrompt()` en engine.ts — escapa `{{`, `}}`, prefijos `Asistente:/Cliente:`, trunca a 500 chars. Aplicada sobre titulos/descripciones de propiedades y campos del lead.
+- Sprint B: eliminado el bloque `# HISTORIAL DE CONVERSACIÓN / {{CONVERSATION_HISTORY}}` del systemPrompt.md. El historial pasa SOLO por el messages array de cada proveedor (OpenAI, Anthropic, Gemini). El system prompt ya no mezcla datos de usuario.
+- Sprint C (Gemini): el contexto del lead ya no se inyecta como turn fake user/model sino en `systemInstruction`, que Gemini trata como configuración de sistema.
+
+**Impacto en n8n/webhooks**: ninguno. La interfaz de `/api/chatbot/message` y `/api/webhooks/whatsapp` no cambió.
+
+---
+
+### 2026-06-08 — Ola 4: botón manual de confirmación WhatsApp en CRM
+
+**Sin cambios de schema.** Nuevos ficheros:
+
+- `src/app/api/appointments/[id]/send-confirmation/route.ts` — POST endpoint interno del CRM que envía la plantilla HSM `confirmacion_visita_cliente` (Meta aprobada) al lead de la cita.
+  - Parámetros HSM: `{{1}}`=nombre cliente, `{{2}}`=título inmueble, `{{3}}`=fecha+hora en `Europe/Madrid`.
+  - Devuelve `{ success, phone, formattedDate, leadName, propertyTitle }` en éxito.
+  - Códigos de error: 404 (cita no encontrada), 400 (sin teléfono / cita cancelada), 502 (Meta rechazó).
+- `src/components/admin/sections/calendar/RouteListView.tsx` — botón "Confirmar" en cada tarjeta de cita (solo visible si hay teléfono y status ≠ cancelled). Gestión de estados sending/sent con hot-toast.
+
+**Impacto en n8n/webhooks**: ninguno. Endpoint solo accesible desde el CRM admin.
+
+---
+
+### 2026-06-08 — Ola 5 / R9: FK `buyers_demands → leads` + backfill
+
+🔴 **Cambio de schema en producción** — nueva columna en `buyers_demands`:
+
+```sql
+ALTER TABLE public.buyers_demands
+  ADD COLUMN lead_id UUID REFERENCES public.leads(id) ON DELETE SET NULL;
+CREATE INDEX idx_buyers_demands_lead_id ON public.buyers_demands(lead_id);
+-- Backfill: 2/2 filas enlazadas por coincidencia de teléfono (normalizado)
+```
+
+- La columna es **nullable** (ON DELETE SET NULL) — histórico se preserva si se borra un lead.
+- **Código actualizado**: `scheduling.ts` (`upsertBuyerDemand`) y `appointmentService.ts` (`bookPublicAppointment`) ya escriben `lead_id` cuando está disponible.
+- `BuyerRegistrationModal.tsx` no actualizado (flujo manual del CRM — prioridad baja; FK es nullable).
+- **Inventario de columnas FK añadidas**: `buyers_demands.lead_id → leads.id`.
+
+**Impacto en n8n/workflows**: el nodo Smart Matchmaker (`/api/n8n/diffusion`) lee `buyers_demands` por phone/zona — ahora también puede usar `lead_id` para joins más eficientes si se actualiza en el futuro. Sin cambio de contrato hoy.
+
+---
+
+### 2026-06-08 — Ola 5 / R8: split DocumentsManager.tsx
+
+**Sin cambios de schema ni infra.** Refactor puro de frontend:
+
+- `DocumentsManager.types.ts` (151 líneas): 6 interfaces + `STATUS_LABEL` + `EMAIL_RE` + `emptyOwner` + `emptyParty`.
+- `DocumentsManager.utils.ts` (46 líneas): `detectKind`, `detectBuyerDocType`, `mergeBody` — funciones puras ahora exportadas como módulo.
+- `DocumentsManager.tsx`: 1605 → 1469 líneas. Importa de los 2 nuevos módulos.
+- Build ✓, GitNexus detect_changes: riesgo LOW, 0 procesos afectados.
+
+---
+
 ### 2026-06-08 — Ola 2 auditoría: cambio de SCHEMA (DROP de 2 tablas)
 
 🔴 **Cambio de schema en producción** — relevante para cualquier flujo n8n/webhook:
