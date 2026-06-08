@@ -7,7 +7,6 @@ import {
   Calendar,
   Layers,
   BarChart3,
-  Clock,
 } from "lucide-react";
 import type { PropertyRow, LeadRow, AppointmentRow, ConversationRow, WebVisitRow } from "./types";
 
@@ -174,18 +173,11 @@ export default function MarketingTab() {
       ? Math.round((lowBudgetRedirects / buyers.length) * 100)
       : 0;
 
-  // 4. First contact response delay computation
-  const responseDelays = conversations
-    .map((c) =>
-      Number((c.metadata as Record<string, unknown>)?.first_response_delay_sec)
-    )
-    .filter((val) => !isNaN(val) && val > 0);
-  const avgDelay =
-    responseDelays.length > 0
-      ? (
-          responseDelays.reduce((acc, v) => acc + v, 0) / responseDelays.length
-        ).toFixed(1)
-      : "4.8";
+  // [Eliminado @cleanup] La métrica "Tiempo de Primer Contacto" (avgDelay) se
+  // retiró: su fallback era "4.8s" inventado cuando no había datos, y el bot
+  // responde de forma automática en segundos, así que no era una métrica
+  // accionable. Si en el futuro se quiere medir latencia real, leer
+  // `first_response_delay_sec` de metadata y mostrar "—" cuando no haya datos.
 
   return (
     <div className="space-y-6">
@@ -517,36 +509,8 @@ export default function MarketingTab() {
           </div>
         </div>
 
-        {/* AI reaction speed gauge */}
-        <div className="bg-[#1E293B]/60 backdrop-blur-md p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">
-                Tiempo de Primer Contacto
-              </p>
-              <h3 className="text-4xl font-extrabold text-blue-400">
-                {avgDelay}s
-              </h3>
-            </div>
-            <div className="bg-blue-500/20 p-2 rounded-lg text-blue-400 animate-pulse">
-              <Clock size={16} />
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t border-white/5">
-            <div className="w-full bg-slate-900 rounded-full h-2 relative overflow-hidden">
-              <div
-                className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full shadow-lg shadow-blue-500/50"
-                style={{
-                  width: `${Math.min(100, (Number(avgDelay) / 12) * 100)}%`,
-                }}
-              ></div>
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500 mt-2 font-medium">
-              <span>Instante (0s)</span>
-              <span>Objetivo Humano (&lt; 30 min)</span>
-            </div>
-          </div>
-        </div>
+        {/* Card "Tiempo de Primer Contacto" eliminada @cleanup: mostraba un
+            avgDelay con fallback inventado y no era una métrica accionable. */}
       </div>
     </div>
   );

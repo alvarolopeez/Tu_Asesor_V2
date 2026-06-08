@@ -5,6 +5,16 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-08 — Ola 2 auditoría: cambio de SCHEMA (DROP de 2 tablas)
+
+🔴 **Cambio de schema en producción** — relevante para cualquier flujo n8n/webhook:
+- **Eliminadas** las tablas `property_documents` y `offers` (migración `drop_dead_tables_property_documents_offers`). Eran legacy muertas (0 filas, 0 referencias en código, 0 FKs/vistas). **Ningún workflow n8n las usaba** — pero si algún flujo futuro las referenciaba, ya no existen.
+- `operating_expenses` **vaciada**: borrados los 3 gastos `is_automated=true` (baselines de prueba). La tabla arranca vacía; Álvaro mete sus gastos reales desde FinanzasTab. El auto-seed del código se eliminó.
+- Inventario de tablas: **23 → 21**.
+- `tool_calculations` confirmada VIVA (la escriben `/plusvalia` y `/rentabilidad`). NO tocar.
+
+Sin cambios en webhooks ni en el contrato de `/api/webhooks/n8n`. Solo se añadió un log diagnóstico cuando `get_pending_visit_followups` se salta por ventana horaria.
+
 ### 2026-06-08 — Auditoría CRM completa → docs/CRM-GUIDE.md
 
 **Alcance**: auditoría de lectura de los 7 frentes del CRM (Leads & Compradores, Encargos & Documentos, Inmuebles & Catálogo, Dashboard analítico, Calendario & Citas, Chatbot & IA, Integraciones). Solo documentación — sin cambios de código.

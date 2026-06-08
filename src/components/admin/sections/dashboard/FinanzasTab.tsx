@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Settings, 
@@ -37,16 +37,6 @@ export default function FinanzasTab() {
   const [isSavingExpense, setIsSavingExpense] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
-  // Guard de ejecución única para el auto-seed de gastos baseline.
-  // La causa real de gastos duplicados NO es el check por categoría (que es
-  // correcto), sino el doble-montaje: React StrictMode en dev monta el
-  // componente dos veces, y dos `fetchFinanceData` concurrentes leen la tabla
-  // vacía a la vez, ambos ven que falta el baseline y ambos insertan. Este ref
-  // garantiza que el seed se intenta UNA sola vez por instancia. @cleanup R2.
-  // (Cierre definitivo contra concurrencia entre pestañas/usuarios = índice
-  //  único parcial en operating_expenses(category) WHERE is_automated — Ola 2.)
-  const seedAttemptedRef = useRef(false);
-
   useEffect(() => {
     fetchFinanceData();
   }, []);
@@ -63,57 +53,12 @@ export default function FinanzasTab() {
       ]);
 
       setProperties((propsData || []) as any[]);
-      
-      // Auto-seeding default baseline operating expenses if they are missing
-      let finalExpenses = (expensesData || []) as ExpenseRow[];
-      const hasAutonomos = finalExpenses.some(e => e.category === "autonomos");
-      const hasIdealista = finalExpenses.some(e => e.category === "idealista" || e.category === "portales");
-      const hasTecnologia = finalExpenses.some(e => e.category === "tecnologia" || e.category === "stack");
-      
-      const seedItems = [];
-      if (!hasAutonomos) {
-        seedItems.push({
-          name: "Cuota de Autónomos (Fija)",
-          category: "autonomos",
-          amount: 294.00,
-          is_automated: true
-        });
-      }
-      if (!hasIdealista) {
-        seedItems.push({
-          name: "Suscripción Idealista (Baseline)",
-          category: "idealista",
-          amount: 120.00,
-          is_automated: true
-        });
-      }
-      if (!hasTecnologia) {
-        seedItems.push({
-          name: "Stack de Infraestructura Cloud",
-          category: "tecnologia",
-          amount: 80.00,
-          is_automated: true
-        });
-      }
 
-      if (seedItems.length > 0 && !seedAttemptedRef.current) {
-        seedAttemptedRef.current = true;
-        try {
-          const { data: insertedData, error: seedError } = await supabase
-            .from("operating_expenses")
-            .insert(seedItems)
-            .select();
-          
-          if (!seedError && insertedData) {
-            finalExpenses = [...finalExpenses, ...(insertedData as any[])].sort(
-              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            );
-          }
-        } catch (seedErr) {
-          console.error("Error auto-seeding baseline expenses:", seedErr);
-        }
-      }
-      setExpenses(finalExpenses);
+      // La tabla de gastos arranca VACÍA: Álvaro añade sus gastos reales a mano.
+      // (Antes se auto-insertaban 3 baselines —Autónomos €294, Idealista €120,
+      //  Cloud €80— pero eran importes asumidos que falseaban las finanzas.
+      //  Decisión de Álvaro 2026-06-08: nada de datos inventados.) @cleanup
+      setExpenses((expensesData || []) as ExpenseRow[]);
     } catch (error) {
       console.error("Error loading financial metrics:", error);
     } finally {

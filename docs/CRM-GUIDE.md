@@ -113,15 +113,14 @@ erDiagram
 | `n8n_webhook_logs` | 55 | ✅ | Log de llamadas n8n |
 | `operating_expenses` | 3 | ✅ | Gastos operativos del negocio |
 | `system_errors` | 5 | ✅ | Errores del sistema |
-| `tool_calculations` | 0 | ✅ | Cálculos de valoración/plusvalía |
-| `offers` | 0 | ✅ | Ofertas de compra (sin UI activa) |
-| `property_documents` | 0 | ✅ | Documentos de inmueble (legacy) |
+| `tool_calculations` | 0 | ✅ | Cálculos de valoración/plusvalía (escrita por /plusvalia y /rentabilidad) |
 | `posts` | 13 | ✅ | Artículos del blog |
 | `reviews` | 1 | ✅ | Reseñas de clientes |
 
 **Tablas que NO existen** (mencionadas en comentarios/docs):
-- `chatbot_followups` → el estado vive en `chatbot_conversations.metadata`
+- `chatbot_followups` → el estado vive en `chatbot_conversations.metadata.followup_visit`
 - `expenses` → el nombre real es `operating_expenses`
+- `property_documents` y `offers` → **eliminadas el 2026-06-08** (Ola 2): eran legacy muertas (0 refs, 0 filas).
 
 ---
 
@@ -611,7 +610,13 @@ Esfuerzo: S | Impacto: LOW
 - `tool_calculations`: **viva** (la escriben `/plusvalia` y `/rentabilidad` vía `leadService.submitLeadWithCalculation`; `/valoracion` NO). No tocar.
 - Metadata del chatbot (§2.6) corregido con los campos reales del código.
 
-### Ola 1 — Quick-wins de datos falsos (commit pendiente) (2026-06-08)
+### Ola 2 — Migración + limpieza de datos inventados (2026-06-08)
+- **DROP** `property_documents` y `offers` (migración `drop_dead_tables_property_documents_offers`). Verificado 0 filas + 0 refs código + 0 FKs/vistas DB antes de borrar. **El inventario de tablas baja de 23 a 21.**
+- **MarketingTab**: eliminada la card "Tiempo de Primer Contacto" entera (mostraba `avgDelay` con fallback inventado `"4.8"`; métrica no accionable porque el bot responde en segundos). Import `Clock` retirado.
+- **FinanzasTab**: eliminado el auto-seed de gastos baseline COMPLETO. La tabla `operating_expenses` arranca vacía; Álvaro mete sus gastos reales a mano. Borrados los 3 registros `is_automated=true` que quedaban (importes de prueba). Import `useRef` retirado.
+- **NO ejecutado** (a propósito): `ai_interactions.lead_id nullable` (R3) — sin código que escriba en la tabla, el ALTER no aporta. Y el índice único de gastos ya no aplica (sin auto-seed, no hay duplicados que prevenir). Ambos quedan descartados/pospuestos.
+
+### Ola 1 — Quick-wins de datos falsos (commit `b58d188`) (2026-06-08)
 - **R1** MarketingTab: eliminado el `+5` artificial de `webVisitors` (ahora = visitantes únicos reales) + guard div/0 en `formsRate` + eliminados los 2 badges de tendencia hardcodeados (`+14.2%`, `+8.7%`) + import huérfano `TrendingUp` retirado.
 - **R2** FinanzasTab: añadido `seedAttemptedRef` (guard de un disparo) contra el doble-montaje que duplicaba los gastos baseline. *(Nota: el cierre total contra concurrencia entre pestañas requiere índice único parcial — Ola 2.)*
 - **R4** Heatmap oculto del menú (`AdminDashboard.tsx`) + import `Activity` retirado. Reversible (1 línea).
