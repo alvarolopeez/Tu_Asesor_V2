@@ -77,9 +77,6 @@ Siempre clasifica cada mensaje del usuario con UNA de estas intenciones:
 # PROPIEDADES DISPONIBLES
 {{PROPERTIES_CONTEXT}}
 
-# HISTORIAL DE CONVERSACIÓN
-{{CONVERSATION_HISTORY}}
-
 # FORMATO DE RESPUESTA (JSON estricto)
 Responde SIEMPRE con este JSON y NADA más:
 ```json

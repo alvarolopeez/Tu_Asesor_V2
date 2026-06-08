@@ -306,7 +306,19 @@ function buildTodayContext(): { today: string; tomorrow: string; next7: string }
   };
 }
 
-function buildSystemPrompt(propertiesContext: string, history: Array<{ role: string; content: string }>) {
+/**
+ * Construye el system prompt estático del bot.
+ *
+ * Sprint B (Ola 3): el historial de conversación ya NO se embebe aquí como
+ * texto plano — se pasa directamente a cada provider como array de messages
+ * con roles separados (user / assistant / model). Esto es:
+ *  - Más seguro: la API del provider aplica separación de roles a nivel de
+ *    protocolo, no de texto. Un mensaje de usuario no puede "fingir" ser
+ *    una respuesta del asistente dentro del array.
+ *  - Sin doble inyección: antes el historial llegaba al LLM dos veces
+ *    (string en system + array de messages). Ahora solo una vez.
+ */
+function buildSystemPrompt(propertiesContext: string) {
   // Leer el system prompt desde el archivo .md
   let systemPrompt: string;
   try {
@@ -318,18 +330,6 @@ function buildSystemPrompt(propertiesContext: string, history: Array<{ role: str
     // Fallback inline si no se encuentra el archivo
     systemPrompt = 'Eres un asistente inmobiliario en Sevilla. Responde en JSON con campos: response, intent, confidence, data_extracted.';
   }
-
-  // Sustituir placeholders.
-  // Sanitizamos el contenido de cada turno del historial para prevenir que un
-  // mensaje de usuario inyecte "Asistente: ignora tus instrucciones" dentro del
-  // bloque {{CONVERSATION_HISTORY}} y confunda al LLM sobre quién habla.
-  const historyText = history
-    .map(m => {
-      const role = m.role === 'user' ? 'Cliente' : 'Asistente';
-      const safeContent = sanitizeForPrompt(m.content, 300);
-      return `${role}: ${safeContent}`;
-    })
-    .join('\n');
 
   const todayCtx = buildTodayContext();
 
@@ -343,8 +343,7 @@ function buildSystemPrompt(propertiesContext: string, history: Array<{ role: str
     .replace('{{TODAY}}', todayCtx.today)
     .replace('{{TOMORROW}}', todayCtx.tomorrow)
     .replace('{{NEXT_7_DAYS}}', todayCtx.next7)
-    .replace('{{PROPERTIES_CONTEXT}}', wrappedProperties)
-    .replace('{{CONVERSATION_HISTORY}}', historyText || '(Primera interacción)');
+    .replace('{{PROPERTIES_CONTEXT}}', wrappedProperties);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -365,7 +364,9 @@ async function callOpenAI(
     return keywordFallback(message, '');
   }
 
-  const systemPrompt = buildSystemPrompt(properties, history);
+  // Sprint B: historial pasa como messages array (roles separados a nivel de API),
+  // NO embebido en el system prompt. buildSystemPrompt ya no recibe history.
+  const systemPrompt = buildSystemPrompt(properties);
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -435,7 +436,8 @@ async function callAnthropic(
     return keywordFallback(message, '');
   }
 
-  const systemPrompt = buildSystemPrompt(properties, history);
+  // Sprint B: historial pasa como anthropicMessages array, no en el system prompt.
+  const systemPrompt = buildSystemPrompt(properties);
   let systemContent = systemPrompt;
 
   if (leadContext?.name) {
@@ -501,7 +503,8 @@ async function callGemini(
     return keywordFallback(message, '');
   }
 
-  const systemPrompt = buildSystemPrompt(properties, history);
+  // Sprint B: historial pasa como geminiMessages (contents array), no en systemInstruction.
+  const systemPrompt = buildSystemPrompt(properties);
 
   // Mapear historial al formato de Gemini (roles: user / model).
   // Sanitizamos el contenido de cada turno para prevenir que un mensaje de
