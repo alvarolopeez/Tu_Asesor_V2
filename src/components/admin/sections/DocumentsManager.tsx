@@ -19,133 +19,20 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-// ─── TYPES ──────────────────────────────────────────────────────────────
-interface DocumentTemplate {
-  id: string;
-  name: string;
-  category: string;
-  body: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface GeneratedDocument {
-  id: string;
-  template_id: string | null;
-  property_id: string | null;
-  seller_lead_id: string | null;
-  buyer_id: string | null;
-  merged_data: Record<string, unknown>;
-  signature_status: string;
-  created_at: string;
-}
-
-interface SellerLead {
-  id: string;
-  name: string;
-  phone: string | null;
-  email: string | null;
-  property_id: string | null;
-  preferences: Record<string, any> | null;
-}
-
-interface OwnerInput {
-  nombre: string;
-  dni: string;
-  telefono: string;
-  email: string;
-  direccion: string;
-}
-
-interface PartyInput {
-  nombre: string;
-  nif: string;
-  email: string;
-}
-
-/** Formulario editable de la "página previa" antes de generar el documento. */
-interface GenForm {
-  /** "nota" = Nota de encargo (owners=vendedores). "propuesta" = Propuesta de
-   *  compraventa (owners=compradores/proponentes + sellers=vendedores).
-   *  "contrato" = Contrato privado (mismo modelo de partes que propuesta, con
-   *  campos notariales adicionales; se pre-rellena desde una propuesta origen). */
-  kind: "nota" | "propuesta" | "contrato" | "comprador";
-  /** Sólo en contrato: id de la propuesta de origen que pre-rellenó el form. */
-  sourceProposalId?: string;
-  templateId: string;
-  leadId: string;
-  buyerId: string;
-  lugar: string;
-  fecha: string; // YYYY-MM-DD
-  owners: OwnerInput[];
-  repEnabled: boolean;
-  repNombre: string;
-  repDni: string;
-  repCalidad: string;
-  inmDireccion: string;
-  inmTipo: string;
-  inmM2: string;
-  inmM2Construidos: string;
-  inmDatosRegistrales: string;
-  inmAnexos: string;
-  inmRefCatastral: string;
-  cargas: string;
-  precio: string;
-  honorariosPct: string;
-  fechaInicio: string;
-  fechaFin: string;
-  // ── Propuesta de compraventa ──
-  sellers: PartyInput[];
-  pagoInicial: string;
-  pagoAmpliacion: string;
-  pagoRestante: string;
-  // ── Documentos del comprador (Ficha 218/2005, KYC, Visita) ──
-  /** "ficha" | "kyc" | "visita" — sub-tipo del kind "comprador". */
-  buyerDocType?: "ficha" | "kyc" | "visita" | "";
-  // Ficha Informativa (Decreto 218/2005)
-  cuotaComunidad: string;
-  anyoConstruccion: string;
-  certLetra: string;
-  certConsumo: string;
-  certEmisiones: string;
-  fechaNotaSimple: string;
-  itpPct: string;
-  gastosNotariaPct: string;
-  // KYC (Ley 10/2010)
-  actividadProfesional: string;
-  titularidadTipo: "propia" | "tercero";
-  titularidadTerceroDetalle: string;
-  prpFlag: "no" | "si";
-  prpCargo: string;
-  origenFondos: "ahorros" | "hipoteca" | "venta_patrimonio" | "herencia" | "otros";
-  origenOtrosDetalle: string;
-  // Parte de Visita
-  fechaVisita: string;
-  plazoContrato: string; // YYYY-MM-DD
-  plazoEscritura: string; // YYYY-MM-DD
-  diasHabiles: string;
-  // ── Contrato privado de compraventa ──
-  notarioNombre: string;
-  notarioCiudad: string;
-  notarioFechaEscritura: string; // YYYY-MM-DD
-  notarioNumProtocolo: string;
-  registroNumero: string;
-  registroCiudad: string;
-  ibanVendedor: string;
-  formaPagoAmpliacion: string;
-}
-
-const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
-  draft: { label: "Borrador", cls: "bg-slate-500/15 text-slate-300" },
-  sent: { label: "Enviado a firmar", cls: "bg-sky-500/15 text-sky-300" },
-  viewed: { label: "Visto", cls: "bg-amber-500/15 text-amber-300" },
-  completed: { label: "Firmado", cls: "bg-emerald-500/15 text-emerald-300" },
-  rejected: { label: "Rechazado", cls: "bg-red-500/15 text-red-300" },
-};
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const emptyOwner = (): OwnerInput => ({ nombre: "", dni: "", telefono: "", email: "", direccion: "" });
-const emptyParty = (): PartyInput => ({ nombre: "", nif: "", email: "" });
+// ─── R8 Ola 5: tipos y utils extraídos a archivos dedicados ─────────────────
+import {
+  type DocumentTemplate,
+  type GeneratedDocument,
+  type SellerLead,
+  type OwnerInput,
+  type PartyInput,
+  type GenForm,
+  STATUS_LABEL,
+  EMAIL_RE,
+  emptyOwner,
+  emptyParty,
+} from "./DocumentsManager.types";
+import { detectKind, detectBuyerDocType, mergeBody } from "./DocumentsManager.utils";
 
 /**
  * Sección admin "Documentos" (Fase 4).
@@ -203,25 +90,6 @@ export default function DocumentsManager() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Categoría → kind del formulario.
-  const detectKind = (template: DocumentTemplate): GenForm["kind"] => {
-    const cat = (template.category || "").toLowerCase();
-    const nam = template.name.toLowerCase();
-    if (cat.includes("contrato") || nam.includes("contrato privado")) return "contrato";
-    if (cat.includes("propuesta") || nam.includes("propuesta")) return "propuesta";
-    if (cat.includes("ficha") || cat.includes("kyc") || cat.includes("pbc") || cat.includes("titularidad") || cat.includes("visita")) return "comprador";
-    return "nota";
-  };
-
-  /** Sub-tipo de documento del comprador (sirve para mostrar la sección correcta del form). */
-  const detectBuyerDocType = (template: DocumentTemplate): "ficha" | "kyc" | "visita" | "" => {
-    const c = `${template.category} ${template.name}`.toLowerCase();
-    if (c.includes("ficha")) return "ficha";
-    if (c.includes("visita")) return "visita";
-    if (c.includes("kyc") || c.includes("pbc") || c.includes("titularidad")) return "kyc";
-    return "";
   };
 
   // ─── PASO 1 → 2: abrir la página previa con datos autorrellenados ────────
@@ -685,9 +553,6 @@ export default function DocumentsManager() {
 
     return { ctx, recipients };
   };
-
-  const mergeBody = (body: string, ctx: Record<string, string>): string =>
-    body.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key) => ctx[key] ?? "________");
 
   // ─── GENERAR (desde la página previa) ────────────────────────────────────
   const handleGenerate = async () => {
