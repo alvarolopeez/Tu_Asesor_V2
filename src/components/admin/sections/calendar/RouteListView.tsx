@@ -1,4 +1,6 @@
-import { Calendar as CalendarIcon, Clock, MapPin, Phone, Edit2, User, Home } from "lucide-react";
+import { useState } from "react";
+import { Calendar as CalendarIcon, Clock, MapPin, Phone, Edit2, User, Home, Send } from "lucide-react";
+import toast from "react-hot-toast";
 import type { AppointmentWithRelations } from "./types";
 import { getBadgeStyle, getAppointmentTitle } from "./calendarUtils";
 
@@ -10,6 +12,33 @@ interface RouteListViewProps {
 
 /** Vista de ruta: timeline cronológico optimizado para móvil con deep-links. */
 export default function RouteListView({ appointments, onApptEdit }: RouteListViewProps) {
+  // IDs de citas cuyo botón "Enviar confirmación" está en proceso de envío.
+  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
+  // IDs de citas que ya recibieron confirmación en esta sesión (evita doble envío accidental).
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+
+  /**
+   * Llama al endpoint POST /api/appointments/[id]/send-confirmation
+   * y envía la plantilla HSM `confirmacion_visita_cliente` al lead.
+   */
+  async function sendConfirmation(apptId: string) {
+    setSendingIds(prev => new Set(prev).add(apptId));
+    try {
+      const res = await fetch(`/api/appointments/${apptId}/send-confirmation`, { method: 'POST' });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error || 'Error al enviar la confirmación');
+        return;
+      }
+      toast.success(`✅ Confirmación enviada a ${body.phone}`);
+      setSentIds(prev => new Set(prev).add(apptId));
+    } catch {
+      toast.error('Error de red al enviar la confirmación');
+    } finally {
+      setSendingIds(prev => { const s = new Set(prev); s.delete(apptId); return s; });
+    }
+  }
+
   const sortedAppointments = [...appointments].sort((a, b) =>
     new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
   );
@@ -127,7 +156,26 @@ export default function RouteListView({ appointments, onApptEdit }: RouteListVie
                       </a>
                     )}
 
-                    {/* 3. General edit */}
+                    {/* 3. Enviar confirmación WhatsApp (solo si hay teléfono y no está cancelada) */}
+                    {appt.leads?.phone && appt.status !== 'cancelled' && (
+                      <button
+                        onClick={() => sendConfirmation(appt.id)}
+                        disabled={sendingIds.has(appt.id) || sentIds.has(appt.id)}
+                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-bold transition-all
+                          ${sentIds.has(appt.id)
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 cursor-default'
+                            : sendingIds.has(appt.id)
+                              ? 'bg-blue-500/10 border-blue-500/20 text-blue-300 cursor-wait opacity-70'
+                              : 'bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30 text-blue-400 hover:text-blue-300'
+                          }`}
+                        title={sentIds.has(appt.id) ? 'Confirmación enviada' : 'Enviar confirmación WhatsApp'}
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        {sentIds.has(appt.id) ? 'Enviada' : sendingIds.has(appt.id) ? '…' : 'Confirmar'}
+                      </button>
+                    )}
+
+                    {/* 4. General edit */}
                     <button
                       onClick={() => onApptEdit(appt)}
                       className="p-2.5 hover:bg-white/5 border border-white/5 text-slate-400 hover:text-white rounded-xl transition-colors"
