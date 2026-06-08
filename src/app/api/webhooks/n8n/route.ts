@@ -350,6 +350,16 @@ export async function POST(request: NextRequest) {
           }).format(new Date())
         );
         if (madridHour < 10 || madridHour >= 21) {
+          // Log diagnóstico (R5): dejar rastro del skip por ventana horaria para
+          // poder distinguir "no había follow-ups" de "se rechazó por la hora".
+          // Sin esto, fuera de 10-21h el cron parecía no hacer nada sin pista.
+          await supabase.from('n8n_webhook_logs').insert({
+            webhook_name: 'n8n_get_pending_visit_followups',
+            source: 'n8n',
+            payload: { madrid_hour: madridHour },
+            response_status: 200,
+            error_message: `Skipped: fuera de ventana horaria 10:00-21:00 Madrid (hora actual ${madridHour}h)`,
+          });
           return NextResponse.json({ count: 0, followups: [], skipped_reason: 'out_of_hours_madrid' });
         }
 

@@ -7,7 +7,6 @@ import {
   Calendar,
   Layers,
   BarChart3,
-  TrendingUp,
   Clock,
 } from "lucide-react";
 import type { PropertyRow, LeadRow, AppointmentRow, ConversationRow, WebVisitRow } from "./types";
@@ -63,7 +62,9 @@ export default function MarketingTab() {
   }
   // 1. Funnel data values
   const uniqueWebVisitors = new Set(webVisits.map((v) => v.session_id)).size;
-  const webVisitors = Math.max(leads.length + 5, uniqueWebVisitors);
+  // Dato REAL de visitantes únicos (sesiones). Antes se inflaba con
+  // Math.max(leads.length + 5, ...) — un +5 artificial sin base. @cleanup R1.
+  const webVisitors = uniqueWebVisitors;
   const formsFilled = leads.length;
   const qualifiedLeads = leads.filter((l) =>
     ["qualified", "visit_scheduled", "closed"].includes(l.status ?? "")
@@ -73,8 +74,9 @@ export default function MarketingTab() {
     (a) => a.status === "confirmed"
   ).length;
 
-  // Funnel rates
-  const formsRate = ((formsFilled / webVisitors) * 100).toFixed(1);
+  // Funnel rates. Guard div/0: al usar visitantes reales, webVisitors puede
+  // ser 0 si aún no hay tracking de sesiones → evitamos Infinity/NaN. @cleanup R1.
+  const formsRate = webVisitors > 0 ? ((formsFilled / webVisitors) * 100).toFixed(1) : "0.0";
   const qualifiedRate =
     formsFilled > 0
       ? ((qualifiedLeads / formsFilled) * 100).toFixed(1)
@@ -194,9 +196,8 @@ export default function MarketingTab() {
             <div className="bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
               <Eye className="text-blue-400" size={24} />
             </div>
-            <span className="text-green-400 text-xs font-bold bg-green-500/10 px-2 py-1 rounded-md flex items-center">
-              <TrendingUp size={12} className="mr-1" /> +14.2%
-            </span>
+            {/* Badge de tendencia eliminado: era un "+14.2%" hardcodeado, no
+                calculado. Reañadir solo cuando haya cálculo MoM real. @cleanup R1. */}
           </div>
           <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">
             Visitas Web Únicas
@@ -214,9 +215,8 @@ export default function MarketingTab() {
             <div className="bg-green-500/10 p-3 rounded-xl border border-green-500/20">
               <FileCheck2 className="text-green-400" size={24} />
             </div>
-            <span className="text-green-400 text-xs font-bold bg-green-500/10 px-2 py-1 rounded-md flex items-center">
-              <TrendingUp size={12} className="mr-1" /> +8.7%
-            </span>
+            {/* Badge de tendencia eliminado: era un "+8.7%" hardcodeado, no
+                calculado. Reañadir solo cuando haya cálculo MoM real. @cleanup R1. */}
           </div>
           <p className="text-slate-400 text-xs font-semibold tracking-wider uppercase">
             Registros de Leads

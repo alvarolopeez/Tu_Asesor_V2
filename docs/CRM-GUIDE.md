@@ -303,26 +303,33 @@ features: {
 **Endpoints**: `POST /api/webhooks/whatsapp`, `POST /api/chatbot/message` (web widget), `POST /api/admin/chat/send`, `POST /api/webhooks/chatwoot`
 **Componentes**: `ChatManager.tsx` (~504 LOC), `src/lib/chatbot/engine.ts`, `src/lib/chatbot/scheduling.ts`, `src/lib/chatbot/systemPrompt.md`, `src/lib/whatsapp.ts`
 
-**Estado persistido en `chatbot_conversations.metadata`** (jsonb — toda la máquina de estados):
+**Estado persistido en `chatbot_conversations.metadata`** (jsonb — toda la máquina de estados). ⚠️ Campos verificados contra `scheduling.ts` commit `1141148` (2026-06-08):
 ```json
 {
   "interview_state": {
-    "step": 0,
-    "answers": {},
+    "step": 1,
+    "answers": { "savings": 0, "funding": "", "tipoCompra": "" },
     "attempts": 0,
-    "propertyZone": ""
+    "target": {
+      "propertyId": "uuid",
+      "propertyTitle": "string",
+      "propertyZone": "string|null",
+      "scheduledAt": "ISO_UTC",
+      "leadId": "uuid",
+      "leadName": "string",
+      "leadPhone": "+34..."
+    },
+    "startedAt": "ISO_UTC"
   },
-  "scheduling": {
-    "stage": "...",
-    "propertyId": "...",
-    "preferredDate": "..."
-  },
+  "scheduling": { "pending_day": "YYYY-MM-DD|null" },
+  "followup_visit": { "pending_until": "ISO_UTC", "sent": false },
+  "context_property_id": "uuid",
+  "last_property_id": "uuid",
   "last_escalation_notify_at": "ISO_UTC",
-  "escalated_at": "ISO_UTC",
-  "pending_visit_followup_until": "ISO_UTC",
-  "visit_followup_at": "ISO_UTC"
+  "escalated_at": "ISO_UTC"
 }
 ```
+> Nombres EXACTOS (no usar variantes). Escritos por `setConversationMetadata` / `setSchedulingHint` / `scheduleVisitFollowup` en `scheduling.ts`. Las claves `last_escalation_notify_at` y `escalated_at` las escribe el webhook de WhatsApp (escalación). NO existen `pending_visit_followup_until` ni `visit_followup_at` (eran imprecisión de una versión previa de esta guía).
 
 **Deuda técnica conocida** (ya documentada — NO redescubrir como nuevo):
 
@@ -330,7 +337,7 @@ features: {
 |---|---|---|
 | `CHATBOT-PROMPT-INJECTION` | Historial completo + catálogo de propiedades inyectados en LLM sin sanitización — usuario malicioso puede manipular el bot via mensajes | Pendiente fix |
 | `CHATBOT-LLM-OVERRIDE` | Gemini Flash puede ignorar la regla "no confirmar cita directamente" del system prompt | Mitigado: scheduling vive en código, no en LLM |
-| `CHATBOT-FOLLOWUPS-MISSING` | Tabla `chatbot_followups` no existe; `get_pending_visit_followups` usa `metadata.pending_visit_followup_until` | Workaround funcional |
+| `CHATBOT-FOLLOWUPS-MISSING` | Tabla `chatbot_followups` no existe; `get_pending_visit_followups` usa `metadata.followup_visit.{pending_until,sent}` | Workaround funcional |
 | `CHATBOT-DST` | Edge cases en conversión hora Madrid → UTC en cambios de horario (mar/oct) | Documentado, pendiente fix robusto |
 
 **Zonas frágiles adicionales**:
@@ -417,9 +424,15 @@ features: {
 
 ## 4. Informe de calidad
 
-### CRITICAL — Ninguno confirmado
+### CRITICAL — Ninguno de rotura inmediata, pero leer la nota de seguridad
 
-No se encontraron hallazgos de severidad CRITICAL en esta auditoría.
+No hay hallazgos que rompan el sistema *hoy*. Pero la prioridad real de ejecución debe poner la **seguridad por delante de la cosmética**:
+
+> 🔐 **`CHATBOT-PROMPT-INJECTION` es el riesgo más serio del sistema**, aunque esté listado abajo como "deuda conocida". El bot está expuesto a clientes reales por WhatsApp y el historial + catálogo se inyectan al LLM sin sanitizar ni delimitar. Un mensaje malicioso puede manipular a Paula delante de un cliente (falsas confirmaciones, fuga de instrucciones, suplantación de tono). Para un negocio con citas y firmas, esto pesa más que cualquier `+5` en un dashboard. **Trátese como HIGH de seguridad prioritario, no como nice-to-have.** Plan: delimitar historial/catálogo con marcadores + sanitizar `\n#`, `SYSTEM:`, etc. + dejar de duplicar el historial en system+messages.
+
+### Estado de testing (riesgo transversal)
+
+> ⚠️ **El proyecto NO tiene tests automatizados.** Cada cambio se valida únicamente con `npm run build` (typecheck) + prueba manual en navegador/WhatsApp. Consecuencia operativa: **toda ola de cambios debe terminar con build verde Y una verificación manual del flujo tocado** antes de commit. No hay red de seguridad para regresiones — agrupar cambios por área de riesgo y desplegar de forma incremental.
 
 ---
 
@@ -442,7 +455,7 @@ No se encontraron hallazgos de severidad CRITICAL en esta auditoría.
 | M2 | Dashboard analítico | **ai_interactions nunca se escribe** | `engine.ts` + schema | `ai_interactions.lead_id` es NOT NULL — engine no puede insertar cuando el lead aún es desconocido. Tabla con 0 filas en producción | Hacer `lead_id` nullable (migración simple) o crear lead provisional en primer mensaje WA desconocido. |
 | M3 | Integraciones | **get_pending_visit_followups silencia la ventana horaria** | `api/webhooks/n8n/route.ts:352` | Fuera de 10:00-21:00 Madrid devuelve `[]` sin error — followups no procesados hasta el siguiente cron, sin log diagnóstico | Añadir log en `n8n_webhook_logs` con mensaje "fuera de ventana horaria" para diagnosticabilidad. |
 | M4 | Integraciones | **Credencial Bearer en Difusion Inteligente — verificar** | n8n workflow `6E0AP0gqLUliPQtN` | Warning 2026-06-03: "credentials skipped during auto-assignment" en nodos `Enviar WhatsApp Meta` y `Log Difusion CRM` | Verificar manualmente en n8n UI que credencial `s3YA5o57rEEdFw1W` sigue atada a los nodos. |
-| M5 | Encargos | **property_documents y offers sin UI ni datos** | Schema | `property_documents` (0 filas) y `offers` (0 filas) — código posiblemente dead | Auditar si hay referencias activas en código. Si no las hay, candidatos a `DROP TABLE` con migración. |
+| M5 | Encargos | **property_documents y offers MUERTAS (verificado 2026-06-08)** | Schema | `property_documents` y `offers`: **0 referencias en `src/` + 0 filas**. Confirmado código muerto vía grep. `tool_calculations` SÍ está viva (la escriben `/plusvalia` y `/rentabilidad` vía `leadService.submitLeadWithCalculation`; `/valoracion` NO la usa — 0 filas = aún sin envíos reales). | `property_documents` y `offers` → `DROP TABLE` con migración reversible (Ola 2). `tool_calculations` → NO tocar. |
 | M6 | Chatbot | **ChatManager: label de contacto ambiguo** | `ChatManager.tsx:312` | Si `wa_phone_number` y `metadata.visitor_name` son null, el label es genérico sin identificador único | Añadir fallback `conversation.id.slice(0,8)` como identificador en el label. |
 
 ---
@@ -451,7 +464,7 @@ No se encontraron hallazgos de severidad CRITICAL en esta auditoría.
 
 | # | Área | Título | Archivo:Línea | Detalle | Recomendación |
 |---|---|---|---|---|---|
-| L1 | Integraciones | **analytics/track silencia URL inválida** | `analytics/track/route.ts:41` | `new URL(full_url)` falla silenciosamente; `source` queda como 'direct' sin log de warning | Añadir `console.warn` cuando la URL no es parseable para diagnosticabilidad. |
+| L1 | Integraciones | ~~analytics/track silencia URL inválida~~ **(FALSO — ya cubierto)** | `analytics/track/route.ts:64` | Verificado 2026-06-08: el `catch` del parsing de `full_url` YA hace `console.error('[Analytics Route] Error parsing full_url:', e)`. Hallazgo era impreciso. | Sin acción. |
 | L2 | Dashboard analítico | **system_errors sin UI de visualización** | Schema | 5 filas en `system_errors`, ninguna UI admin para verlas | Añadir sub-tab en WebhooksManager o panel en DashboardOverview. |
 | L3 | Integraciones | **dejar-resena sin rate limiting** | `/dejar-resena/page.tsx` | Formulario público sin protección contra spam de reseñas | Añadir throttle por IP o captcha. |
 
@@ -567,7 +580,7 @@ Esfuerzo: S | Impacto: LOW
 
 2. **`ai_interactions.lead_id` es NOT NULL** — no insertar en esta tabla sin `lead_id` conocido o el INSERT falla con constraint violation.
 
-3. **`chatbot_followups` no existe** — el estado de follow-up vive en `chatbot_conversations.metadata.pending_visit_followup_until`. No crear la tabla sin refactorizar el código.
+3. **`chatbot_followups` no existe** — el estado de follow-up vive en `chatbot_conversations.metadata.followup_visit` (`{pending_until, sent}`). No crear la tabla sin refactorizar el código.
 
 4. **`operating_expenses`** es el nombre real de la tabla (no `expenses` como aparece en algunos comentarios/docs).
 
@@ -589,4 +602,24 @@ Esfuerzo: S | Impacto: LOW
 
 ---
 
-*Generado: 2026-06-08 | Claude Sonnet 4.6 | Schema verificado via Supabase MCP | Commit base: `07dbbef` en `master`*
+---
+
+## 7. Registro de ejecución (olas aplicadas)
+
+### Ola 0 — Verificación de incógnitas (2026-06-08)
+- `property_documents` y `offers`: **confirmadas muertas** (0 refs en `src/` + 0 filas). → DROP en Ola 2.
+- `tool_calculations`: **viva** (la escriben `/plusvalia` y `/rentabilidad` vía `leadService.submitLeadWithCalculation`; `/valoracion` NO). No tocar.
+- Metadata del chatbot (§2.6) corregido con los campos reales del código.
+
+### Ola 1 — Quick-wins de datos falsos (commit pendiente) (2026-06-08)
+- **R1** MarketingTab: eliminado el `+5` artificial de `webVisitors` (ahora = visitantes únicos reales) + guard div/0 en `formsRate` + eliminados los 2 badges de tendencia hardcodeados (`+14.2%`, `+8.7%`) + import huérfano `TrendingUp` retirado.
+- **R2** FinanzasTab: añadido `seedAttemptedRef` (guard de un disparo) contra el doble-montaje que duplicaba los gastos baseline. *(Nota: el cierre total contra concurrencia entre pestañas requiere índice único parcial — Ola 2.)*
+- **R4** Heatmap oculto del menú (`AdminDashboard.tsx`) + import `Activity` retirado. Reversible (1 línea).
+- **R5** `get_pending_visit_followups`: log diagnóstico en `n8n_webhook_logs` al rechazar por ventana horaria.
+- **L1** descartado: `analytics/track` ya logueaba el error de parsing (hallazgo original impreciso).
+- ⚠️ **Hallazgo nuevo (no aplicado)**: `MarketingTab.tsx` tiene un `avgDelay` con fallback inventado `"4.8"` (s) cuando no hay datos de latencia. No se tocó en esta ola porque se usa con `Number()` en una barra de progreso y cambiarlo requiere lógica condicional en el render. Pendiente para Ola futura.
+- ❓ **Decisión de producto pendiente para Álvaro**: ¿el auto-seed de gastos baseline de FinanzasTab (Autónomos €294, Idealista €120, Cloud €80 = €494/mes) debe existir? Si esos importes no son reales, las finanzas muestran gastos asumidos. Análogo a los baselines fake limpiados en brief #002.
+
+---
+
+*Generado: 2026-06-08 | Auditoría: Claude Sonnet 4.6 | Olas 0-1 + correcciones: Claude Opus 4.8 | Schema verificado via Supabase MCP*

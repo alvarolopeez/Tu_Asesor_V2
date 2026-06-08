@@ -23,7 +23,6 @@ import {
   MessageCircle,
   Star,
   PenTool,
-  Activity,
   Briefcase,
   TrendingUp,
   DollarSign,
@@ -194,7 +193,11 @@ export default function AdminDashboard() {
     { id: 'chat', label: 'Live Chat (IA)', icon: MessageCircle },
     { id: 'reviews', label: 'Reseñas', icon: Star },
     { id: 'blog', label: 'Blog', icon: PenTool },
-    { id: 'heatmap', label: 'Mapa de Calor', icon: Activity },
+    // 'heatmap' oculto del menú: HeatmapManager es un placeholder de 11 líneas
+    // sin datos. Para reactivar cuando se implemente (con web_visits agrupadas
+    // por page_path): descomentar la línea de abajo Y re-importar `Activity`
+    // de lucide-react. El type 'heatmap' y el render se dejan intactos. @cleanup R4.
+    // { id: 'heatmap', label: 'Mapa de Calor', icon: Activity },
     { id: 'webhooks', label: 'Webhook Logs', icon: Server },
   ];
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Settings, 
@@ -36,6 +36,16 @@ export default function FinanzasTab() {
   const [newExpenseAmount, setNewExpenseAmount] = useState("");
   const [isSavingExpense, setIsSavingExpense] = useState(false);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+
+  // Guard de ejecución única para el auto-seed de gastos baseline.
+  // La causa real de gastos duplicados NO es el check por categoría (que es
+  // correcto), sino el doble-montaje: React StrictMode en dev monta el
+  // componente dos veces, y dos `fetchFinanceData` concurrentes leen la tabla
+  // vacía a la vez, ambos ven que falta el baseline y ambos insertan. Este ref
+  // garantiza que el seed se intenta UNA sola vez por instancia. @cleanup R2.
+  // (Cierre definitivo contra concurrencia entre pestañas/usuarios = índice
+  //  único parcial en operating_expenses(category) WHERE is_automated — Ola 2.)
+  const seedAttemptedRef = useRef(false);
 
   useEffect(() => {
     fetchFinanceData();
@@ -86,7 +96,8 @@ export default function FinanzasTab() {
         });
       }
 
-      if (seedItems.length > 0) {
+      if (seedItems.length > 0 && !seedAttemptedRef.current) {
+        seedAttemptedRef.current = true;
         try {
           const { data: insertedData, error: seedError } = await supabase
             .from("operating_expenses")
