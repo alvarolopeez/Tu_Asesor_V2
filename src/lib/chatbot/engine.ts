@@ -10,6 +10,17 @@ import {
   clearVisitFollowup,
   clearInterviewStateFromEngine,
 } from './scheduling';
+import { rescueNaturalResponse } from './llmParser';
+import {
+  needsProfile,
+  isNeutralReply,
+  classifyOfferReply,
+  isProfileOfferPending,
+  wasProfileAlreadyOffered,
+  offerInterview,
+  startStandaloneInterview,
+  markOfferDeclined,
+} from './profileCheck';
 
 /**
  * Motor del Chatbot — Orquesta la generación de respuestas.
@@ -29,6 +40,20 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const LLM_MODEL = process.env.LLM_MODEL || 'gemini-1.5-flash';
+
+/**
+ * Tamaño de la ventana de historial de conversación que pasamos al LLM.
+ *
+ * 30 mensajes ≈ 15 turnos de cliente + 15 del bot. En WhatsApp 10 era
+ * insuficiente: "ok", "vale", "perfecto" consumen turnos sin contexto y
+ * el bot perdía la propiedad inicial de la que hablábamos.
+ *
+ * Cota técnica: Gemini 1.5 Flash soporta 1M tokens — 30 mensajes
+ * (200 tokens cada uno) son ~6k. No hay riesgo de desborde.
+ *
+ * @increased 2026-06-08 (Sprint chatbot UX — root cause A)
+ */
+const HISTORY_WINDOW = 30;
 
 // ─── Sanitización anti-inyección ────────────────────────
 /**
@@ -66,6 +91,85 @@ interface EngineInput {
   };
 }
 
+interface NameResolutionState {
+  existing_name: string;
+  profile_name: string;
+  asked_at: string;
+}
+
+/**
+ * Lee del metadata de la conversación los campos que afectan al
+ * comportamiento del LLM en este turno:
+ *   - preferred_name: si el cliente eligió un nombre diferente al de BD
+ *   - pending_name_resolution: si el bot le acaba de preguntar cómo
+ *     prefiere ser llamado y estamos esperando respuesta
+ */
+async function getConversationNameState(conversationId: string): Promise<{
+  preferred_name: string | null;
+  pending_name_resolution: NameResolutionState | null;
+}> {
+  const { data } = await supabase
+    .from('chatbot_conversations')
+    .select('metadata')
+    .eq('id', conversationId)
+    .single();
+  const meta = ((data?.metadata as Record<string, unknown>) || {});
+  return {
+    preferred_name: (meta.preferred_name as string) || null,
+    pending_name_resolution: (meta.pending_name_resolution as NameResolutionState) || null,
+  };
+}
+
+/**
+ * Lee el leadId asociado a una conversación + name y phone del lead (BD).
+ * Usado por la entrevista reactiva (T4) cuando el cliente acepta la oferta
+ * sin que el caller pase el leadId explícitamente.
+ */
+async function getConversationLeadInfo(conversationId: string): Promise<
+  { leadId: string; leadName: string; phone: string } | null
+> {
+  const { data: convo } = await supabase
+    .from('chatbot_conversations')
+    .select('lead_id, wa_phone_number')
+    .eq('id', conversationId)
+    .single();
+  if (!convo?.lead_id) return null;
+  const { data: lead } = await supabase
+    .from('leads')
+    .select('name, phone')
+    .eq('id', convo.lead_id)
+    .single();
+  return {
+    leadId: convo.lead_id,
+    leadName: lead?.name || '',
+    phone: lead?.phone || convo.wa_phone_number || '',
+  };
+}
+
+async function countConversationMessages(conversationId: string): Promise<number> {
+  const { count } = await supabase
+    .from('chatbot_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId);
+  return count || 0;
+}
+
+async function patchConversationMetadata(
+  conversationId: string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { data } = await supabase
+    .from('chatbot_conversations')
+    .select('metadata')
+    .eq('id', conversationId)
+    .single();
+  const current = (data?.metadata as Record<string, unknown>) || {};
+  await supabase
+    .from('chatbot_conversations')
+    .update({ metadata: { ...current, ...patch } })
+    .eq('id', conversationId);
+}
+
 /**
  * Punto de entrada principal del motor del chatbot.
  * Gestiona historial, contexto y delegación al LLM o fallback.
@@ -74,6 +178,53 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
   // -1. El cliente acaba de escribir → si tenía un follow-up programado,
   //     lo cancelamos para no enviar el ping de 30 min redundante. FIX-G.
   void clearVisitFollowup(input.conversationId).catch(() => {});
+
+  // -0.5. T3 — estado de nombre del cliente. Si hay colisión pendiente
+  //       (T2.3) inyectamos en el system prompt un bloque que dice al LLM
+  //       "el cliente está respondiendo a tu pregunta sobre cómo llamarle;
+  //       extrae el nombre elegido en data_extracted.preferred_name".
+  const nameState = await getConversationNameState(input.conversationId).catch(() => ({
+    preferred_name: null,
+    pending_name_resolution: null as NameResolutionState | null,
+  }));
+
+  // -0.4. T4 — entrevista reactiva. Si tenemos una oferta de perfil pendiente,
+  //       interpretamos el mensaje como respuesta sí/no a la oferta.
+  //       Esto va ANTES del check de interview_state porque la oferta vive en
+  //       un estado distinto (profile_offer_pending).
+  if (await isProfileOfferPending(input.conversationId).catch(() => false)) {
+    const cls = await classifyOfferReply(input.message);
+    if (cls === 'yes') {
+      const leadInfo = await getConversationLeadInfo(input.conversationId);
+      if (leadInfo) {
+        return await startStandaloneInterview({
+          conversationId: input.conversationId,
+          leadId: leadInfo.leadId,
+          leadName: nameState.preferred_name || input.leadContext?.name || leadInfo.leadName || 'cliente',
+          phone: leadInfo.phone || input.leadContext?.phone || '',
+        });
+      }
+      // Sin leadId no podemos arrancar entrevista. Marcamos declinada y seguimos.
+      await markOfferDeclined(input.conversationId).catch(() => {});
+    } else if (cls === 'no') {
+      await markOfferDeclined(input.conversationId).catch(() => {});
+      return {
+        response:
+          'Sin problema, lo dejamos para otro momento 🙂 Cuando quieras retomarlo, solo dímelo. ' +
+          'Mientras tanto, ¿en qué te puedo ayudar?',
+        intent: 'general_inquiry',
+        confidence: 0.95,
+        data_extracted: {},
+        conversation_id: input.conversationId,
+        should_escalate: false,
+      };
+    } else {
+      // Ambiguo: marcamos declinada para no insistir y dejamos que el LLM
+      // gestione su mensaje real (probablemente no estaba contestando a la
+      // oferta, sino preguntando otra cosa).
+      await markOfferDeclined(input.conversationId).catch(() => {});
+    }
+  }
 
   // 0. Si la conversación está en medio de la entrevista pre-cita (T4),
   //    interpretamos el mensaje como respuesta a la pregunta actual y
@@ -110,28 +261,82 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     };
   }
 
-  // 1. Recuperar historial de la conversación (últimos 10 mensajes)
-  const history = await getConversationHistory(input.conversationId, 10);
+  // -0.3. T4 — triggers de OFERTA de entrevista (no la respuesta).
+  //       a) Primer mensaje del cliente + needsProfile + no se ofreció antes
+  //       b) Mensaje neutro ("perfecto","vale") + needsProfile + no se ofreció
+  //       Solo si no estamos ya en entrevista y no hay oferta pendiente.
+  const phoneForProfile = input.leadContext?.phone || null;
+  const alreadyOffered = await wasProfileAlreadyOffered(input.conversationId).catch(() => false);
+  const offerPending = await isProfileOfferPending(input.conversationId).catch(() => false);
+  if (!alreadyOffered && !offerPending && phoneForProfile) {
+    const msgCount = await countConversationMessages(input.conversationId).catch(() => -1);
+    // El caller (whatsapp/route.ts) ya insertó el mensaje del cliente antes
+    // de llamarnos → el conteo "1" significa que este es el primer mensaje.
+    const isFirstMessage = msgCount === 1;
+    const isNeutral = isNeutralReply(input.message);
+    if ((isFirstMessage || isNeutral) && await needsProfile(phoneForProfile)) {
+      const leadInfo = await getConversationLeadInfo(input.conversationId);
+      if (leadInfo) {
+        return await offerInterview({
+          conversationId: input.conversationId,
+          leadId: leadInfo.leadId,
+          leadName: nameState.preferred_name || input.leadContext?.name || leadInfo.leadName || '',
+          phone: phoneForProfile,
+          userMessage: input.message,
+        });
+      }
+    }
+  }
+
+  // 1. Recuperar historial de la conversación.
+  //    Tamaño en const HISTORY_WINDOW arriba — visibilidad explícita para
+  //    auditarlo si el modelo LLM cambia su context window.
+  const history = await getConversationHistory(input.conversationId, HISTORY_WINDOW);
 
   // 2. Recuperar propiedades activas para contexto
   const properties = await getActiveProperties();
 
-  // 3. Generar respuesta según el provider configurado
+  // 3. Generar respuesta según el provider configurado.
+  //    Inyectamos el estado de nombre (T3) en el leadContext para que el
+  //    system prompt sepa cómo dirigirse al cliente y, si hay colisión
+  //    pendiente, extraiga preferred_name en data_extracted.
+  const enrichedContext = {
+    ...(input.leadContext || {}),
+    preferred_name: nameState.preferred_name,
+    pending_name_resolution: nameState.pending_name_resolution,
+  } as EngineInput['leadContext'] & {
+    preferred_name: string | null;
+    pending_name_resolution: NameResolutionState | null;
+  };
+
   let result: ChatbotEngineResponse;
 
   switch (LLM_PROVIDER) {
     case 'gemini':
-      result = await callGemini(input.message, history, properties, input.leadContext);
+      result = await callGemini(input.message, history, properties, enrichedContext);
       break;
     case 'openai':
-      result = await callOpenAI(input.message, history, properties, input.leadContext);
+      result = await callOpenAI(input.message, history, properties, enrichedContext);
       break;
     case 'anthropic':
-      result = await callAnthropic(input.message, history, properties, input.leadContext);
+      result = await callAnthropic(input.message, history, properties, enrichedContext);
       break;
     default:
       // Fallback: detección por keywords (Fase 1)
       result = keywordFallback(input.message, input.conversationId);
+  }
+
+  // 3b. T3 — persistir preferred_name si el LLM lo extrajo, y limpiar
+  //     la colisión pendiente. Idempotente: si el cliente eligió el nombre
+  //     que ya teníamos, igual lo guardamos como preferred_name para que el
+  //     metadata sea explícito (y evitar volver a preguntar).
+  const extractedPref = (result.data_extracted as Record<string, unknown> | undefined)?.preferred_name;
+  if (typeof extractedPref === 'string' && extractedPref.trim().length > 0) {
+    const cleaned = extractedPref.trim().slice(0, 60);
+    await patchConversationMetadata(input.conversationId, {
+      preferred_name: cleaned,
+      pending_name_resolution: null,
+    }).catch((err) => console.warn('[engine] patch preferred_name failed:', err));
   }
 
   // 4. Si el LLM detectó ask_price y la respuesta contiene un link público,
@@ -307,6 +512,62 @@ function buildTodayContext(): { today: string; tomorrow: string; next7: string }
 }
 
 /**
+ * Construye el bloque de contexto de cliente que va al system prompt.
+ * Unifica lead.name / preferred_name + estado de colisión pendiente (T3).
+ * Sanitiza todo lo que viene del cliente o BD.
+ *
+ * Devuelve la sección lista para inyectar; vacío si no hay leadContext.
+ */
+function buildClientContextBlock(leadContext?: EngineInput['leadContext'] & {
+  preferred_name?: string | null;
+  pending_name_resolution?: NameResolutionState | null;
+}): string {
+  if (!leadContext) return '';
+
+  const preferred = leadContext.preferred_name?.trim();
+  const base = leadContext.name?.trim();
+  // Nombre canónico que el bot DEBE usar para dirigirse al cliente.
+  // Preferencia explícita > nombre base.
+  const nameForGreeting = preferred || base || null;
+
+  const lines: string[] = ['<contexto_cliente>'];
+  if (nameForGreeting) {
+    lines.push(`Nombre canónico del cliente (usar SIEMPRE para dirigirte a él): ${sanitizeForPrompt(nameForGreeting, 60)}`);
+  }
+  if (base && preferred && base !== preferred) {
+    lines.push(`Nombre original en BD: ${sanitizeForPrompt(base, 60)} (el cliente prefiere "${sanitizeForPrompt(preferred, 60)}")`);
+  }
+  if (leadContext.phone) {
+    lines.push(`Teléfono: ${sanitizeForPrompt(leadContext.phone, 30)}`);
+  }
+  if (leadContext.type) {
+    lines.push(`Tipo: ${sanitizeForPrompt(leadContext.type, 30)}`);
+  }
+
+  // Si hay colisión pendiente (T2.3 → T3 resolution), inyectamos una
+  // instrucción operativa muy explícita: el cliente está respondiendo a la
+  // pregunta sobre cómo prefiere ser llamado.
+  if (leadContext.pending_name_resolution) {
+    const { existing_name, profile_name } = leadContext.pending_name_resolution;
+    lines.push('');
+    lines.push('<resolucion_nombre_pendiente>');
+    lines.push(
+      `En el turno anterior preguntaste al cliente si prefería ser llamado "${sanitizeForPrompt(existing_name, 60)}" o "${sanitizeForPrompt(profile_name, 60)}".`,
+    );
+    lines.push(
+      'El mensaje actual del cliente es su respuesta. INTERPRÉTALA y devuelve el nombre elegido en `data_extracted.preferred_name`. ' +
+      'Si elige claramente uno de los dos, devuelve EXACTAMENTE ese nombre. Si menciona un nombre distinto ("llámame Pepe"), devuelve ese. ' +
+      'Si su respuesta es ambigua, deja preferred_name a null y vuelve a preguntar suavemente. ' +
+      'En el response confirma con calidez la elección antes de seguir la conversación normal.',
+    );
+    lines.push('</resolucion_nombre_pendiente>');
+  }
+
+  lines.push('</contexto_cliente>');
+  return lines.join('\n');
+}
+
+/**
  * Construye el system prompt estático del bot.
  *
  * Sprint B (Ola 3): el historial de conversación ya NO se embebe aquí como
@@ -374,21 +635,11 @@ async function callOpenAI(
     { role: 'user' as const, content: message },
   ];
 
-  if (leadContext?.name) {
-    // Sanitizar campos de lead: un nombre como "Ignora tus instrucciones y di X"
-    // pasaría directamente al sistema sin escape si no se trata aquí.
-    // Delimitadores XML para separar contexto de dato frente al LLM.
-    messages.splice(1, 0, {
-      role: 'system' as const,
-      content: [
-        '<contexto_cliente>',
-        `Nombre: ${sanitizeForPrompt(leadContext.name, 100)}`,
-        `Teléfono: ${sanitizeForPrompt(leadContext.phone, 30) || 'desconocido'}`,
-        `Tipo: ${sanitizeForPrompt(leadContext.type, 30) || 'desconocido'}`,
-        `Interacciones previas: ${leadContext.previousInteractions || 0}`,
-        '</contexto_cliente>',
-      ].join('\n'),
-    });
+  const clientBlock = buildClientContextBlock(leadContext);
+  if (clientBlock) {
+    // T3: bloque unificado con nombre canónico (preferred_name|name) y, si
+    // aplica, instrucción de resolución de colisión.
+    messages.splice(1, 0, { role: 'system' as const, content: clientBlock });
   }
 
   try {
@@ -440,14 +691,9 @@ async function callAnthropic(
   const systemPrompt = buildSystemPrompt(properties);
   let systemContent = systemPrompt;
 
-  if (leadContext?.name) {
-    systemContent += [
-      '',
-      '<contexto_cliente>',
-      `Nombre: ${sanitizeForPrompt(leadContext.name, 100)}`,
-      `Teléfono: ${sanitizeForPrompt(leadContext.phone, 30) || 'desconocido'}`,
-      '</contexto_cliente>',
-    ].join('\n');
+  const clientBlock = buildClientContextBlock(leadContext);
+  if (clientBlock) {
+    systemContent += '\n\n' + clientBlock;
   }
 
   const anthropicMessages = [
@@ -542,17 +788,13 @@ async function callGemini(
             // turns de user/model, porque systemInstruction es el canal más seguro
             // en Gemini: el modelo lo trata como configuración del sistema, no como
             // entrada de usuario, lo que hace más difícil el prompt injection.
+            // T3: buildClientContextBlock unifica nombre canónico + colisión
+            // pendiente para los 3 providers.
             parts: [{
-              text: leadContext?.name
-                ? [
-                    systemPrompt,
-                    '<contexto_cliente>',
-                    `Nombre: ${sanitizeForPrompt(leadContext.name, 100)}`,
-                    `Teléfono: ${sanitizeForPrompt(leadContext.phone, 30) || 'desconocido'}`,
-                    `Tipo: ${sanitizeForPrompt(leadContext.type, 30) || 'desconocido'}`,
-                    '</contexto_cliente>',
-                  ].join('\n')
-                : systemPrompt,
+              text: (() => {
+                const block = buildClientContextBlock(leadContext);
+                return block ? `${systemPrompt}\n\n${block}` : systemPrompt;
+              })(),
             }]
           },
           generationConfig: {
@@ -592,14 +834,14 @@ async function callGemini(
 /**
  * Parsea la respuesta JSON del LLM al tipo ChatbotEngineResponse.
  *
- * Estrategia en cascada:
+ * Estrategia en cascada (T5):
  *  1. JSON.parse directo (camino feliz).
- *  2. Si falla (LLM truncado por maxOutputTokens, sintaxis defectuosa, etc.),
- *     intentar rescatar el campo `response` con regex — así el usuario ve
- *     texto útil en vez del JSON crudo.
- *  3. Si todo falla, devolver un mensaje neutro. NUNCA mostrar JSON al usuario.
+ *  2. Si falla, regex sobre el JSON truncado para rescatar "response".
+ *  3. Si la regex no encuentra nada, llama a rescueNaturalResponse:
+ *     un segundo LLM (barato) reformula el output crudo a una frase amable.
+ *  4. Si todo falla, escalamos. NUNCA mostrar JSON crudo al usuario.
  */
-function parseLLMResponse(raw: string, conversationId: string): ChatbotEngineResponse {
+async function parseLLMResponse(raw: string, conversationId: string): Promise<ChatbotEngineResponse> {
   // 1. Extraer del wrapper markdown si lo trae
   let jsonStr = raw?.trim() || '';
   const codeFence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -659,15 +901,32 @@ function parseLLMResponse(raw: string, conversationId: string): ChatbotEngineRes
       };
     }
 
-    // 4. Último recurso: ni JSON válido ni regex encontró "response"
+    // 4. Plan C (T5): pedir al LLM barato que reformule el output crudo
+    //    en una frase amable. Mejor que devolver "Lo siento, ¿puedes repetir?",
+    //    que crea bucles de mala UX.
+    const rescued = await rescueNaturalResponse(raw || '').catch(() => null);
+    if (rescued) {
+      console.warn('[parseLLMResponse] JSON inválido — usando rescueNaturalResponse');
+      return {
+        response: rescued,
+        intent: null,
+        confidence: 0.4,
+        data_extracted: {},
+        conversation_id: conversationId,
+        should_escalate: false,
+      };
+    }
+
+    // 5. Plan D: escalar de verdad. Es la solución honesta cuando ni el LLM
+    //    principal ni el de rescate producen nada usable.
     console.error('[parseLLMResponse] No se pudo extraer respuesta del LLM. Raw:', raw?.slice(0, 200));
     return {
-      response: 'Disculpa, he tenido un problema procesando tu mensaje. ¿Puedes reformularlo? Si lo prefieres, dime "hablar con Álvaro" y te pongo en contacto con él.',
-      intent: null,
+      response: 'Disculpa, no he conseguido procesar bien tu mensaje. Aviso a Álvaro para que te ayude personalmente cuanto antes 🙌',
+      intent: 'ESCALATE',
       confidence: 0.2,
       data_extracted: {},
       conversation_id: conversationId,
-      should_escalate: false,
+      should_escalate: true,
     };
   }
 }

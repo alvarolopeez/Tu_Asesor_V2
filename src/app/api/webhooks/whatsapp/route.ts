@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { processMessage } from '@/lib/chatbot/engine';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { normalizeEsPhone } from '@/lib/phone';
 
 /**
  * Webhook receptor de WhatsApp Cloud API (Meta Business).
@@ -70,10 +71,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[WhatsApp] 📱 ${parsed.contactName} (${parsed.phoneNumber}): ${parsed.messageText}`);
 
-    // 1. Buscar o crear lead por teléfono
-    const leadId = await findOrCreateLead(parsed.phoneNumber, parsed.contactName);
+    // 1. Buscar o crear lead por teléfono (phone se normaliza dentro a E.164).
+    const leadInfo = await findOrCreateLead(parsed.phoneNumber, parsed.contactName);
+    const leadId = leadInfo?.id ?? null;
 
-    // 2. Buscar o crear conversación activa/escalada
+    // 2. Buscar o crear conversación activa/escalada (también normaliza phone)
     const convInfo = await findOrCreateConversation(
       parsed.phoneNumber, leadId, parsed.contactName
     );
@@ -84,6 +86,65 @@ export async function POST(request: NextRequest) {
 
     const { id: conversationId } = convInfo;
     let conversationStatus = convInfo.status;
+
+    // 2b. Colisión de nombre (T2.3): el cliente ya existe en BD con un nombre
+    //     distinto al que Meta nos pasa en este mensaje. SOLO si la
+    //     conversación se acaba de crear: si ya había historial, asumimos que
+    //     la cuestión ya se cerró antes y no preguntamos otra vez.
+    if (
+      leadInfo?.existing &&
+      leadInfo.existingName &&
+      parsed.contactName &&
+      parsed.contactName !== 'Desconocido' &&
+      normalizeForNameCompare(leadInfo.existingName) !== normalizeForNameCompare(parsed.contactName) &&
+      convInfo.isNew
+    ) {
+      const collisionPrompt =
+        `¡Hola! 👋 Soy Paula, la asistente de Álvaro. ` +
+        `Veo que ya te tengo guardado como *${leadInfo.existingName}*, ` +
+        `pero ahora me escribes como *${parsed.contactName}*. ` +
+        `¿Prefieres que te llame *${leadInfo.existingName}* o *${parsed.contactName}*? 🙂`;
+
+      // Persistimos los dos nombres en metadata para que el siguiente turno
+      // del bot pueda extraer la preferencia y limpiarla.
+      await supabase
+        .from('chatbot_conversations')
+        .update({
+          metadata: {
+            ...(convInfo.metadata || {}),
+            pending_name_resolution: {
+              existing_name: leadInfo.existingName,
+              profile_name: parsed.contactName,
+              asked_at: new Date().toISOString(),
+            },
+          },
+        })
+        .eq('id', conversationId);
+
+      // Registrar el mensaje del cliente Y nuestra respuesta directa.
+      await supabase.from('chatbot_messages').insert({
+        conversation_id: conversationId,
+        role: 'user',
+        content: parsed.messageText,
+        wa_message_id: parsed.messageId,
+      });
+      await supabase.from('chatbot_messages').insert({
+        conversation_id: conversationId,
+        role: 'assistant',
+        content: collisionPrompt,
+        intent_detected: 'name_resolution_requested',
+        confidence: 0.99,
+      });
+
+      await sendWhatsAppMessage(parsed.phoneNumber, collisionPrompt, { logTag: '[WhatsApp name-collision]' });
+      console.log(`[WhatsApp] 🪪 Colisión de nombre — preguntando preferencia (${leadInfo.existingName} ↔ ${parsed.contactName})`);
+      return NextResponse.json({
+        status: 'ok',
+        type: 'name_collision_asked',
+        lead_id: leadId,
+        conversation_id: conversationId,
+      });
+    }
 
     // 3. Guardar el mensaje del usuario
     await supabase.from('chatbot_messages').insert({
@@ -138,13 +199,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (conversationId) {
+      // Si el lead ya existía en BD, usamos su nombre canónico (puede ser
+      // distinto del que Meta nos pasa en este mensaje). El engine, además,
+      // mirará metadata.preferred_name y lo priorizará. T3.
+      const canonicalName = leadInfo?.existingName || parsed.contactName;
+      const normalizedPhone = normalizeEsPhone(parsed.phoneNumber) || parsed.phoneNumber;
+
       const chatbotResult = await processMessage({
         message: parsed.messageText,
         conversationId: conversationId,
         channel: 'whatsapp',
         leadContext: {
-          name: parsed.contactName,
-          phone: parsed.phoneNumber,
+          name: canonicalName,
+          phone: normalizedPhone,
         },
       });
 
@@ -316,50 +383,101 @@ function parseMetaPayload(body: Record<string, unknown>): ParsedMessage | null {
 
 /**
  * Busca un lead por teléfono o crea uno nuevo.
+ *
+ * Bug histórico (resuelto 2026-06-08): Meta envía el phone sin `+` (ej:
+ * `34674924499`), mientras que el formulario web lo guarda normalizado
+ * (`+34674924499`). El `.eq('phone', phone)` fallaba y se creaba un
+ * duplicado. Ahora normalizamos SIEMPRE con `normalizeEsPhone` antes
+ * del lookup y del INSERT — y un `UNIQUE INDEX leads_phone_unique` en
+ * BD nos cubre como red de seguridad.
+ *
+ * Devuelve `{ id, existing }` para que el caller pueda detectar si era
+ * un lead conocido (necesario para la lógica de colisión de nombre
+ * T2.3 en findOrCreateConversation).
  */
-async function findOrCreateLead(phone: string, name: string): Promise<string | null> {
+async function findOrCreateLead(
+  phone: string,
+  name: string,
+): Promise<{ id: string; existing: boolean; existingName: string | null } | null> {
+  const normalized = normalizeEsPhone(phone);
+  if (!normalized) {
+    console.warn('[WhatsApp] findOrCreateLead: phone vacío tras normalizar', phone);
+    return null;
+  }
+
   const { data: existing } = await supabase
     .from('leads')
-    .select('id')
-    .eq('phone', phone)
+    .select('id, name')
+    .eq('phone', normalized)
     .limit(1);
 
   if (existing && existing.length > 0) {
-    return existing[0].id;
+    return { id: existing[0].id, existing: true, existingName: existing[0].name || null };
   }
 
-  const { data: newLead } = await supabase
+  const { data: newLead, error } = await supabase
     .from('leads')
     .insert({
       name,
-      phone,
+      phone: normalized,
       type: 'buyer',
       source: 'whatsapp',
       status: 'new',
     })
-    .select('id')
+    .select('id, name')
     .single();
 
-  return newLead?.id || null;
+  if (error) {
+    // Si el UNIQUE INDEX salta (race condition: dos webhooks simultáneos del
+    // mismo cliente), reintentar el SELECT.
+    if ((error as { code?: string }).code === '23505') {
+      const { data: retry } = await supabase
+        .from('leads')
+        .select('id, name')
+        .eq('phone', normalized)
+        .limit(1);
+      if (retry && retry.length > 0) {
+        return { id: retry[0].id, existing: true, existingName: retry[0].name || null };
+      }
+    }
+    console.error('[WhatsApp] findOrCreateLead insert error:', error);
+    return null;
+  }
+
+  return newLead ? { id: newLead.id, existing: false, existingName: null } : null;
 }
 
 /**
  * Busca una conversación activa o escalada, o crea una nueva.
+ *
+ * Devuelve también `isNew` para que el caller pueda decidir si esta es la
+ * primera interacción (necesario para la lógica de colisión de nombre T2.3
+ * — solo preguntamos en la primera vez).
+ * Y `metadata` para no perder otras claves al actualizarla.
+ *
+ * @updated 2026-06-08 normaliza phone y devuelve isNew + metadata
  */
 async function findOrCreateConversation(
   phone: string,
   leadId: string | null,
   contactName: string
-): Promise<{ id: string; status: string } | null> {
+): Promise<{ id: string; status: string; isNew: boolean; metadata: Record<string, unknown> } | null> {
+  const normalized = normalizeEsPhone(phone) || phone;
+
   const { data: existing } = await supabase
     .from('chatbot_conversations')
-    .select('id, status')
-    .eq('wa_phone_number', phone)
+    .select('id, status, metadata')
+    .eq('wa_phone_number', normalized)
     .in('status', ['active', 'escalated'])
     .limit(1);
 
   if (existing && existing.length > 0) {
-    return { id: existing[0].id, status: existing[0].status };
+    return {
+      id: existing[0].id,
+      status: existing[0].status,
+      isNew: false,
+      metadata: (existing[0].metadata as Record<string, unknown>) || {},
+    };
   }
 
   const { data: newConv } = await supabase
@@ -367,14 +485,34 @@ async function findOrCreateConversation(
     .insert({
       lead_id: leadId,
       channel: 'whatsapp',
-      wa_phone_number: phone,
+      wa_phone_number: normalized,
       status: 'active',
       metadata: { contact_name: contactName },
     })
-    .select('id, status')
+    .select('id, status, metadata')
     .single();
 
-  return newConv ? { id: newConv.id, status: newConv.status } : null;
+  return newConv
+    ? {
+        id: newConv.id,
+        status: newConv.status,
+        isNew: true,
+        metadata: (newConv.metadata as Record<string, unknown>) || {},
+      }
+    : null;
+}
+
+/**
+ * Normaliza un nombre para compararlo case/diacritic-insensible.
+ * Evita falsos positivos como "miriam" vs "Miriam" o "Jose" vs "José".
+ */
+function normalizeForNameCompare(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 // ═══════════════════════════════════════════════════════

@@ -5,6 +5,75 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-09 — Sprint chatbot UX (5 tareas: contexto + dedup + nombre + entrevista reactiva + LLM-as-parser)
+
+**Causas raíz confirmadas en producción** (no especuladas):
+- (A) Ventana de contexto de 10 mensajes era insuficiente en WhatsApp ("ok"/"vale"/"perfecto" gastaban turnos).
+- (B) `findOrCreateLead` no normalizaba phone → 2 pares de duplicados en BD: `Miriam Tortosa` (`34605419384` + `+34605419384`) y `David`+`Antonio Matute gago` (mismo `+34674924499`).
+- (C) `leads.name` nunca llegaba pre-cargado al system prompt → bot no usaba el nombre.
+- (D) `interview_state` solo se activaba con `intent='schedule_visit'` → "Perfecto" tras reserva web pasaba de largo.
+- (E) Parsers regex de `parseSavings`/`parseFunding`/`parseTipoCompra` fallaban con respuestas naturales ("30 mil", "voy con efectivo", "para vivir nosotros") → bucle "no he sabido leer la cifra".
+
+**Cambios aplicados**:
+
+**T1 — Ventana 30** (`engine.ts`)
+- `HISTORY_WINDOW = 30` extraído como const visible. `getConversationHistory(id, 30)`.
+
+**T2 — Dedup leads** (`whatsapp/route.ts` + migración Supabase + cleanup datos)
+- ⚠️ **Migración Supabase aplicada en prod**: `leads_phone_unique_index` → `CREATE UNIQUE INDEX leads_phone_unique ON leads(phone) WHERE phone IS NOT NULL`.
+- Cleanup de duplicados pre-existentes (4 leads ahora, todos `+34...`): chatbot_conversation de Miriam(whatsapp) movida al lead canónico `+34605419384`; lead Antonio Matute (`10719c81`) borrado (sin FKs); phones normalizados a `+34...` con UPDATE SQL.
+- `findOrCreateLead` normaliza phone con `normalizeEsPhone` antes de `.eq()` y antes de `INSERT`. Devuelve `{id, existing, existingName}`. Maneja race condition de doble INSERT con catch de `23505` y reintento del SELECT.
+- `findOrCreateConversation` también normaliza + devuelve `isNew` + `metadata`.
+- **T2.3 colisión de nombre**: si `leadInfo.existing && existingName !== profileName && convInfo.isNew` → setea `metadata.pending_name_resolution = {existing_name, profile_name, asked_at}`, responde "¿Prefieres que te llame X o Y?" y cortocircuita el LLM. Comparación normalizada NFD para no falsos positivos por tildes.
+
+**T3 — preferred_name** (`engine.ts` + `systemPrompt.md`)
+- Nuevo helper `buildClientContextBlock(leadContext)` unificado para los 3 providers (OpenAI/Anthropic/Gemini) → bloque `<contexto_cliente>` con "Nombre canónico (usar SIEMPRE)" = `preferred_name || name`.
+- Si `metadata.pending_name_resolution` está activo → inyecta sub-bloque `<resolucion_nombre_pendiente>` instruyendo al LLM a extraer `data_extracted.preferred_name`.
+- Tras el LLM, `processMessage` lee `data_extracted.preferred_name` → persiste en `metadata.preferred_name` + limpia `pending_name_resolution`.
+- `systemPrompt.md` ampliado con sección "NOMBRE DEL CLIENTE (CRÍTICO — T3)" + nuevo campo `preferred_name` en `data_extracted`.
+- Webhook pasa `canonicalName = leadInfo.existingName || parsed.contactName` y `normalizedPhone` al engine.
+
+**T5 — LLM-as-parser** (nuevo `src/lib/chatbot/llmParser.ts`)
+- `parseWithLLM<T>(question, userMessage, schema: {type, enumValues?, maxLen?})` → JSON validado, soporta Gemini/OpenAI/Anthropic con `temperature: 0.1` (determinista). Modelos baratos: `gemini-flash-latest`, `gpt-4o-mini`, `claude-3-5-haiku`.
+- Parsers híbridos en `scheduling.ts`: `parseSavings`/`parseFunding`/`parseTipoCompra` ahora `async`, intentan regex primero (camino feliz barato) → si null, delegan al LLM. Mensajes de retry educados cuando ambos fallan.
+- Regex ampliados: parseSavings soporta `30k`/`30 mil`/`30000`/`30.000€`. Funding añade `efectivo`→`Al contado`, `preaprobada`→`Preconcedida`. TipoCompra añade `para nosotros`→`habitual`.
+- `parseLLMResponse` (engine.ts) ahora `async`: cuando JSON.parse falla Y regex no rescata → llama `rescueNaturalResponse` (LLM barato que reformula el output crudo). Si tampoco rescata → ESCALA en vez del "Lo siento ¿puedes repetir?" en bucle.
+
+**T4 — Entrevista reactiva** (nuevo `src/lib/chatbot/profileCheck.ts`)
+- `needsProfile(phone)`: true si no hay `buyers_demands` para el phone, O si existe con `savings_contribution=0 AND funding_type='Contado'` (defaults sin entrevista).
+- `isNeutralReply(message)`: regex que captura "perfecto", "vale", "ok", "gracias", "👍", "perfecto 🙌"… (verificado inline).
+- `classifyOfferReply(message)`: regex sí/no + fallback LLM (`enum yes|no|unsure`).
+- `offerInterview(...)`: setea `metadata.profile_offer_pending` + devuelve oferta educada "Por cierto {nombre}, ¿te puedo hacer 3 preguntas rápidas?".
+- `startStandaloneInterview(...)`: arranca `interview_state` con `mode='standalone'` (sin propertyId/scheduledAt) + marca `profile_offered=true`.
+- `markOfferDeclined(...)`: limpia pending + marca offered (no insistimos en la misma conversación).
+- `InterviewState` extendido con `mode?: 'pre_schedule' | 'standalone'`.
+- `finalizeScheduling` en modo `standalone`: NO crea cita; solo upsert `buyers_demands` + aviso HSM `aviso_alvaro` "Perfil de comprador completado por Paula".
+- Triggers en `processMessage`:
+  - Si `profile_offer_pending` → clasifica respuesta sí/no → arranca standalone interview o `markOfferDeclined`.
+  - Si NO se ha ofrecido antes + (`countConversationMessages===1` O `isNeutralReply`) + `needsProfile` → `offerInterview`.
+
+**Verificación local**:
+- ✅ Build verde: `npm run build` sin errores TS, 32 rutas.
+- ✅ (b) UNIQUE INDEX verificado: `INSERT ... ON CONFLICT (phone) WHERE phone IS NOT NULL DO NOTHING` con phone existente → `rows_actually_inserted: 0`.
+- ✅ (h) Parser savings: "unos 30 mil"→30000, "30k"→30000, "30.000€"→30000, "50k aprox"→50000, "tengo unos 30 mil ahorrados"→30000.
+- ✅ (i) Parser funding: "voy con efectivo"→Al contado, "tengo preaprobada"→Preconcedida, "sin estudiar"→Necesito estudio, "tengo preconcedida del santander"→Preconcedida.
+- ✅ (j) Parser tipoCompra: "para vivir nosotros"→habitual, "para alquilar"→inversion, "para mí"→habitual, "vamos a vivir nosotros mismos"→habitual.
+- ✅ Detector neutral: "perfecto"→true, "ok!"→true, "perfecto 🙌"→true, "sí me gustaría agendar visita"→false.
+- ⏭️ (a)(c)(d)(e)(f)(g): aplicados por construcción; requieren conversación real WhatsApp con Gemini activo para validar E2E. Si Gemini cae, T5(h)(i)(j) siguen funcionando vía fallback regex; T3/T4 que dependen del LLM caen a comportamiento neutro sin romper.
+
+**Decisiones de Álvaro respetadas**:
+- Ventana 30 (opción A).
+- Colisión nombre: bot pregunta (opción C). Persiste en `metadata.preferred_name`, NO en `leads.name`.
+- Entrevista reactiva: combinada — primer mensaje + neutro (opción C).
+- Parseo: LLM-as-parser con regex como fast-path (opción A).
+
+**Gotchas para futuros agentes**:
+- Cualquier sitio nuevo que escriba `leads.phone` DEBE pasar por `normalizeEsPhone` o el UNIQUE INDEX lo va a romper con `23505`.
+- `mode: 'standalone'` en `InterviewState`: si se añade un step nuevo a la entrevista, recuerda que en standalone NO hay `propertyId`/`scheduledAt` (strings vacíos como sentinela).
+- Tras una respuesta a colisión de nombre, `preferred_name` queda en `chatbot_conversations.metadata`. NO se actualiza `leads.name` automáticamente (cambiar el nombre canónico del lead es sensible para CRM — se queda como apodo en la conversación).
+
+---
+
 ### 2026-06-08 — Ola 3: hardening anti-inyección del chatbot Paula
 
 **Sin cambios de schema ni infra.** Solo cambios en `src/lib/chatbot/engine.ts` y `src/lib/chatbot/systemPrompt.md`:

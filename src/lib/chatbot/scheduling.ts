@@ -35,6 +35,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { sendWhatsAppTemplate } from '@/lib/whatsapp';
+import { parseWithLLM } from './llmParser';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -67,6 +68,13 @@ export interface InterviewState {
   answers: InterviewAnswers;
   /** Reintentos consumidos por respuestas no parseables. Tras 3 → ESCALATE. */
   attempts?: number;
+  /**
+   * 'pre_schedule' (default): la entrevista precede a una visita real;
+   *   finalizeScheduling crea el appointment.
+   * 'standalone' (T4): el cliente respondió "sí" a la oferta de perfil sin
+   *   pedir visita; finalizeScheduling SOLO upserta buyers_demands.
+   */
+  mode?: 'pre_schedule' | 'standalone';
   target: {
     propertyId: string;
     propertyTitle: string;
@@ -634,8 +642,14 @@ const INTERVIEW_QUESTIONS: Record<InterviewStep, string> = {
   3: '🏠 Última pregunta: ¿la compra sería para vivir tú o para invertir/alquilar?',
 };
 
-function parseSavings(text: string): number | null {
-  const k = text.match(/(\d+)\s*k/i);
+// ─── Parsers regex (camino feliz barato) ───────────────────────────────────
+// Estos parsers manejan respuestas literales. Cuando el cliente responde
+// natural ("tengo unos 30 mil", "voy con efectivo") fallan y delegamos al
+// LLM (parseWithLLM en T5). El LLM tarda ~500ms — preferimos ahorrar esa
+// latencia cuando la respuesta es directa.
+
+function parseSavingsRegex(text: string): number | null {
+  const k = text.match(/(\d+)\s*k\b/i);
   if (k) return Number(k[1]) * 1000;
   const mil = text.match(/(\d+)\s*mil/i);
   if (mil) return Number(mil[1]) * 1000;
@@ -645,19 +659,64 @@ function parseSavings(text: string): number | null {
   return null;
 }
 
-function parseFunding(text: string): InterviewAnswers['funding'] | null {
+function parseFundingRegex(text: string): InterviewAnswers['funding'] | null {
   const t = normalizeText(text);
-  if (/contado|cash|sin hipoteca/.test(t)) return 'Al contado';
-  if (/preconcedid|aprobad|concedid/.test(t)) return 'Preconcedida';
+  if (/contado|cash|sin hipoteca|efectivo/.test(t)) return 'Al contado';
+  if (/preconcedid|preaprobad|aprobad|concedid/.test(t)) return 'Preconcedida';
   if (/estudio\s*hecho|hecho|ya\s*lo\s*he\s*estudiado|presentad/.test(t)) return 'Estudio hecho';
   if (/sin\s*estudi|necesito|no\s*he|todavia|aun\s*no/.test(t)) return 'Necesito estudio';
   return null;
 }
 
-function parseTipoCompra(text: string): InterviewAnswers['tipo_compra'] | null {
+function parseTipoCompraRegex(text: string): InterviewAnswers['tipo_compra'] | null {
   const t = normalizeText(text);
   if (/invers|alquil|rentab|renta/.test(t)) return 'inversion';
-  if (/vivir|habitual|primera\s*viv|para\s*mi|propia/.test(t)) return 'habitual';
+  if (/vivir|habitual|primera\s*viv|para\s*mi|para\s*nosotr|propia/.test(t)) return 'habitual';
+  return null;
+}
+
+// ─── Parsers híbridos regex + LLM-fallback ─────────────────────────────────
+// API unificada: devuelven null SOLO si ambos (regex y LLM) fallan.
+// El caller del scheduling decide qué hacer con null (reintento o escalar).
+
+async function parseSavings(text: string): Promise<number | null> {
+  const fromRegex = parseSavingsRegex(text);
+  if (fromRegex !== null) return fromRegex;
+  return await parseWithLLM<number>(
+    '¿Qué ahorros aportarías a la compra de una vivienda? (cifra en euros)',
+    text,
+    { type: 'number' },
+  );
+}
+
+async function parseFunding(text: string): Promise<InterviewAnswers['funding'] | null> {
+  const fromRegex = parseFundingRegex(text);
+  if (fromRegex) return fromRegex;
+  // Mapeamos enum técnico → estado UI del CRM ("Necesito estudio" etc).
+  const enumValue = await parseWithLLM<string>(
+    '¿Cómo vas con la financiación para comprar una vivienda?',
+    text,
+    { type: 'enum', enumValues: ['sin_estudiar', 'estudio_hecho', 'preconcedida', 'contado'] },
+  );
+  const map: Record<string, InterviewAnswers['funding']> = {
+    sin_estudiar: 'Necesito estudio',
+    estudio_hecho: 'Estudio hecho',
+    preconcedida: 'Preconcedida',
+    contado: 'Al contado',
+  };
+  return enumValue ? map[enumValue] ?? null : null;
+}
+
+async function parseTipoCompra(text: string): Promise<InterviewAnswers['tipo_compra'] | null> {
+  const fromRegex = parseTipoCompraRegex(text);
+  if (fromRegex) return fromRegex;
+  const enumValue = await parseWithLLM<string>(
+    '¿Es la compra para vivir tú o como inversión (alquilar / revender)?',
+    text,
+    { type: 'enum', enumValues: ['vivir', 'inversion'] },
+  );
+  if (enumValue === 'vivir') return 'habitual';
+  if (enumValue === 'inversion') return 'inversion';
   return null;
 }
 
@@ -694,9 +753,9 @@ export async function handleInterviewStep(
   }
 
   if (state.step === 1) {
-    const s = parseSavings(userMessage);
+    const s = await parseSavings(userMessage);
     if (s === null) {
-      return failStep('No he sabido leer la cifra. ¿Me pones la cantidad de ahorros que aportarías en euros? (ej.: 30000)');
+      return failStep('Vaya, no he conseguido leer la cifra. ¿Me das una cantidad aproximada en euros que aportarías como entrada? (por ejemplo: "30 mil", "50.000€", "unos 80k" — lo que prefieras).');
     }
     answers.savings = s;
     const next: InterviewState = { ...state, step: 2, answers, attempts: 0 };
@@ -705,9 +764,9 @@ export async function handleInterviewStep(
   }
 
   if (state.step === 2) {
-    const f = parseFunding(userMessage);
+    const f = await parseFunding(userMessage);
     if (!f) {
-      return failStep('No lo he pillado. Dime cómo vas con la financiación: *sin estudiar*, *estudio hecho*, *hipoteca preconcedida* o *al contado*.');
+      return failStep('Aún no he conseguido encajarlo. Dime con tus palabras cómo vas con la financiación — por ejemplo: "voy al contado", "tengo hipoteca preaprobada", "todavía no la he mirado"… lo que sea de tu situación.');
     }
     answers.funding = f;
     const next: InterviewState = { ...state, step: 3, answers, attempts: 0 };
@@ -715,9 +774,9 @@ export async function handleInterviewStep(
     return { response: INTERVIEW_QUESTIONS[3], shouldEscalate: false, intent: 'schedule_visit_interview' };
   }
 
-  const tc = parseTipoCompra(userMessage);
+  const tc = await parseTipoCompra(userMessage);
   if (!tc) {
-    return failStep('Para terminar: ¿es para *vivir tú* o como *inversión* (alquilar/revender)?');
+    return failStep('Para cerrar: ¿la vivienda sería para vivir tú (o tu familia) o más bien como inversión para alquilar o revender?');
   }
   answers.tipo_compra = tc;
 
@@ -731,6 +790,49 @@ async function finalizeScheduling(
   answers: InterviewAnswers,
   conversationId: string,
 ): Promise<SchedulingHookResult> {
+  const isStandalone = state.mode === 'standalone';
+
+  // Modo standalone (T4): NO creamos cita. Solo enriquecemos el perfil del
+  // comprador (upsert buyers_demands) y avisamos al asesor de que hay un
+  // perfil completo nuevo para revisar.
+  if (isStandalone) {
+    await upsertBuyerDemand({
+      name: state.target.leadName,
+      phone: state.target.leadPhone,
+      answers,
+      propertyMaxPrice: 0, // sin inmueble objetivo en standalone
+      leadId: state.target.leadId,
+    });
+
+    await clearInterviewState(conversationId);
+    await setSchedulingHint(conversationId, { pending_day: null });
+
+    if (ADVISOR_PHONE) {
+      const summary = [
+        state.target.leadName,
+        state.target.leadPhone,
+        `ahorros ${answers.savings ?? '?'}€`,
+        `financiación ${answers.funding ?? '?'}`,
+        answers.tipo_compra ?? '?',
+      ].join(' · ');
+      void sendWhatsAppTemplate(
+        ADVISOR_PHONE,
+        'aviso_alvaro',
+        ['Perfil de comprador completado por Paula', summary],
+        { normalize: true, logTag: '[scheduling][standalone-profile]' },
+      );
+    }
+
+    return {
+      response:
+        '¡Genial, muchas gracias! 🙌 Con esto ya entiendo bien lo que buscas. ' +
+        'Aviso a Álvaro y te contactaré yo si entra algo que te encaje. ' +
+        'Mientras tanto puedes consultar el catálogo en https://tuasesoralvaro.com/comprar — ¿algo más en lo que pueda ayudarte?',
+      shouldEscalate: false,
+      intent: 'schedule_visit_confirmed',
+    };
+  }
+
   const { error: apptErr } = await supabaseAdmin.from('appointments').insert([{
     lead_id: state.target.leadId,
     property_id: state.target.propertyId,
