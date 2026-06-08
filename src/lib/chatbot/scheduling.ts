@@ -589,6 +589,8 @@ async function upsertBuyerDemand(input: {
   phone: string;
   answers: InterviewAnswers;
   propertyMaxPrice: number;
+  /** R9 Ola 5: FK lead_id → buyers_demands. Nullable — si no se conoce, se omite. */
+  leadId?: string | null;
 }): Promise<void> {
   const fundingTypeForCRM = input.answers.funding === 'Al contado' ? 'Al contado' : 'Hipoteca';
 
@@ -609,6 +611,9 @@ async function upsertBuyerDemand(input: {
     status: 'Búsqueda activa',
     last_activity_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    // Vinculamos el comprador con su lead solo cuando el ID es conocido.
+    // ON DELETE SET NULL en la FK protege filas huérfanas si el lead se borra.
+    ...(input.leadId ? { lead_id: input.leadId } : {}),
   };
 
   if (existing && existing.length > 0) {
@@ -758,6 +763,7 @@ async function finalizeScheduling(
     phone: state.target.leadPhone,
     answers,
     propertyMaxPrice,
+    leadId: state.target.leadId, // R9 Ola 5: FK lead_id
   });
 
   await clearInterviewState(conversationId);
