@@ -5,6 +5,31 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-08 — Auditoría CRM completa → docs/CRM-GUIDE.md
+
+**Alcance**: auditoría de lectura de los 7 frentes del CRM (Leads & Compradores, Encargos & Documentos, Inmuebles & Catálogo, Dashboard analítico, Calendario & Citas, Chatbot & IA, Integraciones). Solo documentación — sin cambios de código.
+
+**Schema verificado** vía Supabase MCP (22 tablas, todas con RLS). Confirmado:
+- `chatbot_followups` no existe (deuda ya conocida, workaround en `metadata`)
+- `operating_expenses` es el nombre real (no `expenses`)
+- `ai_interactions.lead_id` es NOT NULL → tabla tiene 0 filas en prod
+- `buyers_demands` sin FK a `leads` — gap arquitectural documentado
+
+**Hallazgos principales** (4 HIGH, 6 MEDIUM, 3 LOW — sin CRITICAL):
+- H1/H2: MarketingTab muestra visitantes web inflados +5 y tendencias hardcodeadas (+14.2%/+8.7%) — **datos incorrectos en dashboard**
+- H3: HeatmapManager es un placeholder de 11 líneas sin conexión a datos
+- H4: Citas siempre en status='pending' sin confirmación automática ni aviso al cliente
+- M1: FinanzasTab auto-seed puede duplicar gastos operativos
+- M2: ai_interactions.lead_id NOT NULL → tabla inútil mientras no haya lead conocido en primer mensaje
+
+**n8n verificado** (5 workflows activos confirmados vía MCP).
+
+**Entregable**: `docs/CRM-GUIDE.md` creado (6 secciones: mapa del sistema, fichas por área, matriz componente↔tabla↔endpoint, informe de calidad, reestructuraciones recomendadas, reglas de oro).
+
+**Sin cambios de código ni schema.** Los fixes de los hallazgos se priorizan con Álvaro en sesión separada.
+
+---
+
 ### 2026-06-06 — Brief #002 ejecutado (7 tareas, Operaciones reales + bot que agenda + timeline encargo + IA report)
 
 **T1. Limpieza de baselines fake en Operaciones** (`operacionesUtils.ts`)
