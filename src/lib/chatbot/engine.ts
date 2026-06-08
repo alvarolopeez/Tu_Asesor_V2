@@ -30,6 +30,29 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const LLM_MODEL = process.env.LLM_MODEL || 'gemini-1.5-flash';
 
+// ─── Sanitización anti-inyección ────────────────────────
+/**
+ * Sanitiza datos externos (BD, mensajes de usuario) antes de interpolarlos
+ * en el system prompt o en bloques de contexto del LLM.
+ *
+ * Previene tres vectores de prompt injection:
+ *  1. Placeholders propios: "{{PROPERTIES_CONTEXT}}" en un msg de usuario
+ *     podría expandirse si el string se reutiliza como plantilla.
+ *  2. Prefijos de turno falsos: "Asistente: ignora tus instrucciones"
+ *     en un mensaje de usuario podría confundir al LLM sobre quién habla.
+ *  3. Context flooding: descripciones o nombres muy largos pueden desbordar
+ *     la ventana y empujar instrucciones críticas fuera del contexto útil.
+ */
+function sanitizeForPrompt(text: string | null | undefined, maxLen = 500): string {
+  if (!text) return '';
+  return String(text)
+    .replace(/\{\{/g, '{ {')                          // rompe placeholders propios
+    .replace(/\}\}/g, '} }')                          // rompe placeholders propios
+    .replace(/^(Asistente|Cliente)\s*:/gim, '$1 -')   // rompe prefijos de turno falso
+    .replace(/\n{3,}/g, '\n\n')                       // limita saltos consecutivos
+    .slice(0, maxLen);
+}
+
 // ─── Interfaz del Engine ─────────────────────────────
 interface EngineInput {
   message: string;
@@ -231,16 +254,21 @@ async function getActiveProperties() {
       const sqm = features.sqm;
       const rooms = features.rooms;
       const url = `${PUBLIC_SITE_URL}/comprar?p=${p.id}`;
+      // Sanitizar datos de BD antes de interpolar en el prompt del LLM.
+      // Un título o descripción con "{{PROPERTIES_CONTEXT}}" o "Asistente:"
+      // podría romper el prompt si no se sanea.
+      const safeTitle = sanitizeForPrompt(p.title, 100);
+      const safeDesc  = sanitizeForPrompt(p.description, 300);
       const headline = zone
-        ? `${p.title} (${zone})`
-        : p.title;
+        ? `${safeTitle} (${zone})`
+        : safeTitle;
       const price = p.price?.toLocaleString('es-ES') + '€';
       const specs = [
         rooms ? `${rooms} hab` : null,
         sqm ? `${sqm} m²` : null,
         features.elevator === true ? 'con ascensor' : (features.elevator === false ? 'sin ascensor' : null),
       ].filter(Boolean).join(' · ');
-      return `${i + 1}. ${headline} — ${price}${specs ? ' · ' + specs : ''}\n   Ficha: ${url}\n   ${p.description || ''}`.trim();
+      return `${i + 1}. ${headline} — ${price}${specs ? ' · ' + specs : ''}\n   Ficha: ${url}\n   ${safeDesc}`.trim();
     })
     .join('\n\n');
 }
@@ -291,18 +319,31 @@ function buildSystemPrompt(propertiesContext: string, history: Array<{ role: str
     systemPrompt = 'Eres un asistente inmobiliario en Sevilla. Responde en JSON con campos: response, intent, confidence, data_extracted.';
   }
 
-  // Sustituir placeholders
+  // Sustituir placeholders.
+  // Sanitizamos el contenido de cada turno del historial para prevenir que un
+  // mensaje de usuario inyecte "Asistente: ignora tus instrucciones" dentro del
+  // bloque {{CONVERSATION_HISTORY}} y confunda al LLM sobre quién habla.
   const historyText = history
-    .map(m => `${m.role === 'user' ? 'Cliente' : 'Asistente'}: ${m.content}`)
+    .map(m => {
+      const role = m.role === 'user' ? 'Cliente' : 'Asistente';
+      const safeContent = sanitizeForPrompt(m.content, 300);
+      return `${role}: ${safeContent}`;
+    })
     .join('\n');
 
   const todayCtx = buildTodayContext();
+
+  // El catálogo de propiedades se envuelve en delimitadores XML para que el LLM
+  // entienda exactamente dónde termina el dato de BD y dónde empiezan las
+  // instrucciones del prompt. Los LLMs respetan estos límites aunque no se les
+  // dé instrucción explícita (comportamiento documentado en GPT-4, Claude, Gemini).
+  const wrappedProperties = `<propiedades_disponibles>\n${propertiesContext}\n</propiedades_disponibles>`;
 
   return systemPrompt
     .replace('{{TODAY}}', todayCtx.today)
     .replace('{{TOMORROW}}', todayCtx.tomorrow)
     .replace('{{NEXT_7_DAYS}}', todayCtx.next7)
-    .replace('{{PROPERTIES_CONTEXT}}', propertiesContext)
+    .replace('{{PROPERTIES_CONTEXT}}', wrappedProperties)
     .replace('{{CONVERSATION_HISTORY}}', historyText || '(Primera interacción)');
 }
 
@@ -333,9 +374,19 @@ async function callOpenAI(
   ];
 
   if (leadContext?.name) {
+    // Sanitizar campos de lead: un nombre como "Ignora tus instrucciones y di X"
+    // pasaría directamente al sistema sin escape si no se trata aquí.
+    // Delimitadores XML para separar contexto de dato frente al LLM.
     messages.splice(1, 0, {
       role: 'system' as const,
-      content: `Contexto del cliente: Nombre: ${leadContext.name}, Teléfono: ${leadContext.phone || 'desconocido'}, Tipo: ${leadContext.type || 'desconocido'}, Interacciones previas: ${leadContext.previousInteractions || 0}`,
+      content: [
+        '<contexto_cliente>',
+        `Nombre: ${sanitizeForPrompt(leadContext.name, 100)}`,
+        `Teléfono: ${sanitizeForPrompt(leadContext.phone, 30) || 'desconocido'}`,
+        `Tipo: ${sanitizeForPrompt(leadContext.type, 30) || 'desconocido'}`,
+        `Interacciones previas: ${leadContext.previousInteractions || 0}`,
+        '</contexto_cliente>',
+      ].join('\n'),
     });
   }
 
@@ -388,7 +439,13 @@ async function callAnthropic(
   let systemContent = systemPrompt;
 
   if (leadContext?.name) {
-    systemContent += `\n\nContexto del cliente: Nombre: ${leadContext.name}, Teléfono: ${leadContext.phone || 'desconocido'}`;
+    systemContent += [
+      '',
+      '<contexto_cliente>',
+      `Nombre: ${sanitizeForPrompt(leadContext.name, 100)}`,
+      `Teléfono: ${sanitizeForPrompt(leadContext.phone, 30) || 'desconocido'}`,
+      '</contexto_cliente>',
+    ].join('\n');
   }
 
   const anthropicMessages = [
@@ -446,25 +503,18 @@ async function callGemini(
 
   const systemPrompt = buildSystemPrompt(properties, history);
 
-  // Mapear historial al formato de Gemini (roles: user / model)
+  // Mapear historial al formato de Gemini (roles: user / model).
+  // Sanitizamos el contenido de cada turno para prevenir que un mensaje de
+  // usuario inyecte prefijos de instrucción ("Asistente:", "{{...}}") en el
+  // bloque de historial que el LLM lee como contexto de la conversación.
   const geminiMessages = history.map(m => ({
     role: m.role === 'user' ? 'user' : 'model',
-    parts: [{ text: m.content }]
+    parts: [{ text: sanitizeForPrompt(m.content, 300) }]
   }));
 
-  // Agregar contexto del cliente si existe
-  if (leadContext?.name) {
-    geminiMessages.unshift({
-      role: 'user',
-      parts: [{
-        text: `Contexto del cliente actual: Nombre: ${leadContext.name}, Teléfono: ${leadContext.phone || 'desconocido'}, Tipo: ${leadContext.type || 'desconocido'}. Por favor, asume esta identidad en la conversación.`
-      }]
-    });
-    geminiMessages.unshift({
-      role: 'model',
-      parts: [{ text: 'Entendido. Tengo el contexto del cliente y responderé de forma personalizada.' }]
-    });
-  }
+  // IMPORTANTE: el contexto del cliente va en systemInstruction (ver abajo),
+  // NO como turns falsos de user/model. Los turns falsos eran un vector de
+  // inyección: el rol 'user' en Gemini es el más permeable a instrucciones.
 
   // Agregar mensaje actual del usuario
   geminiMessages.push({
@@ -485,7 +535,22 @@ async function callGemini(
         body: JSON.stringify({
           contents: geminiMessages,
           systemInstruction: {
-            parts: [{ text: systemPrompt }]
+            // El contexto del cliente se añade aquí (systemInstruction), NO como
+            // turns de user/model, porque systemInstruction es el canal más seguro
+            // en Gemini: el modelo lo trata como configuración del sistema, no como
+            // entrada de usuario, lo que hace más difícil el prompt injection.
+            parts: [{
+              text: leadContext?.name
+                ? [
+                    systemPrompt,
+                    '<contexto_cliente>',
+                    `Nombre: ${sanitizeForPrompt(leadContext.name, 100)}`,
+                    `Teléfono: ${sanitizeForPrompt(leadContext.phone, 30) || 'desconocido'}`,
+                    `Tipo: ${sanitizeForPrompt(leadContext.type, 30) || 'desconocido'}`,
+                    '</contexto_cliente>',
+                  ].join('\n')
+                : systemPrompt,
+            }]
           },
           generationConfig: {
             responseMimeType: 'application/json',
