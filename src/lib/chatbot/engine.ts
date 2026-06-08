@@ -293,6 +293,9 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
   //    auditarlo si el modelo LLM cambia su context window.
   const history = await getConversationHistory(input.conversationId, HISTORY_WINDOW);
 
+  // T5.2: contador de turnos del asistente — para suprimir el doble saludo en turno 2+
+  const assistantTurnCount = history.filter((m) => m.role === 'assistant').length;
+
   // 2. Recuperar propiedades activas para contexto
   const properties = await getActiveProperties();
 
@@ -304,9 +307,11 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     ...(input.leadContext || {}),
     preferred_name: nameState.preferred_name,
     pending_name_resolution: nameState.pending_name_resolution,
+    assistant_turn_count: assistantTurnCount,
   } as EngineInput['leadContext'] & {
     preferred_name: string | null;
     pending_name_resolution: NameResolutionState | null;
+    assistant_turn_count: number;
   };
 
   let result: ChatbotEngineResponse;
@@ -536,6 +541,7 @@ function buildTodayContext(): { today: string; tomorrow: string; next7: string }
 function buildClientContextBlock(leadContext?: EngineInput['leadContext'] & {
   preferred_name?: string | null;
   pending_name_resolution?: NameResolutionState | null;
+  assistant_turn_count?: number;
 }): string {
   if (!leadContext) return '';
 
@@ -576,6 +582,12 @@ function buildClientContextBlock(leadContext?: EngineInput['leadContext'] & {
       'En el response confirma con calidez la elección antes de seguir la conversación normal.',
     );
     lines.push('</resolucion_nombre_pendiente>');
+  }
+
+  // T5.2: inyectar contador para que el LLM suprima saludo en turnos 2+
+  const turnCount = leadContext.assistant_turn_count ?? 0;
+  if (turnCount > 0) {
+    lines.push(`[turno_asistente: ${turnCount}]`);
   }
 
   lines.push('</contexto_cliente>');
