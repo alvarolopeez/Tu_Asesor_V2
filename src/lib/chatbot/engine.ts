@@ -390,6 +390,21 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     });
   }
 
+  // T1 Brief #006 — Backstop: si el cliente dice CLARAMENTE cancelar/anular/no voy a poder,
+  // forzamos intent='cancel_visit' aunque el LLM lo clasifique como schedule_visit o ESCALATE.
+  // Esto garantiza que tryHandleCancelVisit se invoca aunque Gemini falle en la clasificación.
+  const CANCEL_BACKSTOP_REGEX =
+    /\b(cancel(ar|a|o)|anul(ar|a|o)|elimin(ar|a|o)|borr(ar|a|o)\s+(la\s+)?(cita|visita)|no\s+voy\s+a\s+(poder\s+)?ir|ya\s+no\s+(puedo|voy)|no\s+puedo\s+ir)/i;
+
+  if (CANCEL_BACKSTOP_REGEX.test(input.message) && result.intent !== 'cancel_visit') {
+    console.log(
+      '[engine] T1#006 backstop: forzando intent=cancel_visit (LLM devolvió:',
+      result.intent,
+      ')',
+    );
+    result.intent = 'cancel_visit';
+  }
+
   // 5a. T3 Brief #005 — cancel_visit tiene precedencia sobre schedule_visit.
   //     También captura respuestas de continuación cuando hay un cancel_flow activo
   //     (el cliente responde "sí"/"cancelar" en medio del flujo de dos turnos).
