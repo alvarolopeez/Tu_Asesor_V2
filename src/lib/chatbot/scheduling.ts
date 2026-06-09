@@ -34,7 +34,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { sendWhatsAppTemplate } from '@/lib/whatsapp';
+import { sendWhatsAppTemplate, sendWhatsAppMessage } from '@/lib/whatsapp';
 import { parseWithLLM } from './llmParser';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -1330,6 +1330,69 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
     startedAt: new Date().toISOString(),
   };
   return await finalizeScheduling(fakeState, {}, input.conversationId);
+}
+
+// ─── Notificaciones al asesor (T4 Brief #005) ──────────────────────────────
+
+/**
+ * Envía un mensaje libre de texto a Álvaro.
+ * Usa la ventana de 24h (habitualmente abierta); si Meta la rechaza, el log
+ * lo indica y habría que añadir fallback a template HSM.
+ */
+async function notifyAdvisor(message: string): Promise<void> {
+  if (!ADVISOR_PHONE) {
+    console.warn('[notify] ADVISOR_WHATSAPP_PHONE no configurado');
+    return;
+  }
+  await sendWhatsAppMessage(ADVISOR_PHONE, message, { logTag: '[notify advisor]' });
+}
+
+/**
+ * T4 Brief #005 — Notifica a Álvaro cuando Paula cancela una visita.
+ * Incluye nombre y teléfono del lead, título, fecha/hora y motivo.
+ */
+export async function notifyAdvisorOfCancellation(params: {
+  appointmentId: string;
+  leadId: string;
+  scheduledAt: string;
+  title: string;
+  reason: string;
+}): Promise<void> {
+  if (!ADVISOR_PHONE) {
+    console.warn('[notify cancel] ADVISOR_WHATSAPP_PHONE no configurado');
+    return;
+  }
+  const { data: lead } = await supabaseAdmin
+    .from('leads')
+    .select('name, phone')
+    .eq('id', params.leadId)
+    .single();
+
+  const summary =
+    `🟠 *Cancelación de visita*\n\n` +
+    `Cliente: ${lead?.name || 'sin nombre'} (${lead?.phone || '?'})\n` +
+    `Visita: ${params.title}\n` +
+    `Fecha: ${formatDateTimeMadrid(params.scheduledAt)}\n` +
+    `Motivo: ${params.reason}\n\n` +
+    `Cancelado por el cliente vía Paula. ID: ${params.appointmentId}`;
+
+  await sendWhatsAppMessage(ADVISOR_PHONE, summary, { logTag: '[notify cancel]' });
+}
+
+// ─── Cancelación de visitas (T3 Brief #005) ─────────────────────────────────
+
+/**
+ * Devuelve el número de cancelaciones hechas por un lead en las últimas `hours` horas.
+ */
+async function countRecentCancellations(leadId: string, hours: number): Promise<number> {
+  const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+  const { data } = await supabaseAdmin
+    .from('appointments')
+    .select('id')
+    .eq('lead_id', leadId)
+    .eq('status', 'cancelled')
+    .gte('cancelled_at', since);
+  return data?.length ?? 0;
 }
 
 // ─── Follow-up 30 min (FIX-G) ───────────────────────────────────────────────
