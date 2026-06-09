@@ -375,6 +375,15 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
   //    que era spam). El filtro de horario 10-21 Madrid lo hace el endpoint
   //    cron `get_pending_visit_followups`.
   if (result.intent === 'ask_price' && /tuasesoralvaro\.com\/comprar/.test(result.response)) {
+    // T1: persistir context_property_id cuando el bot recomienda un inmueble concreto.
+    const propUuidMatch = result.response.match(
+      /[?&]p=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+    );
+    if (propUuidMatch) {
+      await patchConversationMetadata(input.conversationId, {
+        context_property_id: propUuidMatch[1],
+      }).catch((err) => console.warn('[engine] patch context_property_id failed:', err));
+    }
     void scheduleVisitFollowup(input.conversationId, 180).catch((err) => {
       console.warn('[engine] scheduleVisitFollowup falló:', err);
     });
