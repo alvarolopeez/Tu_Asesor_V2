@@ -264,6 +264,8 @@ interface ParsedDateTime {
   dateKey: string;
   /** null si solo se detectó día sin hora. */
   timeKey: string | null;
+  /** Solo presente cuando la hora era ambigua (sin AM/PM). Contiene [candAM, candPM]. */
+  timeKeyCandidates?: string[];
 }
 
 /**
@@ -275,6 +277,94 @@ function isReasonableDateKey(dateKey: string): boolean {
   const today = todayDateKey();
   const limit = addDays(today, 90);
   return dateKey >= today && dateKey <= limit;
+}
+
+// ─── Parser de horas en castellano ─────────────────────────────────────────
+
+/** Número castellano (1-12) → entero para horas del reloj. */
+const HORA_PALABRA: Record<string, number> = {
+  una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6,
+  siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12,
+};
+
+/** Palabra de minutos → entero. */
+const MINUTO_PALABRA: Record<string, number> = {
+  cuarto: 15, media: 30, veinte: 20, veinticinco: 25,
+};
+
+/**
+ * Parsea expresiones de hora en castellano y devuelve candidatos "HH:MM".
+ *
+ * @returns
+ *   - 1 elemento: hora inequívoca (con "de la mañana/tarde/noche", am, pm).
+ *   - 2 elementos [mañana, tarde]: hora ambigua sin calificador.
+ *   - null: no se encontró ninguna hora castellana en el texto.
+ *
+ * @examples
+ *   "seis y media"               → ["06:30", "18:30"]
+ *   "nueve menos cuarto"         → ["08:45", "20:45"]
+ *   "cinco de la tarde"          → ["17:00"]
+ *   "diez de la mañana"          → ["10:00"]
+ *   "las ocho"                   → ["08:00", "20:00"]
+ *   "nueve y media de la noche"  → ["21:30"]
+ */
+export function parseSpanishTime(text: string): string[] | null {
+  if (!text || text.trim().length === 0) return null;
+
+  const n = normalizeText(text);
+
+  const HORA_PAT = Object.keys(HORA_PALABRA).join('|');
+  const MINS_Y   = 'media|cuarto|veinte|veinticinco';
+  const MINS_M   = 'cuarto|veinte|veinticinco';
+
+  const rx = new RegExp(
+    `(?:(?:a\\s+)?(?:las?|sobre\\s+las?|hacia\\s+las?)\\s+)?` +
+    `(${HORA_PAT})` +
+    `(?:\\s+y\\s+(${MINS_Y}))?` +
+    `(?:\\s+menos\\s+(${MINS_M}))?` +
+    `(?:\\s+en\\s+punto)?` +
+    `(?:[,]?\\s+(de\\s+la\\s+(?:manana|tarde|noche)|por\\s+la\\s+(?:manana|tarde|noche)|am|pm))?`,
+    'i',
+  );
+
+  const m = n.match(rx);
+  if (!m || !m[1]) return null;
+
+  const hourWord  = m[1];
+  const yWord     = m[2] ?? null;
+  const menosWord = m[3] ?? null;
+  const qualStr   = m[4] ?? null;
+
+  const baseHour = HORA_PALABRA[hourWord];
+  if (baseHour === undefined) return null;
+
+  let minutes = 0;
+  let hourAdj = 0;
+  if (yWord) {
+    minutes = MINUTO_PALABRA[yWord] ?? 0;
+  } else if (menosWord) {
+    const minus = MINUTO_PALABRA[menosWord] ?? 0;
+    // "siete menos cuarto" = 7h - 15m = 6:45
+    minutes = 60 - minus;
+    hourAdj = -1;
+  }
+
+  /** Convierte (baseH + hourAdj) con los minutos calculados a "HH:MM". */
+  function toHHMM(h: number): string {
+    const total = ((h + hourAdj) * 60 + minutes + 1440) % 1440;
+    return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+  }
+
+  const isAM = qualStr ? /manana|am/.test(qualStr) : null;
+  const isPM = qualStr ? /tarde|noche|pm/.test(qualStr) : null;
+
+  if (isAM) return [toHHMM(baseHour)];
+  if (isPM) return [toHHMM(baseHour < 12 ? baseHour + 12 : baseHour)];
+
+  // Ambigua: devolver candidato AM y PM (si son distintos).
+  const candAM = toHHMM(baseHour);
+  const candPM = toHHMM(baseHour < 12 ? baseHour + 12 : baseHour);
+  return candAM === candPM ? [candAM] : [candAM, candPM];
 }
 
 /**
@@ -330,7 +420,13 @@ export function parseDateTime(input: string | null | undefined): ParsedDateTime 
     dateKey = isReasonableDateKey(cand) ? cand : null;
   }
 
-  if (hmMatch) {
+  // T2: parser castellano primero (seis y media, nueve menos cuarto, etc.)
+  let timeKeyCandidates: string[] | undefined;
+  const spanishCands = parseSpanishTime(txt);
+  if (spanishCands && spanishCands.length > 0) {
+    timeKey = spanishCands[0];
+    if (spanishCands.length > 1) timeKeyCandidates = spanishCands;
+  } else if (hmMatch) {
     timeKey = `${pad2(Number(hmMatch[1]))}:${hmMatch[2]}`;
   } else {
     // "a las 11" sin minutos → 11:00.
@@ -346,7 +442,7 @@ export function parseDateTime(input: string | null | undefined): ParsedDateTime 
 
   if (!dateKey && !timeKey) return null;
 
-  return { dateKey: dateKey || '', timeKey };
+  return { dateKey: dateKey || '', timeKey, timeKeyCandidates };
 }
 
 // ─── Metadata helpers ──────────────────────────────────────────────────────
@@ -944,14 +1040,14 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
   // intentamos combinar con el día detectado en el texto.
   if (parsed && !parsed.dateKey) {
     const fromText = parseDateTime(input.userMessage);
-    if (fromText?.dateKey) parsed = { dateKey: fromText.dateKey, timeKey: parsed.timeKey };
+    if (fromText?.dateKey) parsed = { dateKey: fromText.dateKey, timeKey: parsed.timeKey, timeKeyCandidates: parsed.timeKeyCandidates };
   }
 
   // Si el user dio solo hora sin día, recuperar día pendiente del contexto.
   if (parsed && !parsed.dateKey && parsed.timeKey) {
     const hint = await getSchedulingHint(input.conversationId);
     if (hint?.pending_day) {
-      parsed = { dateKey: hint.pending_day, timeKey: parsed.timeKey };
+      parsed = { dateKey: hint.pending_day, timeKey: parsed.timeKey, timeKeyCandidates: parsed.timeKeyCandidates };
     }
   }
   // Si dio solo día (sin hora), recordarlo para el próximo turno.
@@ -978,6 +1074,30 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
 
   const dateKey = parsed.dateKey;
   const free = await freeSlotsForDate(schedule, property.id, dateKey);
+
+  // T2 — desambiguación de hora: si parseSpanishTime devolvió 2 candidatos
+  // (e.g. "seis y media" → ["06:30","18:30"]), resolver contra los huecos reales.
+  if (parsed.timeKeyCandidates && parsed.timeKeyCandidates.length === 2) {
+    const [candAM, candPM] = parsed.timeKeyCandidates;
+    const amOk = free.includes(candAM);
+    const pmOk = free.includes(candPM);
+    if (pmOk && !amOk) {
+      // Solo el candidato de tarde está libre → usarlo sin preguntar.
+      parsed = { ...parsed, timeKey: candPM, timeKeyCandidates: undefined };
+    } else if (amOk && !pmOk) {
+      // Solo el candidato de mañana está libre → usarlo sin preguntar.
+      parsed = { ...parsed, timeKey: candAM, timeKeyCandidates: undefined };
+    } else if (amOk && pmOk) {
+      // Ambos disponibles → preguntar explícitamente (horario laboral normal).
+      return {
+        response: `¿A qué hora exactamente? Tengo huecos a las *${candAM}* y también a las *${candPM}*. ¿De mañana o de tarde?`,
+        shouldEscalate: false,
+        intent: 'schedule_visit',
+      };
+    }
+    // Si ninguno está libre → parsed.timeKey sigue siendo candAM;
+    // el CASO B/D más abajo gestionará el hueco no disponible.
+  }
 
   // CASO B — ese día no admite visitas o no le quedan huecos.
   if (free.length === 0) {
