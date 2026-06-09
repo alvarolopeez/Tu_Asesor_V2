@@ -6,6 +6,7 @@ import {
   getInterviewState,
   handleInterviewStep,
   tryHandleScheduleVisit,
+  tryHandleCancelVisit,
   scheduleVisitFollowup,
   clearVisitFollowup,
   clearInterviewStateFromEngine,
@@ -387,6 +388,51 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     void scheduleVisitFollowup(input.conversationId, 180).catch((err) => {
       console.warn('[engine] scheduleVisitFollowup falló:', err);
     });
+  }
+
+  // 5a. T3 Brief #005 — cancel_visit tiene precedencia sobre schedule_visit.
+  //     También captura respuestas de continuación cuando hay un cancel_flow activo
+  //     (el cliente responde "sí"/"cancelar" en medio del flujo de dos turnos).
+  {
+    let cancelErrored = false;
+    const cancelRes = await tryHandleCancelVisit({
+      conversationId: input.conversationId,
+      leadName: input.leadContext?.name,
+      leadPhone: input.leadContext?.phone,
+      userMessage: input.message,
+      extracted: {
+        name: result.data_extracted?.name ?? null,
+        phone: result.data_extracted?.phone ?? null,
+        preferred_date: result.data_extracted?.preferred_date ?? null,
+        property_interest: result.data_extracted?.property_interest ?? null,
+      },
+      intent: result.intent ?? '',
+    }).catch((err) => {
+      console.error('[engine] tryHandleCancelVisit error:', err);
+      cancelErrored = true;
+      return null;
+    });
+
+    if (cancelRes) {
+      result = {
+        response: cancelRes.response,
+        intent: cancelRes.shouldEscalate ? 'ESCALATE' : 'cancel_visit',
+        confidence: 0.9,
+        data_extracted: result.data_extracted,
+        conversation_id: input.conversationId,
+        should_escalate: cancelRes.shouldEscalate,
+      };
+    } else if (cancelErrored) {
+      result = {
+        response:
+          'He tenido un problema técnico al gestionar tu solicitud. Aviso a Álvaro para que te ayude.',
+        intent: 'ESCALATE',
+        confidence: 0.5,
+        data_extracted: result.data_extracted,
+        conversation_id: input.conversationId,
+        should_escalate: true,
+      };
+    }
   }
 
   // 5. Si el LLM detectó schedule_visit, dejamos que el módulo de scheduling
@@ -923,7 +969,7 @@ async function parseLLMResponse(raw: string, conversationId: string): Promise<Ch
 
       // Intentar también extraer intent aunque el JSON esté roto.
       // Whitelist contra el tipo AIIntent | 'ESCALATE' del contrato.
-      const VALID_INTENTS = ['schedule_visit', 'ask_price', 'valuation', 'general_inquiry', 'ESCALATE'] as const;
+      const VALID_INTENTS = ['schedule_visit', 'cancel_visit', 'ask_price', 'valuation', 'general_inquiry', 'ESCALATE'] as const;
       type ValidIntent = typeof VALID_INTENTS[number];
       const intentMatch = jsonStr.match(/"intent"\s*:\s*"([^"]+)"/);
       const rawIntent = intentMatch?.[1];

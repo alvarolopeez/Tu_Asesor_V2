@@ -130,7 +130,7 @@ export interface Appointment {
 }
 
 // ─── AI INTERACTIONS ─────────────────────────────────
-export type AIIntent = 'schedule_visit' | 'ask_price' | 'valuation' | 'general_inquiry';
+export type AIIntent = 'schedule_visit' | 'cancel_visit' | 'ask_price' | 'valuation' | 'general_inquiry';
 
 export interface AIInteraction {
   id: string;

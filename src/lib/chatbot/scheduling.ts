@@ -149,7 +149,19 @@ export interface SchedulingHookResult {
     | 'schedule_visit_interview'
     | 'schedule_visit_confirmed'
     | 'schedule_visit_unavailable'
+    | 'cancel_visit_offered_reschedule'
+    | 'cancel_visit_awaiting_confirm'
+    | 'cancel_visit_done'
+    | 'cancel_visit_none'
+    | 'cancel_visit_too_close'
+    | 'cancel_visit_rate_limited'
+    | 'cancel_visit_error'
     | 'ESCALATE';
+}
+
+/** Input específico para tryHandleCancelVisit — extiende el base con el intent detectado. */
+export interface CancelHookInput extends SchedulingHookInput {
+  intent: string;
 }
 
 // ─── Helpers de fecha/día ──────────────────────────────────────────────────
@@ -1393,6 +1405,181 @@ async function countRecentCancellations(leadId: string, hours: number): Promise<
     .eq('status', 'cancelled')
     .gte('cancelled_at', since);
   return data?.length ?? 0;
+}
+
+/**
+ * Obtiene el lead_id asociado a una conversación (helper local).
+ */
+async function getLeadIdFromConversation(conversationId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from('chatbot_conversations')
+    .select('lead_id')
+    .eq('id', conversationId)
+    .single();
+  return data?.lead_id ?? null;
+}
+
+/**
+ * Maneja la intención de cancelar una visita. Implementa los 5 guardarraíles
+ * del Brief #005:
+ *  G1. Filtro por lead_id (no toca citas ajenas).
+ *  G2. Soft delete + auditoría completa (UPDATE, nunca DELETE).
+ *  G3. Ventana mínima 4h — si la visita es a <4h, escala a Álvaro.
+ *  G4. Confirmación explícita en dos turnos (ofrece reagendar primero).
+ *  G5. Notificación inmediata a Álvaro tras ejecutar cancel.
+ *  Extra: rate limit de 3 cancelaciones/24h por lead → escala.
+ */
+export async function tryHandleCancelVisit(input: CancelHookInput): Promise<SchedulingHookResult | null> {
+  // Leer metadata al inicio — necesaria para el early-exit y para el estado del flujo.
+  const meta = await getConversationMetadata(input.conversationId);
+  const cancelFlow = meta?.cancel_flow as
+    | { step: 'offered_reschedule' | 'awaiting_confirm'; appointmentId: string }
+    | null;
+
+  // Entrar solo si el intent es cancel_visit O hay un cancel_flow activo
+  // (continuación de turno: el cliente respondió a "reagendar/cancelar").
+  if (input.intent !== 'cancel_visit' && !cancelFlow) return null;
+
+  const leadId = await getLeadIdFromConversation(input.conversationId);
+  if (!leadId) return null;
+
+  // Rate limit: ¿más de 3 cancelaciones en las últimas 24h?
+  const recentCancels = await countRecentCancellations(leadId, 24);
+  if (recentCancels >= 3) {
+    await notifyAdvisor(
+      `🚨 Lead ${leadId} ha intentado cancelar ${recentCancels} veces en 24h. Posible abuso. Conversación ${input.conversationId}.`,
+    );
+    return {
+      response: 'He notificado a Álvaro de tu solicitud. Te contacta él directamente.',
+      shouldEscalate: true,
+      intent: 'cancel_visit_rate_limited',
+    };
+  }
+
+  // Buscar próxima cita futura activa del lead.
+  const { data: future } = await supabaseAdmin
+    .from('appointments')
+    .select('id, scheduled_at, property_id, title, status')
+    .eq('lead_id', leadId)
+    .eq('status', 'pending')
+    .gte('scheduled_at', new Date().toISOString())
+    .order('scheduled_at', { ascending: true })
+    .limit(1);
+
+  if (!future || future.length === 0) {
+    // Si hay cancel_flow activo pero no cita → limpiar estado y responder amable.
+    if (cancelFlow) await setConversationMetadata(input.conversationId, { cancel_flow: null });
+    return {
+      response:
+        'No encuentro ninguna visita futura tuya. Si crees que es un error, escríbeme y te conecto con Álvaro.',
+      shouldEscalate: false,
+      intent: 'cancel_visit_none',
+    };
+  }
+
+  const apt = future[0];
+  const scheduledAt = new Date(apt.scheduled_at);
+  const hoursToVisit = (scheduledAt.getTime() - Date.now()) / 3_600_000;
+
+  // G3: ventana mínima 4h
+  if (hoursToVisit < 4) {
+    await notifyAdvisor(
+      `🚨 Lead ${leadId} pide cancelar visita programada en <4h (${apt.scheduled_at}). Le he derivado a ti.`,
+    );
+    return {
+      response:
+        'Tu visita es en menos de 4 horas. Para cancelar con tan poco margen necesito que Álvaro lo gestione directamente — ya le he avisado y te escribirá en breve. Disculpa las molestias.',
+      shouldEscalate: true,
+      intent: 'cancel_visit_too_close',
+    };
+  }
+
+  // G4: flujo de dos turnos — usar el cancelFlow ya leído arriba.
+
+  // FASE A — primera vez: ofrecer reagendar
+  if (!cancelFlow) {
+    await setConversationMetadata(input.conversationId, {
+      cancel_flow: { step: 'offered_reschedule', appointmentId: apt.id },
+    });
+    return {
+      response:
+        `Tienes una visita el ${formatDateTimeMadrid(apt.scheduled_at)} para *${apt.title || 'el inmueble'}*. ¿Prefieres reagendar a otro día o cancelarla del todo?`,
+      shouldEscalate: false,
+      intent: 'cancel_visit_offered_reschedule',
+    };
+  }
+
+  // FASE B — el cliente eligió. Detectar respuesta.
+  const userLower = input.userMessage.toLowerCase();
+  const wantsReschedule = /(reagend|cambiar|mover|otro\s*d[ií]a|otro\s*horario)/i.test(userLower);
+  const wantsCancel = /(cancel|anular|no\s*ir|ya no|elimin|borrar)/i.test(userLower);
+
+  if (wantsReschedule && !wantsCancel) {
+    // Limpiar flag y devolver null para que tryHandleScheduleVisit lo gestione.
+    await setConversationMetadata(input.conversationId, { cancel_flow: null });
+    return null;
+  }
+
+  // FASE C — confirmar cancelación
+  if (cancelFlow.step === 'offered_reschedule') {
+    if (!wantsCancel) {
+      return {
+        response:
+          '¿Confirmas que quieres cancelarla? Responde "sí" para anularla o cuéntame cómo prefieres seguir.',
+        shouldEscalate: false,
+        intent: 'cancel_visit_awaiting_confirm',
+      };
+    }
+    await setConversationMetadata(input.conversationId, {
+      cancel_flow: { step: 'awaiting_confirm', appointmentId: apt.id },
+    });
+    return {
+      response:
+        'Vale. ¿Me cuentas brevemente el motivo? (opcional, una frase me vale). O responde solo "sí" para cancelarla sin más detalle.',
+      shouldEscalate: false,
+      intent: 'cancel_visit_awaiting_confirm',
+    };
+  }
+
+  // FASE D — ejecutar cancel (cancelFlow.step === 'awaiting_confirm').
+  const reason = input.userMessage.trim().slice(0, 280);
+  const { error: updErr } = await supabaseAdmin
+    .from('appointments')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: 'client_chatbot',
+      cancellation_reason: reason || null,
+    })
+    .eq('id', cancelFlow.appointmentId)
+    .eq('lead_id', leadId); // G1: doble filtro de seguridad
+
+  if (updErr) {
+    console.error('[cancel] update failed:', updErr);
+    return {
+      response: 'Ha habido un problema cancelando la cita. Aviso a Álvaro para que lo gestione.',
+      shouldEscalate: true,
+      intent: 'cancel_visit_error',
+    };
+  }
+
+  // Limpiar flag.
+  await setConversationMetadata(input.conversationId, { cancel_flow: null });
+
+  // G5: notificar a Álvaro.
+  await notifyAdvisorOfCancellation({
+    appointmentId: cancelFlow.appointmentId,
+    leadId,
+    scheduledAt: apt.scheduled_at,
+    title: apt.title || '',
+    reason: reason || '(sin motivo)',
+  });
+
+  return {
+    response: `Hecho. He cancelado tu visita del ${formatDateTimeMadrid(apt.scheduled_at)}. Si cambias de idea o quieres ver el inmueble más adelante, dímelo y lo agendamos de nuevo.`,
+    shouldEscalate: false,
+    intent: 'cancel_visit_done',
+  };
 }
 
 // ─── Follow-up 30 min (FIX-G) ───────────────────────────────────────────────
