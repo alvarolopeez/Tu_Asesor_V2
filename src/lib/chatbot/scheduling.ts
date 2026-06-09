@@ -115,6 +115,19 @@ export function formatPropertyName(title: string, zone?: string | null): string 
   return zone ? `"${title}, en ${zone}"` : `"${title}"`;
 }
 
+/**
+ * Restricciones de disponibilidad declaradas por el lead en lenguaje natural.
+ * Persiste en chatbot_conversations.metadata.availability_constraints (T3).
+ */
+export interface AvailabilityConstraints {
+  /** Días de la semana en castellano capitalizados (["Martes","Miércoles"]). */
+  days?: string[];
+  /** Franja horaria preferida. */
+  time_of_day?: 'morning' | 'afternoon' | 'evening' | 'any';
+  /** Texto original del cliente, para debug / mensajes de tope. */
+  raw?: string;
+}
+
 export interface SchedulingHookInput {
   conversationId: string;
   leadName?: string;
@@ -1000,6 +1013,56 @@ async function finalizeScheduling(
 
 // ─── Entrada principal ─────────────────────────────────────────────────────
 
+// ─── Helpers de disponibilidad (T3) ───────────────────────────────────────
+
+/**
+ * Filtra slots por franja horaria según las constraints del user.
+ * Devuelve todos si no hay constraints o time_of_day === 'any'.
+ */
+function filterSlotsByConstraints(slots: string[], constraints: AvailabilityConstraints): string[] {
+  const tod = constraints.time_of_day;
+  if (!tod || tod === 'any') return slots;
+  return slots.filter((t) => {
+    const h = parseInt(t.split(':')[0], 10);
+    if (tod === 'morning')   return h < 14;
+    if (tod === 'afternoon') return h >= 14;
+    if (tod === 'evening')   return h >= 19;
+    return true;
+  });
+}
+
+/**
+ * Como nextDaysWithFreeSlots pero respeta AvailabilityConstraints (T3):
+ *  - Filtra días de la semana si constraints.days está definido.
+ *  - Filtra slots por franja horaria.
+ * Si no hay ningún día constrained en 14 días, devuelve array vacío
+ * (el caller decide si volver a llamar sin constraints para el tope).
+ */
+async function nextDaysWithFreeSlotsConstrained(
+  schedule: VisitableSchedule,
+  propertyId: string,
+  count: number,
+  constraints: AvailabilityConstraints | null,
+): Promise<Array<{ dateKey: string; free: string[] }>> {
+  if (!constraints) return nextDaysWithFreeSlots(schedule, propertyId, count);
+
+  const today = todayDateKey();
+  const out: Array<{ dateKey: string; free: string[] }> = [];
+  const allowedDays = constraints.days?.map((d) => d.toLowerCase()) ?? null;
+
+  for (let i = 0; i < 14 && out.length < count; i++) {
+    const k = addDays(today, i);
+    if (allowedDays && allowedDays.length > 0) {
+      const dow = dayOfWeekFor(k).toLowerCase();
+      if (!allowedDays.some((d) => normalizeText(d) === normalizeText(dow))) continue;
+    }
+    let free = await freeSlotsForDate(schedule, propertyId, k);
+    free = filterSlotsByConstraints(free, constraints);
+    if (free.length > 0) out.push({ dateKey: k, free });
+  }
+  return out;
+}
+
 export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promise<SchedulingHookResult | null> {
   const active = await getInterviewState(input.conversationId);
   if (active) return null;
@@ -1020,6 +1083,12 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
 
   const schedule = property.schedule;
   const propLabel = formatPropertyName(property.title, property.zone);
+
+  // T3: leer restricciones de disponibilidad del lead (si las declaró).
+  const meta = await getConversationMetadata(input.conversationId);
+  const constraints: AvailabilityConstraints | null =
+    (meta?.availability_constraints as AvailabilityConstraints) || null;
+
   if (!schedule || !schedule.schedule || Object.keys(schedule.schedule).length === 0) {
     return {
       response:
@@ -1057,12 +1126,24 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
 
   // CASO A — no tenemos fecha → ofrecer próximos 3 días con huecos.
   if (!parsed || !parsed.dateKey) {
-    const preview = await nextDaysWithFreeSlots(schedule, property.id, 3);
+    const preview = await nextDaysWithFreeSlotsConstrained(schedule, property.id, 3, constraints);
     if (preview.length === 0) {
+      // Tope T3: sin huecos con constraints → ofrecer los más próximos sin filtro + aviso.
+      const fallback = await nextDaysWithFreeSlots(schedule, property.id, 3);
+      if (fallback.length === 0) {
+        return {
+          response: `Por desgracia ahora mismo no me quedan huecos libres para visitar ${propLabel}. Aviso a Álvaro para que te proponga alternativa.`,
+          shouldEscalate: true,
+          intent: 'schedule_visit_unavailable',
+        };
+      }
+      const constraint_label = constraints?.raw
+        ? `los días/horario que mencionaste`
+        : `ese horario`;
       return {
-        response: `Por desgracia ahora mismo no me quedan huecos libres para visitar ${propLabel}. Aviso a Álvaro para que te proponga alternativa.`,
-        shouldEscalate: true,
-        intent: 'schedule_visit_unavailable',
+        response: `No tengo huecos para ${propLabel} con ${constraint_label} en los próximos días. Los más próximos disponibles son:\n${formatDaysPreview(fallback)}\n¿Te encaja alguno?`,
+        shouldEscalate: false,
+        intent: 'schedule_visit',
       };
     }
     return {
@@ -1101,12 +1182,22 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
 
   // CASO B — ese día no admite visitas o no le quedan huecos.
   if (free.length === 0) {
-    const preview = await nextDaysWithFreeSlots(schedule, property.id, 3);
+    const preview = await nextDaysWithFreeSlotsConstrained(schedule, property.id, 3, constraints);
     if (preview.length === 0) {
+      // Tope T3: sin huecos con constraints → probar sin filtro + aviso.
+      const fallbackPreview = await nextDaysWithFreeSlots(schedule, property.id, 3);
+      if (fallbackPreview.length === 0) {
+        return {
+          response: `No me quedan huecos libres próximos para ${propLabel}. Aviso a Álvaro para que te proponga otra fecha.`,
+          shouldEscalate: true,
+          intent: 'schedule_visit_unavailable',
+        };
+      }
+      const constraintLabel = constraints?.raw ? `los días/horario que mencionaste` : `ese horario`;
       return {
-        response: `No me quedan huecos libres próximos para ${propLabel}. Aviso a Álvaro para que te proponga otra fecha.`,
-        shouldEscalate: true,
-        intent: 'schedule_visit_unavailable',
+        response: `El ${formatDateHuman(dateKey)} no tengo huecos libres. Tampoco encuentro huecos con ${constraintLabel} esta semana, pero los más próximos son:\n${formatDaysPreview(fallbackPreview)}\n¿Te encaja alguno?`,
+        shouldEscalate: false,
+        intent: 'schedule_visit',
       };
     }
     return {
@@ -1118,8 +1209,18 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
 
   // CASO C — tenemos día pero no hora → ofrecer los libres de ese día.
   if (!parsed.timeKey) {
+    const filteredFree = filterSlotsByConstraints(free, constraints);
+    if (filteredFree.length === 0 && free.length > 0) {
+      // Tope T3: no hay huecos con constraints en este día → mostrar todos con aviso.
+      const constraintLabel = constraints?.raw ? `los días/horario que mencionaste` : `ese horario`;
+      return {
+        response: `Para el ${formatDateHuman(dateKey)} no tengo huecos con ${constraintLabel}. Los huecos disponibles ese día son: *${free.join(', ')}*. ¿Alguno te encaja?`,
+        shouldEscalate: false,
+        intent: 'schedule_visit',
+      };
+    }
     return {
-      response: `Para el ${formatDateHuman(dateKey)} tengo libres: *${free.join(', ')}*. ¿Cuál te viene mejor?`,
+      response: `Para el ${formatDateHuman(dateKey)} tengo libres: *${(filteredFree.length > 0 ? filteredFree : free).join(', ')}*. ¿Cuál te viene mejor?`,
       shouldEscalate: false,
       intent: 'schedule_visit',
     };
@@ -1128,8 +1229,11 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
   // CASO D — fecha + hora.
   const timeKey = parsed.timeKey;
   if (!free.includes(timeKey)) {
+    // T3: mostrar huecos alternativos respetando constraints si los hay.
+    const filteredFree = filterSlotsByConstraints(free, constraints);
+    const displaySlots = filteredFree.length > 0 ? filteredFree : free;
     return {
-      response: `Las *${timeKey}* del ${formatDateHuman(dateKey)} no están disponibles. Para ese día tengo libres: *${free.join(', ')}*. ¿Cuál te encaja?`,
+      response: `Las *${timeKey}* del ${formatDateHuman(dateKey)} no están disponibles. Para ese día tengo libres: *${displaySlots.join(', ')}*. ¿Cuál te encaja?`,
       shouldEscalate: false,
       intent: 'schedule_visit',
     };

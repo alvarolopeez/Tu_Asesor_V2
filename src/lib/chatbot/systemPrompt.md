@@ -99,7 +99,8 @@ Responde SIEMPRE con este JSON y NADA más:
     "phone": "teléfono si lo menciona o null",
     "preferred_date": "YYYY-MM-DDTHH:MM si el cliente la ha dicho CLARAMENTE y la fecha está en los próximos 7 días (lista de arriba). Si dudas, devuelve null.",
     "property_interest": "título exacto del inmueble que cita el cliente o null",
-    "location_interest": "zona/municipio de interés o null"
+    "location_interest": "zona/municipio de interés o null",
+    "availability_hint": "SOLO si el cliente declara explícitamente días u horario disponibles (ej: 'solo martes y miércoles por la tarde', 'solo mañanas entre semana'): objeto {\"days\": [\"Martes\",\"Miércoles\"], \"time_of_day\": \"afternoon\"}. days = array de días en castellano capitalizados o null. time_of_day = \"morning\" (antes 14:00) | \"afternoon\" (≥14:00) | \"evening\" (≥19:00) | \"any\". Si el cliente NO declara disponibilidad, null."
   }
 }
 ```

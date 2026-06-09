@@ -359,6 +359,16 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     }
   }
 
+  // 3c. T3 — persistir availability_constraints si el LLM detectó disponibilidad declarada
+  //     (e.g. "solo martes y miércoles por la tarde"). Se persiste una vez y se
+  //     reutiliza en todos los listados de huecos de ese lead/conversación.
+  const availHint = (result.data_extracted as Record<string, unknown> | undefined)?.availability_hint;
+  if (availHint && typeof availHint === 'object' && !Array.isArray(availHint)) {
+    await patchConversationMetadata(input.conversationId, {
+      availability_constraints: availHint,
+    }).catch((err) => console.warn('[engine] patch availability_constraints failed:', err));
+  }
+
   // 4. Si el LLM detectó ask_price y la respuesta contiene un link público,
   //    marcamos un follow-up para preguntarle si quiere visita.
   //    FIX HIGH UX #10 (review adversarial): subimos delay a 3h (no 30 min,
