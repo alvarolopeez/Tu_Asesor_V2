@@ -5,6 +5,44 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-09 — Sprint chatbot scheduling #004 (6 fixes: preferred_name durable, anti-saludo, tiempo español, restricciones, property_id, herencia interview)
+
+**Commits**: T5.1 (`feat(engine): persist preferred_name to leads.preferences`) · T5.2 (`feat(engine): suppress Paula greeting after turn 1`) · T2 (`feat(scheduling): parseSpanishTime + jest infrastructure`) · T3 (`feat(scheduling): respetar restricciones de disponibilidad` — 63c2487) · T1 (`fix(scheduling): persistir context_property_id al recomendar inmueble` — 0ec81a0) · T4 (`feat(scheduling): pre-cita interview hereda respuestas del onboarding` — c457805)
+
+**T5.1 — preferred_name durable** (`engine.ts`)
+- `preferred_name` se persiste ahora en DOS sitios: `chatbot_conversations.metadata.preferred_name` (ya existía) **y** en `leads.preferences JSONB` (nuevo). Esto garantiza que si la conversación expira o se crea una nueva, el nombre preferido del cliente sobrevive.
+
+**T5.2 — anti-saludo** (`engine.ts` + `systemPrompt.md`)
+- Contador de turnos del asistente derivado del historial: `assistantTurnCount = history.filter(m => m.role === 'assistant').length`.
+- Se inyecta `[turno_asistente: N]` en el bloque `<contexto_cliente>` cuando N ≥ 1.
+- `systemPrompt.md` instruye a Paula: "Si N ≥ 1 ya te presentaste — NO abras con 'Hola', 'Soy Paula' ni presentación."
+
+**T2 — parseSpanishTime + Jest** (`scheduling.ts` + nuevos `jest.config.js`, `jest.setup.js`, `package.json`, `src/lib/chatbot/__tests__/parseSpanishTime.test.ts`)
+- Nueva función `parseSpanishTime(text)`: parsea "seis y media", "nueve menos cuarto", "cinco de la tarde", "doce en punto", etc. Devuelve `string[] | null` (1 candidato si hora unívoca; 2 si ambigua AM/PM).
+- `parseDateTime` ahora llama `parseSpanishTime` antes del regex de dígitos.
+- `ParsedDateTime` gana campo opcional `timeKeyCandidates?: string[]`.
+- Desambiguación en `tryHandleScheduleVisit`: si 2 candidatos, selecciona el que esté libre; si ambos libres, pregunta al cliente "¿de mañana o de tarde?".
+- Jest + ts-jest añadido al proyecto. 21 tests verdes.
+
+**T3 — restricciones de disponibilidad** (`systemPrompt.md` + `engine.ts` + `scheduling.ts`)
+- `systemPrompt.md`: nuevo campo `availability_hint` en `data_extracted` — objeto `{days, time_of_day}` extraído por el LLM cuando el cliente declara disponibilidad explícita.
+- `engine.ts`: persiste `availability_hint` en `metadata.availability_constraints` tras cada turno del LLM.
+- `scheduling.ts`: `AvailabilityConstraints` interface + helpers `filterSlotsByConstraints` y `nextDaysWithFreeSlotsConstrained`. Aplicados en CASO A (preview días), CASO B (días alternativos), CASO C (slots del día), CASO D (conflicto de hora). Tope: si tras filtrar quedan 0 huecos → listar próximos reales con aviso "No tengo huecos con ese horario, los más próximos son…".
+
+**T1 — context_property_id** (`engine.ts`)
+- Cuando `intent === 'ask_price'` y la respuesta del LLM incluye `?p=<uuid>`, extrae el UUID y lo persiste en `metadata.context_property_id` para que el flujo de scheduling resuelva el inmueble sin re-preguntar.
+
+**T4 — herencia de entrevista** (`scheduling.ts`)
+- En `tryHandleScheduleVisit`, antes de arrancar la entrevista pre-cita: lee `interview_state` previo de la conversación (de un onboarding standalone) e hereda las respuestas.
+- Calcula primer paso sin respuesta: si `savings` existe → arranca en Q2; si también `funding` → en Q3; si los 3 existen → salta directo a `finalizeScheduling` sin repetir el cuestionario.
+
+**Verificación**:
+- ✅ `npm run build` verde (sin errores TS).
+- ✅ `npm test` — 21/21 tests de `parseSpanishTime` verdes.
+- ✅ `gitnexus_detect_changes` — riesgo LOW/MEDIUM, sin HIGH ni CRITICAL.
+
+---
+
 ### 2026-06-09 — Sprint chatbot UX (5 tareas: contexto + dedup + nombre + entrevista reactiva + LLM-as-parser)
 
 **Causas raíz confirmadas en producción** (no especuladas):
