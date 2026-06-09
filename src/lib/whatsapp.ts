@@ -155,3 +155,53 @@ export async function sendWhatsAppTemplate(
     return false;
   }
 }
+
+/**
+ * T1+T2 Brief #005 — Marca un mensaje entrante como leído en Meta Cloud API
+ * (doble tick azul) y, opcionalmente, activa el typing indicator ("Paula está
+ * escribiendo…") en la misma request.
+ *
+ * Fire-and-forget: no bloquea el flujo si Meta falla.
+ *
+ * @param messageId — wamid del mensaje del cliente (parsed.messageId del webhook)
+ * @param withTyping — si true, incluye typing_indicator en el mismo payload (T2)
+ */
+export async function markWhatsAppRead(
+  messageId: string,
+  withTyping: boolean = false,
+): Promise<boolean> {
+  if (!ACCESS_TOKEN || !PHONE_NUMBER_ID) {
+    console.warn('[WhatsApp markRead] ⚠️ Credenciales no configuradas');
+    return false;
+  }
+  try {
+    const body: Record<string, unknown> = {
+      messaging_product: 'whatsapp',
+      status: 'read',
+      message_id: messageId,
+    };
+    if (withTyping) {
+      body.typing_indicator = { type: 'text' };
+    }
+    const response = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${PHONE_NUMBER_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${ACCESS_TOKEN}`,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.warn('[WhatsApp markRead] Meta error:', response.status, errorBody);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.warn('[WhatsApp markRead] Error de red:', error);
+    return false;
+  }
+}

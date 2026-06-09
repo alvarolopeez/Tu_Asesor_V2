@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { processMessage } from '@/lib/chatbot/engine';
-import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { sendWhatsAppMessage, markWhatsAppRead } from '@/lib/whatsapp';
 import { normalizeEsPhone } from '@/lib/phone';
 
 /**
@@ -67,6 +67,11 @@ export async function POST(request: NextRequest) {
     if (!parsed) {
       // No es un mensaje procesable (status update, read receipt, etc.)
       return NextResponse.json({ status: 'ok', type: 'non_message_event' });
+    }
+
+    // T1+T2: marcar como leído + activar typing indicator (fire-and-forget).
+    if (parsed.messageId) {
+      void markWhatsAppRead(parsed.messageId, true).catch(() => {});
     }
 
     console.log(`[WhatsApp] 📱 ${parsed.contactName} (${parsed.phoneNumber}): ${parsed.messageText}`);
