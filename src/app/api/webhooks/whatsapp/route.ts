@@ -71,7 +71,9 @@ export async function POST(request: NextRequest) {
 
     // T1+T2: marcar como leído + activar typing indicator (fire-and-forget).
     if (parsed.messageId) {
-      void markWhatsAppRead(parsed.messageId, true).catch(() => {});
+      void markWhatsAppRead(parsed.messageId, true).catch((e) =>
+        console.warn('[webhook] markWhatsAppRead threw:', e),
+      );
     }
 
     console.log(`[WhatsApp] 📱 ${parsed.contactName} (${parsed.phoneNumber}): ${parsed.messageText}`);

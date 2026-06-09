@@ -196,7 +196,12 @@ export async function markWhatsAppRead(
     );
     if (!response.ok) {
       const errorBody = await response.text();
-      console.warn('[WhatsApp markRead] Meta error:', response.status, errorBody);
+      console.warn(
+        '[WhatsApp markRead] Meta error',
+        response.status,
+        '— payload enviado:', JSON.stringify(body),
+        '— respuesta Meta:', errorBody,
+      );
       return false;
     }
     return true;
