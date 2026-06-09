@@ -5,6 +5,56 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-09 — Sprint chatbot WhatsApp UX + cancelación de visitas #005
+
+**Commits**:
+- Migración Supabase: `feat(db): add cancellation fields to appointments`
+- T1+T2: `feat(whatsapp): read receipts y typing indicator` (648c045)
+- T4: `feat(notifications): helper de notificación de cancelación al asesor` (5c5ac33)
+- T3: `feat(chatbot): cancelación de visitas con guardarraíles` (9602801)
+
+**Migración Supabase** (`appointments`)
+- Añadidas columnas: `cancelled_at TIMESTAMPTZ`, `cancelled_by TEXT DEFAULT 'bot'`, `cancellation_reason TEXT`.
+- Patrón soft-delete: UPDATE `status='cancelled'` + `cancelled_at` + `cancelled_by` + `cancellation_reason`. Nunca DELETE.
+
+**T1+T2 — Read receipts y typing indicator** (`src/lib/whatsapp.ts` + `src/app/api/webhooks/whatsapp/route.ts`)
+- Nueva función `markWhatsAppRead(messageId, withTyping=false)`: llama `POST /v21.0/{PHONE_NUMBER_ID}/messages` con `status:'read'` + opcionalmente `typing_indicator:{type:'text'}`. Fire-and-forget, never throws.
+- Webhook `route.ts`: tras extraer `parsed.messageId`, dispara `void markWhatsAppRead(parsed.messageId, true)` antes del procesamiento pesado. Entrega al cliente visualmente: ✅✅ azules + "Escribiendo…" inmediato.
+- ⚠️ `typing_indicator` dura hasta que el bot envíe respuesta o ~25s, lo que ocurra antes. Requiere `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` en `.env.local`.
+
+**T4 — Notificación al asesor en cancelaciones** (`src/lib/chatbot/scheduling.ts`)
+- `notifyAdvisorOfCancellation({appointmentId, leadId, scheduledAt, title, reason})`: resuelve `leads.name`+`phone` vía Supabase y envía WhatsApp free-text al `ADVISOR_WHATSAPP_PHONE`.
+- `countRecentCancellations(leadId, hours)`: cuenta cancelaciones en ventana deslizante para rate-limit.
+- Depend: `sendWhatsAppMessage` importado desde `@/lib/whatsapp` (mensajes libres, no plantilla HSM).
+
+**T3 — Cancelación de visitas con guardarraíles** (`src/lib/chatbot/scheduling.ts` + `engine.ts` + `systemPrompt.md` + `src/types/index.ts`)
+- Nuevo export `tryHandleCancelVisit(input: CancelHookInput): Promise<SchedulingHookResult | null>`.
+- Flujo de dos pasos: Fase A → ofrece reagendar/cancelar (guarda `cancel_flow:{step:'offered_reschedule'}` en metadata) → Fase B → si elige cancelar, pide motivo (step `awaiting_confirm`) → Fase C → ejecuta soft-delete + notifica.
+- **5 guardarraíles**:
+  1. G1: doble filtro `.eq('id', aptId).eq('lead_id', leadId)` — nunca cancela cita de otro lead.
+  2. G2: rate-limit ≥3 cancels/24h → `shouldEscalate=true, intent='cancel_visit_rate_limited'`.
+  3. G3: ventana <4h → `shouldEscalate=true, intent='cancel_visit_too_close'` (no negociable).
+  4. G4: sin citas futuras → `intent='cancel_visit_none'`, respuesta amistosa.
+  5. G5: siempre notifica al asesor vía WhatsApp tras cada cancelación exitosa.
+- **Intents de sub-estado** (en `SchedulingHookResult.intent`): `cancel_visit_none`, `cancel_visit_offered_reschedule`, `cancel_visit_too_close`, `cancel_visit_rate_limited`, `cancel_visit_awaiting_confirm`, `cancel_visit_done`.
+- `AIIntent` en `src/types/index.ts` ampliado con `cancel_visit`.
+- `engine.ts`: invoca `tryHandleCancelVisit` en bloque 5a, con prioridad sobre `tryHandleScheduleVisit`. `cancel_visit` añadido a `VALID_INTENTS`.
+- `systemPrompt.md`: nueva sección intent `cancel_visit` — "el cliente pide cancelar/anular/eliminar una visita YA confirmada. NO confundir con reagendar."
+
+**Tests nuevos**: `src/lib/chatbot/__tests__/tryHandleCancelVisit.test.ts` — 8 tests (todos los escenarios del brief). 29/29 total verdes.
+
+**Verificación**:
+- ✅ `npm run build` verde (sin errores TS).
+- ✅ `npm test` — 29/29 tests verdes (parseSpanishTime 21 + tryHandleCancelVisit 8).
+- ✅ `gitnexus_detect_changes` — riesgo MEDIUM, sin HIGH ni CRITICAL.
+
+**Gotchas para futuros agentes**:
+- La cancelación es SIEMPRE soft-delete (`status='cancelled'`). NUNCA `DELETE FROM appointments`.
+- El `cancel_flow` se persiste en `chatbot_conversations.metadata`. En el turno de continuación, el intent del LLM será `general_inquiry` (el usuario dice "sí"/"cancelarla") — el handler re-entra por el guard `!cancelFlow === false`, no por `intent`.
+- `jest.setup.js` define `ADVISOR_WHATSAPP_PHONE`, `WHATSAPP_PHONE_NUMBER_ID` y `WHATSAPP_ACCESS_TOKEN` como constantes de módulo antes del primer import — imprescindible para que `scheduling.ts` las capture en su inicialización.
+
+---
+
 ### 2026-06-09 — Sprint chatbot scheduling #004 (6 fixes: preferred_name durable, anti-saludo, tiempo español, restricciones, property_id, herencia interview)
 
 **Commits**: T5.1 (`feat(engine): persist preferred_name to leads.preferences`) · T5.2 (`feat(engine): suppress Paula greeting after turn 1`) · T2 (`feat(scheduling): parseSpanishTime + jest infrastructure`) · T3 (`feat(scheduling): respetar restricciones de disponibilidad` — 63c2487) · T1 (`fix(scheduling): persistir context_property_id al recomendar inmueble` — 0ec81a0) · T4 (`feat(scheduling): pre-cita interview hereda respuestas del onboarding` — c457805)
