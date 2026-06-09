@@ -5,6 +5,46 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-09 — Sprint cancelación bulletproof + diagnóstico typing/read #006
+
+**Commits**:
+- T1.A: `feat(prompt): few-shot examples para cancel_visit` (c98da19)
+- T1.B: `feat(chatbot): backstop regex para cancel_visit` (530290a)
+- T2.1: `chore(whatsapp): logs detallados de markWhatsAppRead` (4172011)
+- T2.2: pendiente — requiere revisar logs de Netlify tras deploy
+
+**Causa raíz** (observada en E2E real):
+Gemini Flash clasificaba "Quiero cancelar la visita al piso" como `schedule_visit` en lugar de `cancel_visit`. `tryHandleCancelVisit` nunca se invocaba. En el turno de las 08:40, Paula dijo "He anotado la cancelación" pero la cita quedó `pending` en BD — **falsa confirmación a cliente**.
+
+**T1.A — Refuerzo system prompt** (`src/lib/chatbot/systemPrompt.md`)
+- Añadido bloque `## EJEMPLOS DE CLASIFICACIÓN PARA cancel_visit vs schedule_visit` con 8 ejemplos positivos y 3 negativos (reagendar ≠ cancelar).
+- Regla de oro: ELIMINAR/ANULAR/NO ACUDIR → `cancel_visit`; CAMBIAR/MOVER/REAGENDAR → `schedule_visit`.
+- Aviso explícito: cuando devuelvas `cancel_visit`, di solo "Un momento, déjame revisar tu cita." — NUNCA "He cancelado" ni "Anotada la cancelación".
+
+**T1.B — Backstop regex** (`src/lib/chatbot/engine.ts`)
+- `CANCEL_BACKSTOP_REGEX` insertado ANTES de la sección `5a` (cancel handler) y DESPUÉS de la sección de `ask_price`.
+- Si el cliente dice claramente cancelar/anular/no voy a poder ir Y el LLM devuelve otro intent → fuerza `result.intent = 'cancel_visit'`.
+- Log: `[engine] T1#006 backstop: forzando intent=cancel_visit (LLM devolvió: schedule_visit)`.
+- 10 tests en `cancelBackstop.test.ts`. Total suite: 39/39 verdes.
+
+**T2.1 — Logs detallados de markWhatsAppRead** (`src/lib/whatsapp.ts` + webhook `route.ts`)
+- Error log ampliado: incluye `response.status`, payload enviado (sin token) y body de respuesta de Meta.
+- Webhook: `.catch(() => {})` reemplazado por `.catch((e) => console.warn('[webhook] markWhatsAppRead threw:', e))` para exponer excepciones de red.
+- Deploy en producción: ver logs en https://app.netlify.com/projects/snazzy-profiterole-e72863/logs/functions
+
+**T2.2 — PENDIENTE (requiere acción de Álvaro)**
+1. Enviar un WhatsApp de prueba a Paula desde cualquier número.
+2. Abrir los logs de Netlify Functions y buscar `[WhatsApp markRead]`.
+3. Si aparece error 400 con `typing_indicator` → siguiente agente aplica T2.2: cambiar llamada a `markWhatsAppRead(parsed.messageId, false)`.
+4. Si aparece otro error → documentar hallazgo y proponer fix.
+5. Si no hay error pero tampoco tick azul → el problema puede ser permisos del token (`whatsapp_business_messaging` scope verificado).
+
+**Gotchas para futuros agentes**:
+- `CANCEL_BACKSTOP_REGEX` está definida dentro de la función `processMessage` en engine.ts Y replicada en `cancelBackstop.test.ts`. Si se modifica una, actualizar la otra.
+- El backstop actúa sobre `result.intent` ANTES del bloque 5a de `tryHandleCancelVisit`. No modifica `result.response` — el texto que devuelve el LLM puede ser incoherente si Gemini escribió algo de schedule_visit. El handler `tryHandleCancelVisit` sobreescribe la respuesta completa.
+
+---
+
 ### 2026-06-09 — Sprint chatbot WhatsApp UX + cancelación de visitas #005
 
 **Commits**:
