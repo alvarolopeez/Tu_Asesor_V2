@@ -1257,9 +1257,44 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
   const hasDemand = await buyerDemandExists(phone);
 
   if (!hasDemand) {
+    // T4: heredar respuestas de un onboarding standalone previo en esta conversación
+    // (el usuario respondió Q1/Q2 en modo standalone y luego pidió visita — no
+    // repetirle las preguntas ya contestadas).
+    const priorInterview = await getInterviewState(input.conversationId);
+    const inherited: InterviewAnswers = priorInterview?.answers ?? {};
+
+    // Calcular primer paso aún sin respuesta.
+    let initialStep: InterviewStep = 1;
+    if (inherited.savings !== undefined) initialStep = 2;
+    if (inherited.savings !== undefined && inherited.funding !== undefined) initialStep = 3;
+
+    // Si las 3 respuestas ya existen → saltar directo a finalización.
+    if (
+      inherited.savings !== undefined &&
+      inherited.funding !== undefined &&
+      inherited.tipo_compra !== undefined
+    ) {
+      const allAnsweredState: InterviewState = {
+        step: 3,
+        answers: inherited,
+        attempts: 0,
+        target: {
+          propertyId: property.id,
+          propertyTitle: property.title,
+          propertyZone: property.zone,
+          scheduledAt,
+          leadId,
+          leadName: name || 'Lead chatbot',
+          leadPhone: phone,
+        },
+        startedAt: new Date().toISOString(),
+      };
+      return await finalizeScheduling(allAnsweredState, inherited, input.conversationId);
+    }
+
     const state: InterviewState = {
-      step: 1,
-      answers: {},
+      step: initialStep,
+      answers: inherited,
       attempts: 0,
       target: {
         propertyId: property.id,
@@ -1274,7 +1309,7 @@ export async function tryHandleScheduleVisit(input: SchedulingHookInput): Promis
     };
     await setConversationMetadata(input.conversationId, { interview_state: state });
     return {
-      response: INTERVIEW_QUESTIONS[1],
+      response: INTERVIEW_QUESTIONS[initialStep],
       shouldEscalate: false,
       intent: 'schedule_visit_interview',
     };
