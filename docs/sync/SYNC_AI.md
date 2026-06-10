@@ -5,6 +5,63 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-10 — Brief #007: decisiones estructurales del flujo CRM
+
+**Commits** (en orden):
+- `chore(gitnexus): reindex` (11ffb92)
+- T1.2: `feat(leads): helper de funnel con reversión de visita` (f34fdce)
+- T2.1+T2.2: `feat(funnel): reserva web y Paula mueven el funnel + skip bienvenida en reserva` (6c15334)
+- T2.3: `feat(funnel): cancelaciones revierten visit_scheduled` (0f9f475)
+- T2.4: `feat(funnel): contacted al primer mensaje saliente` (7aba31f)
+- T3: `refactor(encargos): promocion desde Vendedores usa POST /api/encargos` (bf3d743)
+- T4: `fix(diffusion): matching contra buyers_demands JOIN leads` (c255490)
+- T5: `fix(valoracion): dedupe por phone normalizado` (18f0164)
+- T6: `feat(timeline): eventos con efecto de estado` (c8e5095)
+- T7: `fix(encargos): event_type legible en el log de captacion + data-fix` (7d0e237)
+
+**T1.0/T1.1 — Migraciones de datos: NO-OP con los datos actuales** (verificado vía Supabase MCP):
+- T1.0: `SELECT ... WHERE type='seller' AND status IN ('qualified','visit_scheduled')` → **0 filas**. Ningún vendedor fuera del modelo de 4 estados; no se aplicó UPDATE.
+- T1.1: los 4 leads buyer tienen `preferences = {}` (sin claves de perfil que migrar). 3 de 4 ya tienen demand con `lead_id` enlazado (David, Miriam, Álvaro); Patricia no tiene demand pero tampoco preferences de origen. **No se aplicó ningún UPDATE/INSERT**.
+
+**T1.2 — Helper de funnel** (`src/lib/leadFunnel.ts` + 17 tests):
+- `advanceLeadStatus(leadId, 'contacted'|'qualified')` forward-only; `setVisitScheduled(leadId)`; `revertVisitStatus(leadId)`. `closed`/`lost` terminales: el helper no los toca jamás. Fire-and-soft (console.warn, nunca rompe al caller).
+- ⚠️ **Desviación deliberada del prompt original**: el estado previo de la visita se guarda en `preferences._visit_prev_status`, NO en `_prev_status` — esa clave ya la usa el flujo de encargos para SU reversión (encargos/route.ts y [id]/route.ts). No colisionan.
+- `revertVisitStatus` NO revierte si el lead tiene otra cita activa futura (pending/confirmed, scheduled_at >= now) y limpia la clave al revertir; sin clave cae a 'contacted'.
+
+**T2 — El funnel se mueve solo (solo COMPRADOR, 6 estados)**:
+- Reserva web (`appointmentService.bookPublicAppointment`): tras crear la cita → `setVisitScheduled`. **Eliminado el disparo del webhook n8n `new-lead`** (decisión 5: doble WhatsApp) — la bienvenida HSM queda SOLO en `BuyerRegistrationModal` (no tocado). La env `N8N_NEW_LEAD_WEBHOOK_URL` ya no se lee desde appointmentService.
+- Paula (`finalizeScheduling`): entrevista completa → `advanceLeadStatus('qualified')` (pre_schedule y standalone) y DESPUÉS `setVisitScheduled` → `_visit_prev_status='qualified'`. El camino directo (demand previa, answers vacío) solo hace setVisitScheduled.
+- Cancelaciones: `tryHandleCancelVisit` llama `revertVisitStatus` tras el soft-delete. CRM manual: **nuevo endpoint `POST /api/leads/funnel`** (body `{leadId, action:'revert_visit'}` o `{leadId, action:'advance', target}`; service-role; mismo patrón de acceso sin API key que `/api/encargos`). `AppointmentFormModal` lo invoca al marcar `cancelled` y al borrar físicamente una cita.
+- `contacted` al primer mensaje saliente: webhook WhatsApp (tras el `sendWhatsAppMessage` final de Paula) y `admin/chat/send` (envío manual). La bienvenida HSM de n8n NO cuenta.
+
+**T3 — Promoción Vendedores → encargo (camino único)**:
+- "Promover a Encargo" abre `EncargoFormModal` (nueva prop opcional `initialValues` retrocompatible) con lead preseleccionado y prefill desde `leads.preferences` (`direccion`←property_address, sqm, rooms, baths, `precio_captacion`←agent_valuation). Ya NO se crea ninguna property.
+- `handleLeadPromoted` y `buildPromoteInitialValues`→PropertyFormModal eliminados: `POST /api/encargos` ya hace `closed` + `_prev_status` + log de timeline (un solo hito).
+- `PropertyFormModal` pierde la prop `markAsEncargo` y **deja de escribir/preservar `features.is_encargo`** (vestigio). OJO: al editar un inmueble viejo que tuviera el flag, el rebuild de features ya no lo preserva (instrucción explícita del brief). El dato en BD no se borra. Único resto en código: el campo opcional del tipo en `properties/types.ts` (inofensivo).
+
+**T4 — Difusión sobre `buyers_demands JOIN leads`** (`api/n8n/diffusion/route.ts`):
+- Query base: TODAS las `buyers_demands` + lookup de `leads` por `lead_id` (`id,name,phone,email,status,preferences`).
+- Funnel: descarta solo `closed`/`lost` (visit_scheduled ENTRA). Demand sin `lead_id` → incluida con `console.warn`.
+- Presupuesto real: `max_budget>0` → `max_budget >= price*(1-margen/100)`; `max_budget=0` → incluida + log `[diffusion] demand sin presupuesto, incluida`.
+- Tipo/rooms/baths desde la demand; geo (polygons/area/lat-lng) desde `lead.preferences` vía JOIN; sin lead o sin geo → sin filtro geo.
+- Matching extraído a **`src/lib/diffusionMatch.ts`** (función pura `matchDemand`, 20 tests). **Contrato del payload n8n intacto** (`recipients[{lead_id,name,phone,email,maxPricePreference}]`, ahora `maxPricePreference`←`max_budget` y name/phone/email del lead si existe, si no de la demand).
+
+**T5 — `/valoracion` dedupe**: `normalizeEsPhone` antes de toda query; SELECT→UPDATE con merge de preferences (claves nuevas pisan, resto se conserva) + name/email si informados; INSERT con phone normalizado si no existe; race 23505 con retry del SELECT.
+
+**T6 — Eventos de timeline con efecto de estado**:
+- T6.1 BuyersManager: log 'Visita física realizada' → completa la cita activa más relevante del comprador (vía `buyers_demands.lead_id`; la pasada más reciente o, si no hay pasadas, la más próxima). Sin lead/cita → toast informativo, NO toca el funnel. (Añadido `lead_id` a la interfaz local `BuyerDemand`.)
+- T6.2 WarmLeadsManager: log 'Valoración' → `advance contacted` vía `/api/leads/funnel` (⚠️ nunca `qualified`: el vendedor usa el modelo de 4 estados del PDF — decisión 3 aclarada 2026-06-10).
+
+**T7 — Data-fix `GitCommit` (vía Supabase MCP)**: `seller_activity_logs`: SELECT previo → 1 fila con `event_type='GitCommit'` → UPDATE a `'Adquisición'` → verificación: 0 GitCommit, 3 Adquisición. El código (`POST /api/encargos`) ya escribe 'Adquisición'.
+
+**Gotchas para futuros agentes**:
+- Dos claves de reversión en `leads.preferences` que NO deben confundirse: `_prev_status` (flujo de encargos) y `_visit_prev_status` (flujo de citas, leadFunnel).
+- El funnel del VENDEDOR es manual (4 estados: new/contacted/closed/lost según PDF); ningún automatismo debe meterlo en `qualified`/`visit_scheduled`. El re-etiquetado visual del dropdown (STATUS_CONFIG sigue con 6 entradas) va en un brief de UI posterior.
+- `EncargoFormModal` ahora acepta `initialValues` (prefill); el reset al cerrar NO limpia los initialValues si el componente permanece montado con open=false — WarmLeadsManager lo monta condicionalmente, así que no afecta.
+- Pre-existente (NO tocado, fuera de alcance): la entrevista encadenada desde reserva web (`startInterviewFromWebBooking`) no marca `mode`, por lo que al completarse pasa por `finalizeScheduling` modo pre_schedule e inserta una SEGUNDA cita con el mismo scheduledAt que la reserva web original. Candidato a fix en brief futuro.
+
+---
+
 ### 2026-06-09 — Sprint cancelación bulletproof + diagnóstico typing/read #006
 
 **Commits**:
