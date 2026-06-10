@@ -327,6 +327,21 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
 
       if (error) throw error;
 
+      // Brief #007 T6.2: enviar la valoración ES un contacto saliente → el
+      // vendedor queda al menos en "Contacto establecido". El helper de
+      // funnel es server-side (service-role) → pasamos por /api/leads/funnel.
+      // Forward-only: no-op si ya está más avanzado. ⚠️ target='contacted',
+      // nunca 'qualified' (no existe en el funnel del vendedor, decisión 3).
+      if (newLogType === 'Valoración') {
+        void fetch("/api/leads/funnel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId: selectedLead.id, action: "advance", target: "contacted" }),
+        })
+          .then(() => fetchSellers())
+          .catch((err) => console.warn("[WarmLeadsManager] advance funnel falló:", err));
+      }
+
       // Si el asesor eligió fecha/hora, además creamos una cita en el Calendario
       // vinculada al lead (recordatorio + visibilidad en agenda).
       if (newLogDateTime) {

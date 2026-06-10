@@ -35,6 +35,8 @@ import toast from "react-hot-toast";
 // ─── TYPES ─────────────────────────────────────────────────────────────
 interface BuyerDemand {
   id: string;
+  /** FK a leads (R9 Ola 5). Null en demands antiguas sin lead vinculado. */
+  lead_id: string | null;
   name: string;
   phone: string | null;
   email: string | null;
@@ -334,6 +336,47 @@ export default function BuyersManager() {
     }
   };
 
+  // Brief #007 T6.1: al registrar 'Visita física realizada', marcar como
+  // completada la cita activa más relevante del comprador: la más reciente
+  // ya pasada (scheduled_at <= ahora) o, si no hay pasadas, la más próxima.
+  // Fire-and-soft: el log ya quedó insertado; si no hay cita, solo informa.
+  const completeMostRecentAppointment = async () => {
+    if (!selectedBuyer) return;
+    if (!selectedBuyer.lead_id) {
+      toast("Hito registrado (la demanda no tiene lead vinculado: sin cita que completar)", { icon: 'ℹ️' });
+      return;
+    }
+    try {
+      const { data: active, error } = await supabase
+        .from('appointments')
+        .select('id, scheduled_at')
+        .eq('lead_id', selectedBuyer.lead_id)
+        .in('status', ['pending', 'confirmed'])
+        .order('scheduled_at', { ascending: false });
+      if (error) throw error;
+      if (!active || active.length === 0) {
+        toast("Hito registrado (sin cita pendiente que completar)", { icon: 'ℹ️' });
+        return;
+      }
+
+      const now = Date.now();
+      // Orden descendente → la primera con scheduled_at <= ahora es la pasada
+      // más reciente; si todas son futuras, la última del array es la más próxima.
+      const past = active.find(a => new Date(a.scheduled_at).getTime() <= now);
+      const target = past || active[active.length - 1];
+
+      const { error: updError } = await supabase
+        .from('appointments')
+        .update({ status: 'completed' })
+        .eq('id', target.id);
+      if (updError) throw updError;
+      toast.success("Visita marcada como completada en el Calendario ✅");
+    } catch (err: any) {
+      console.error("No se pudo completar la cita asociada:", err.message);
+      toast("Hito registrado, pero no se pudo completar la cita en el Calendario", { icon: '⚠️' });
+    }
+  };
+
   // Timeline Event Form Submit (Add/Edit)
   const handleLogSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -370,6 +413,12 @@ export default function BuyersManager() {
 
         if (error) throw error;
         toast.success("Actividad registrada en la línea de tiempo");
+
+        // Brief #007 T6.1: 'Visita física realizada' completa la cita más
+        // relevante del comprador en el Calendario. NO toca el funnel del lead.
+        if (logType === 'Visita física realizada') {
+          await completeMostRecentAppointment();
+        }
       }
 
       setLogTitle("");
