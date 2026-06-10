@@ -27,6 +27,7 @@ import {
   type OwnerInput,
   type PartyInput,
   type GenForm,
+  type DocIntent,
   STATUS_LABEL,
   EMAIL_RE,
   emptyOwner,
@@ -54,7 +55,14 @@ interface BuyerDemandOption {
   status: string;
 }
 
-export default function DocumentsManager() {
+interface DocumentsManagerProps {
+  /** Intent llegado desde un evento de timeline (Brief #008 T4). */
+  docIntent?: DocIntent | null;
+  /** Avisar al padre de que el intent ya se procesó (lo limpia). */
+  onIntentConsumed?: () => void;
+}
+
+export default function DocumentsManager({ docIntent, onIntentConsumed }: DocumentsManagerProps = {}) {
   const [view, setView] = useState<"generar" | "plantillas">("generar");
   const [loading, setLoading] = useState(true);
 
@@ -82,6 +90,56 @@ export default function DocumentsManager() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  // ─── Consumo de DocIntent (Brief #008 T4) ─────────────────────────────────
+  // El intent llega al montar (DocumentsManager se monta al cambiar de tab);
+  // esperamos a que fetchAll termine para tener plantillas/leads/demands.
+  useEffect(() => {
+    if (!docIntent || loading) return;
+    consumeDocIntent(docIntent);
+    onIntentConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docIntent, loading]);
+
+  const consumeDocIntent = (intent: DocIntent) => {
+    setView("generar");
+    const tpl = templates.find((t) => detectKind(t) === intent.kind);
+    if (!tpl) {
+      toast.error(`No hay ninguna plantilla de tipo "${intent.kind}" — créala en Plantillas`);
+      return;
+    }
+    setGenTemplateId(tpl.id);
+    if (intent.buyerId) setGenBuyerId(intent.buyerId);
+
+    if (intent.kind === "nota") {
+      // 'Adquisición' en Vendedores: el leadId es el vendedor.
+      if (intent.leadId) setGenLeadId(intent.leadId);
+      openEditorSellerDoc(tpl, intent.leadId || genLeadId, "");
+      return;
+    }
+
+    if (intent.kind === "propuesta") {
+      // 'Oferta presentada' en Pedidos: el comprador viene del intent; el lead
+      // VENDEDOR del inmueble queda en el valor por defecto del paso 1 y es
+      // editable dentro del propio editor.
+      openEditorSellerDoc(tpl, genLeadId, intent.buyerId || "");
+      return;
+    }
+
+    // 'Contrato firmado': el contrato parte de una propuesta de origen. Si el
+    // comprador tiene una propuesta vinculada (buyer_id, T3), la usamos; si no,
+    // dejamos el paso 1 con la plantilla preseleccionada para que se elija.
+    const proposalTplIds = templates.filter((t) => detectKind(t) === "propuesta").map((t) => t.id);
+    const proposal = intent.buyerId
+      ? generated.find((g) => proposalTplIds.includes(g.template_id || "") && g.buyer_id === intent.buyerId)
+      : undefined;
+    if (proposal) {
+      setGenProposalId(proposal.id);
+      openEditorFromProposal(tpl, proposal.id);
+    } else {
+      toast("Elige la propuesta de origen para pre-rellenar el contrato", { icon: "📄" });
+    }
+  };
 
   const fetchAll = async () => {
     setLoading(true);
@@ -117,11 +175,20 @@ export default function DocumentsManager() {
     if (kind === "contrato") return openEditorFromProposal(template);
     if (kind === "comprador") return openEditorBuyerDoc(template);
 
-    const lead = sellerLeads.find((l) => l.id === genLeadId);
+    return openEditorSellerDoc(template, genLeadId, genBuyerId);
+  };
+
+  /**
+   * Camino nota/propuesta parametrizado (Brief #008 T4): lo usa tanto el botón
+   * del paso 1 (con el estado de los selectores) como el consumo de DocIntent
+   * (con valores explícitos, sin esperar al re-render de setState).
+   */
+  const openEditorSellerDoc = (template: DocumentTemplate, leadIdParam: string, buyerIdParam: string) => {
+    const lead = sellerLeads.find((l) => l.id === leadIdParam);
     if (!lead) return toast.error("Selecciona un lead vendedor");
 
     const p = lead.preferences || {};
-    const isPropuesta = kind === "propuesta";
+    const isPropuesta = detectKind(template) === "propuesta";
     const today = new Date().toISOString().slice(0, 10);
 
     // En propuesta, el "owner" que firma es el COMPRADOR (vacío, se teclea) y el
@@ -137,8 +204,8 @@ export default function DocumentsManager() {
     // Brief #008 T3: si se eligió un comprador de Pedidos, pre-rellenamos
     // owners[0] desde la demand (editable: DNI, dirección, más owners...) y
     // el INSERT guardará buyer_id → generated_documents deja de ir a NULL.
-    const selectedDemand = isPropuesta && genBuyerId
-      ? buyerDemands.find((d) => d.id === genBuyerId)
+    const selectedDemand = isPropuesta && buyerIdParam
+      ? buyerDemands.find((d) => d.id === buyerIdParam)
       : undefined;
     const ownerFromDemand: OwnerInput | null = selectedDemand
       ? {
@@ -216,8 +283,8 @@ export default function DocumentsManager() {
    * escalera de pagos, plazos, honorarios%). El usuario sólo añade los datos
    * notariales (notario, registro, IBAN, etc.).
    */
-  const openEditorFromProposal = (template: DocumentTemplate) => {
-    const propId = genProposalId;
+  const openEditorFromProposal = (template: DocumentTemplate, proposalIdParam?: string) => {
+    const propId = proposalIdParam ?? genProposalId;
     if (!propId) return toast.error("Selecciona una propuesta de origen");
     const proposal = generated.find((g) => g.id === propId);
     if (!proposal) return toast.error("Propuesta no encontrada");

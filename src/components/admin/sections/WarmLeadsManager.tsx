@@ -46,6 +46,8 @@ import { displaySource, LEAD_SOURCE_OPTIONS } from "@/lib/leadSources";
 // ─── INTERFACES & HELPER TYPES ──────────────────────────────────────────
 interface WarmLeadsManagerProps {
   leads: Lead[];
+  /** Brief #008 T4: navegar a Documentos con un intent de documento prerellenado. */
+  onGoToDocuments?: (intent: import("./DocumentsManager.types").DocIntent) => void;
 }
 
 interface SellerPreferences {
@@ -86,7 +88,7 @@ const SOURCE_OPTIONS = LEAD_SOURCE_OPTIONS;
 
 const PROPERTY_TYPES = ["Piso", "Casa", "Ático", "Dúplex", "Chalet", "Local", "Oficina", "Suelo", "Cualquiera"];
 
-export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
+export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsManagerProps) {
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────
   const [sellerLeads, setSellerLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -340,6 +342,12 @@ export default function WarmLeadsManager({ leads }: WarmLeadsManagerProps) {
         })
           .then(() => fetchSellers())
           .catch((err) => console.warn("[WarmLeadsManager] advance funnel falló:", err));
+      }
+
+      // Brief #008 T4: 'Adquisición' abre la Nota de Encargo prerellenada en
+      // Documentos (el log narrativo ya quedó insertado arriba).
+      if (newLogType === 'Adquisición') {
+        onGoToDocuments?.({ kind: 'nota', leadId: selectedLead.id });
       }
 
       // Si el asesor eligió fecha/hora, además creamos una cita en el Calendario

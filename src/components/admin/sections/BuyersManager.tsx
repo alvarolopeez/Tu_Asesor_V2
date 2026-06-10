@@ -80,7 +80,12 @@ const SEVILLA_ZONAS_PUEBLOS = Object.entries(SEVILLA_TAXONOMY)
 const PROPERTY_TYPES = ["Piso", "Casa", "Ático", "Dúplex", "Chalet", "Local", "Oficina", "Cualquiera"];
 const STATUS_OPTIONS = ['Búsqueda activa', 'En negociación', 'Con piso reservado', 'Inactivo'] as const;
 
-export default function BuyersManager() {
+interface BuyersManagerProps {
+  /** Brief #008 T4: navegar a Documentos con un intent de documento prerellenado. */
+  onGoToDocuments?: (intent: import("./DocumentsManager.types").DocIntent) => void;
+}
+
+export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = {}) {
   const [buyers, setBuyers] = useState<BuyerDemand[]>([]);
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerDemand | null>(null);
   const [activityLogs, setActivityLogs] = useState<BuyerActivityLog[]>([]);
@@ -418,6 +423,19 @@ export default function BuyersManager() {
         // relevante del comprador en el Calendario. NO toca el funnel del lead.
         if (logType === 'Visita física realizada') {
           await completeMostRecentAppointment();
+        }
+
+        // Brief #008 T4: los eventos transaccionales abren el modal de
+        // documento prerellenado en la pestaña Documentos (el log narrativo
+        // ya quedó insertado arriba).
+        if (logType === 'Oferta presentada') {
+          onGoToDocuments?.({
+            kind: 'propuesta',
+            buyerId: selectedBuyer.id,
+            leadId: selectedBuyer.lead_id ?? undefined,
+          });
+        } else if (logType === 'Contrato firmado') {
+          onGoToDocuments?.({ kind: 'contrato', buyerId: selectedBuyer.id });
         }
       }
 

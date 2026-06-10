@@ -35,6 +35,23 @@ export interface SellerLead {
   preferences: Record<string, any> | null;
 }
 
+// ─── Navegación inter-tab (Brief #008 T4) ───────────────────────────────────
+
+/**
+ * Intent de creación de documento lanzado desde un evento de timeline
+ * (Pedidos/Vendedores) hacia la pestaña Documentos. AdminDashboard lo
+ * transporta; DocumentsManager lo consume al montar (preselecciona plantilla
+ * y abre el editor) y avisa con onIntentConsumed.
+ */
+export interface DocIntent {
+  kind: "propuesta" | "contrato" | "nota";
+  /** Lead asociado: vendedor para 'nota'; lead del comprador para 'propuesta'. */
+  leadId?: string;
+  /** buyers_demands.id del comprador ('propuesta'/'contrato'). */
+  buyerId?: string;
+  encargoId?: string;
+}
+
 // ─── Form inputs ─────────────────────────────────────────────────────────────
 
 export interface OwnerInput {

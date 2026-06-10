@@ -40,6 +40,7 @@ import BlogManager from "./sections/BlogManager";
 import HeatmapManager from "./sections/HeatmapManager";
 import WebhooksManager from "./sections/WebhooksManager";
 import DocumentsManager from "./sections/DocumentsManager";
+import type { DocIntent } from "./sections/DocumentsManager.types";
 
 type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'sellers' | 'warm_sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
 
@@ -51,6 +52,13 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState("");
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  // Brief #008 T4: intent de documento lanzado desde un evento de timeline
+  // (Pedidos/Vendedores). DocumentsManager lo consume al montar y lo limpia.
+  const [docIntent, setDocIntent] = useState<DocIntent | null>(null);
+  const goToDocuments = (intent: DocIntent) => {
+    setDocIntent(intent);
+    setActiveTab('documents');
+  };
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
@@ -317,13 +325,13 @@ export default function AdminDashboard() {
             {activeTab === 'properties' && <PropertiesManager />}
 
             {/* 4. PEDIDOS (COMPRADORES) */}
-            {activeTab === 'buyers' && <BuyersManager />}
+            {activeTab === 'buyers' && <BuyersManager onGoToDocuments={goToDocuments} />}
 
             {/* 5. ENCARGOS (VENDEDORES EXCLUSIVOS) */}
             {activeTab === 'sellers' && <EncargosManager />}
 
             {/* 6. VENDEDORES (WARM LEADS) */}
-            {activeTab === 'warm_sellers' && <WarmLeadsManager leads={leads} />}
+            {activeTab === 'warm_sellers' && <WarmLeadsManager leads={leads} onGoToDocuments={goToDocuments} />}
 
             {/* 7. LIVE CHAT */}
             {activeTab === 'chat' && <ChatManager />}
@@ -341,7 +349,9 @@ export default function AdminDashboard() {
             {activeTab === 'webhooks' && <WebhooksManager />}
 
             {/* 12. DOCUMENTOS */}
-            {activeTab === 'documents' && <DocumentsManager />}
+            {activeTab === 'documents' && (
+              <DocumentsManager docIntent={docIntent} onIntentConsumed={() => setDocIntent(null)} />
+            )}
 
           </div>
         )}
