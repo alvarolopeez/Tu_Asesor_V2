@@ -160,9 +160,12 @@ export async function POST(req: NextRequest) {
 
   // 7. (Mejor-esfuerzo) Anotar la captación en el timeline del vendedor.
   try {
+    // Brief #007 T7: 'Adquisición' es un event_type existente con icono
+    // propio (maletín) en el timeline de WarmLeadsManager; antes se escribía
+    // "GitCommit" (nombre del icono de lucide colado como tipo de evento).
     await supabaseAdmin.from("seller_activity_logs").insert({
       lead_id: body.seller_lead_id,
-      event_type: "GitCommit",
+      event_type: "Adquisición",
       title: "Captado en exclusiva",
       notes: `Encargo creado · ${body.direccion || "sin dirección"} · ${
         body.honorarios_pct ? `${body.honorarios_pct}% honorarios` : "honorarios pendientes"
