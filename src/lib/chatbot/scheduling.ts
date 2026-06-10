@@ -36,6 +36,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendWhatsAppTemplate, sendWhatsAppMessage } from '@/lib/whatsapp';
 import { parseWithLLM } from './llmParser';
+import { advanceLeadStatus, setVisitScheduled, revertVisitStatus } from '@/lib/leadFunnel';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -925,6 +926,11 @@ async function finalizeScheduling(
       leadId: state.target.leadId,
     });
 
+    // Funnel (Brief #007 T2.2): entrevista completada = lead cualificado.
+    if (state.target.leadId) {
+      await advanceLeadStatus(state.target.leadId, 'qualified');
+    }
+
     await clearInterviewState(conversationId);
     await setSchedulingHint(conversationId, { pending_day: null });
 
@@ -988,6 +994,21 @@ async function finalizeScheduling(
     propertyMaxPrice,
     leadId: state.target.leadId, // R9 Ola 5: FK lead_id
   });
+
+  // Funnel (Brief #007 T2.2): el orden importa — primero qualified (solo si
+  // completó la entrevista de 3 preguntas; el camino directo con demand
+  // previa llega aquí con answers vacío), después visit_scheduled, para que
+  // _visit_prev_status quede en 'qualified'.
+  if (state.target.leadId) {
+    const interviewCompleted =
+      answers.savings !== undefined &&
+      answers.funding !== undefined &&
+      answers.tipo_compra !== undefined;
+    if (interviewCompleted) {
+      await advanceLeadStatus(state.target.leadId, 'qualified');
+    }
+    await setVisitScheduled(state.target.leadId);
+  }
 
   await clearInterviewState(conversationId);
   await setSchedulingHint(conversationId, { pending_day: null });
