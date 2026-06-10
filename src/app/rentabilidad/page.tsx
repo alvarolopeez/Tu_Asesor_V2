@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BUSINESS, ITP_DATA, IRPF_TRAMOS } from "@/lib/constants";
-import { submitLeadWithCalculation } from "@/lib/leadService";
+import { submitLeadWithCalculation, upsertMinimalBuyerDemand } from "@/lib/leadService";
 import type { RentabilidadResult } from "@/types";
 import { 
   Calculator, 
@@ -160,6 +160,18 @@ export default function RentabilidadPage() {
     setSubmitting(false);
 
     if (result.success) {
+      // Brief #008 T2: el inversor debe verse en Pedidos y entrar en la
+      // difusión → upsert mínimo de buyers_demands (su presupuesto es el
+      // precio de compra que él mismo tecleó). Fire-and-soft: si falla,
+      // el lead y el cálculo ya quedaron registrados.
+      if (result.leadId) {
+        void upsertMinimalBuyerDemand(result.leadId, {
+          name: formData.nombre,
+          phone: formData.telefono,
+          maxBudget: parseFloat(formData.precioCompra) || 0,
+          propertyType: 'Indiferente',
+        });
+      }
       setStep(3);
     } else {
       setSubmitError(result.error || 'Hubo un error. Inténtalo de nuevo.');
