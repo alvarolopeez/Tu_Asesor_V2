@@ -5,6 +5,22 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-10 — Fix cita duplicada: reserva web → entrevista WhatsApp (`mode: 'web_booking'`)
+
+**Bug** (pre-existente, detectado durante Brief #007 — ver gotcha de la entrada de abajo): `startInterviewFromWebBooking` creaba el `interview_state` SIN campo `mode`. Al completar el cliente la entrevista de 3 preguntas por WhatsApp, `finalizeScheduling` caía en la rama pre_schedule (`mode` undefined) y ejecutaba un SEGUNDO INSERT en `appointments` con el mismo lead/property/scheduled_at que la cita ya creada por `bookPublicAppointment` → cita duplicada en el CRM.
+
+**Fix** (`src/lib/chatbot/scheduling.ts`):
+- Nuevo `mode: 'web_booking'` en `InterviewState` (tercer valor junto a `pre_schedule`/`standalone`). Lo setea SOLO `startInterviewFromWebBooking`.
+- `finalizeScheduling` con `web_booking`: **salta el INSERT en appointments** pero conserva el resto del cierre — `upsertBuyerDemand` con `max_budget` real del inmueble, `advanceLeadStatus('qualified')` + `setVisitScheduled` (no-ops en la práctica porque la reserva web ya puso el lead en visit_scheduled, pero quedan como red de seguridad), y limpieza de `interview_state`/`pending_day`.
+- Aviso al asesor diferenciado: título `Perfil completado tras reserva web (Paula)` con las 3 respuestas (Álvaro ya recibió "Nueva visita reservada (web)" al crearse la cita — repetir "Nueva cita" sugería una segunda visita). Respuesta al cliente también propia (agradece el perfil y recuerda fecha, no "visita reservada" de nuevo).
+- Flujos NO afectados: `pre_schedule` (chatbot puro, sigue insertando su cita) y `standalone` (perfil sin visita) intactos — verificado con tests de regresión.
+
+**Tests**: nuevo `src/lib/chatbot/__tests__/finalizeScheduling.test.ts` (4 tests: state web_booking persiste el mode; web_booking no inserta appointment pero sí demand/funnel/aviso; pre_schedule inserta exactamente 1; standalone no inserta). Suite completa 80/80 verde + `npm run build` OK.
+
+**Pendiente de verificación E2E manual en producción**: reserva web con teléfono que tenga conversación WhatsApp activa → completar las 3 preguntas → comprobar que `appointments` tiene UNA sola fila para ese lead/inmueble/hora.
+
+---
+
 ### 2026-06-10 — Brief #007: decisiones estructurales del flujo CRM
 
 **Commits** (en orden):
@@ -58,7 +74,7 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 - Dos claves de reversión en `leads.preferences` que NO deben confundirse: `_prev_status` (flujo de encargos) y `_visit_prev_status` (flujo de citas, leadFunnel).
 - El funnel del VENDEDOR es manual (4 estados: new/contacted/closed/lost según PDF); ningún automatismo debe meterlo en `qualified`/`visit_scheduled`. El re-etiquetado visual del dropdown (STATUS_CONFIG sigue con 6 entradas) va en un brief de UI posterior.
 - `EncargoFormModal` ahora acepta `initialValues` (prefill); el reset al cerrar NO limpia los initialValues si el componente permanece montado con open=false — WarmLeadsManager lo monta condicionalmente, así que no afecta.
-- Pre-existente (NO tocado, fuera de alcance): la entrevista encadenada desde reserva web (`startInterviewFromWebBooking`) no marca `mode`, por lo que al completarse pasa por `finalizeScheduling` modo pre_schedule e inserta una SEGUNDA cita con el mismo scheduledAt que la reserva web original. Candidato a fix en brief futuro.
+- *(resuelto 2026-06-10, ver entrada superior)* Pre-existente: la entrevista encadenada desde reserva web (`startInterviewFromWebBooking`) no marcaba `mode`, por lo que al completarse pasaba por `finalizeScheduling` modo pre_schedule e insertaba una SEGUNDA cita con el mismo scheduledAt que la reserva web original. Fix: `mode: 'web_booking'`.
 
 ---
 

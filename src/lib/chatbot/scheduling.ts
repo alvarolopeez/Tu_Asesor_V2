@@ -74,8 +74,12 @@ export interface InterviewState {
    *   finalizeScheduling crea el appointment.
    * 'standalone' (T4): el cliente respondió "sí" a la oferta de perfil sin
    *   pedir visita; finalizeScheduling SOLO upserta buyers_demands.
+   * 'web_booking' (FIX cita duplicada Brief #007): la cita YA existe — la
+   *   insertó bookPublicAppointment antes de encadenar la entrevista —;
+   *   finalizeScheduling NO inserta otra: solo upserta buyers_demands,
+   *   avanza el funnel y avisa al asesor del perfil completado.
    */
-  mode?: 'pre_schedule' | 'standalone';
+  mode?: 'pre_schedule' | 'standalone' | 'web_booking';
   target: {
     propertyId: string;
     propertyTitle: string;
@@ -913,6 +917,10 @@ async function finalizeScheduling(
   conversationId: string,
 ): Promise<SchedulingHookResult> {
   const isStandalone = state.mode === 'standalone';
+  // Modo web_booking: bookPublicAppointment ya insertó la cita antes de
+  // encadenar la entrevista. Repetir aquí el INSERT duplicaba la visita
+  // en el CRM cuando el cliente completaba las 3 preguntas por WhatsApp.
+  const isWebBooking = state.mode === 'web_booking';
 
   // Modo standalone (T4): NO creamos cita. Solo enriquecemos el perfil del
   // comprador (upsert buyers_demands) y avisamos al asesor de que hay un
@@ -960,24 +968,26 @@ async function finalizeScheduling(
     };
   }
 
-  const { error: apptErr } = await supabaseAdmin.from('appointments').insert([{
-    lead_id: state.target.leadId,
-    property_id: state.target.propertyId,
-    scheduled_at: state.target.scheduledAt,
-    status: 'pending',
-    type: 'visita',
-    title: `Visita: ${state.target.propertyTitle}`,
-    notes: `Agendada por Paula (chatbot). Perfil del lead: ahorros ${answers.savings ?? '?'}€ · financiación ${answers.funding ?? '?'} · ${answers.tipo_compra ?? '?'}.`,
-    duration_minutes: 30,
-  }]);
+  if (!isWebBooking) {
+    const { error: apptErr } = await supabaseAdmin.from('appointments').insert([{
+      lead_id: state.target.leadId,
+      property_id: state.target.propertyId,
+      scheduled_at: state.target.scheduledAt,
+      status: 'pending',
+      type: 'visita',
+      title: `Visita: ${state.target.propertyTitle}`,
+      notes: `Agendada por Paula (chatbot). Perfil del lead: ahorros ${answers.savings ?? '?'}€ · financiación ${answers.funding ?? '?'} · ${answers.tipo_compra ?? '?'}.`,
+      duration_minutes: 30,
+    }]);
 
-  if (apptErr) {
-    console.error('[scheduling] insert appointment falló:', apptErr.message);
-    return {
-      response: 'Vaya, no he podido registrar la cita por un problema técnico. Aviso a Álvaro para que te confirme manualmente.',
-      shouldEscalate: true,
-      intent: 'ESCALATE',
-    };
+    if (apptErr) {
+      console.error('[scheduling] insert appointment falló:', apptErr.message);
+      return {
+        response: 'Vaya, no he podido registrar la cita por un problema técnico. Aviso a Álvaro para que te confirme manualmente.',
+        shouldEscalate: true,
+        intent: 'ESCALATE',
+      };
+    }
   }
 
   const { data: prop } = await supabaseAdmin
@@ -1020,21 +1030,46 @@ async function finalizeScheduling(
   // sendWhatsAppTemplate ya lo loguea sin romper este flow. La cita queda
   // creada y visible en el CRM aunque Álvaro no reciba el ping.
   if (ADVISOR_PHONE) {
-    const summary = [
-      state.target.leadName,
-      state.target.leadPhone,
-      `"${state.target.propertyTitle}"`,
-      when,
-    ].join(' · ');
+    // web_booking: Álvaro ya recibió "Nueva visita reservada (web)" al
+    // crearse la cita — aquí lo nuevo es el perfil, no la reserva.
+    const summary = isWebBooking
+      ? [
+          state.target.leadName,
+          state.target.leadPhone,
+          `"${state.target.propertyTitle}"`,
+          `ahorros ${answers.savings ?? '?'}€`,
+          `financiación ${answers.funding ?? '?'}`,
+          answers.tipo_compra ?? '?',
+        ].join(' · ')
+      : [
+          state.target.leadName,
+          state.target.leadPhone,
+          `"${state.target.propertyTitle}"`,
+          when,
+        ].join(' · ');
     void sendWhatsAppTemplate(
       ADVISOR_PHONE,
       'aviso_alvaro',
-      ['Nueva cita reservada por Paula', summary],
-      { normalize: true, logTag: '[scheduling][aviso asesor]' },
+      [
+        isWebBooking ? 'Perfil completado tras reserva web (Paula)' : 'Nueva cita reservada por Paula',
+        summary,
+      ],
+      { normalize: true, logTag: isWebBooking ? '[scheduling][web-booking-profile]' : '[scheduling][aviso asesor]' },
     );
   }
 
   const propLabel = formatPropertyName(state.target.propertyTitle, state.target.propertyZone);
+
+  if (isWebBooking) {
+    return {
+      response:
+        `¡Genial, muchas gracias! 🙌 Con esto Álvaro preparará tu visita a ${propLabel} a tu medida. ` +
+        `Te esperamos el *${when}*. Si necesitas cambiar la hora, dímelo por aquí.`,
+      shouldEscalate: false,
+      intent: 'schedule_visit_confirmed',
+    };
+  }
+
   return {
     response:
       `✅ ¡Listo! Visita reservada para *${when}* en ${propLabel}. ` +
@@ -1719,6 +1754,10 @@ export async function startInterviewFromWebBooking(params: {
     step: 1,
     answers: {},
     attempts: 0,
+    // La cita ya la insertó bookPublicAppointment — sin este mode,
+    // finalizeScheduling caía en la rama pre_schedule y creaba una
+    // SEGUNDA cita idéntica al completarse la entrevista (bug Brief #007).
+    mode: 'web_booking',
     target: {
       propertyId: params.propertyId,
       propertyTitle: params.propertyTitle,
