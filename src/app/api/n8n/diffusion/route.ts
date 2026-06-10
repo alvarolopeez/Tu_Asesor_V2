@@ -1,62 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { matchDemand } from '@/lib/diffusionMatch';
 
 /**
  * Proxy server-side para la difusión IA de campañas WhatsApp vía n8n.
- * 
+ *
  * SEGURIDAD MIGRADA (Fase 3 — 2026-05-22):
  * - El frontend ya NO calcula las coincidencias localmente ni expone datos confidenciales de leads compradores.
  * - Este endpoint recibe únicamente: property_id, price_margin, geo_radius.
  * - La lógica de cruce (Smart Matchmaker) se ejecuta enteramente en el servidor de forma segura.
- * - Los leads coincidentes se cruzan directamente en el backend usando la BD Supabase.
  * - El payload enriquecido con los destinatarios confidenciales se envía internamente a n8n.
  * - La API Key de n8n se mantiene 100% protegida del lado del servidor.
- * 
- * @updated 2026-05-22 — Coordinado con Agente CRM y Agente de Seguridad
+ *
+ * MATCHING SOBRE buyers_demands (Brief #007 T4 — 2026-06-10):
+ * - La fuente canónica del perfil comprador es `buyers_demands` (JOIN con
+ *   `leads` vía lead_id para funnel y datos geo). `leads.preferences` queda
+ *   como metadata de origen, NO para matching (salvo polygons/geo).
+ * - Funnel: se descartan solo leads `closed`/`lost` (visit_scheduled ENTRA).
+ * - Presupuesto real: `max_budget` de la demand (antes se leía
+ *   `preferences.maxPrice`, que la entrevista de Paula nunca escribía).
+ * - El contrato del payload hacia n8n NO cambia (`Separar Destinatarios`
+ *   espera los mismos campos).
+ *
+ * @updated 2026-06-10 — Brief #007 T4
  */
 
 const N8N_API_KEY = process.env.N8N_API_KEY || '';
-
-// ─── FUNCIONES AUXILIARES DE COINCIDENCIA GEOGRÁFICA ───
-
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371; // Radio de la tierra en km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c; // Distancia en km
-}
-
-function getPolygonCentroid(polygon: [number, number][]): [number, number] {
-  let latSum = 0;
-  let lngSum = 0;
-  polygon.forEach(([lat, lng]) => {
-    latSum += lat;
-    lngSum += lng;
-  });
-  return [latSum / polygon.length, lngSum / polygon.length];
-}
-
-function isPointInPolygon(point: [number, number], polygon: [number, number][]): boolean {
-  const [lat, lng] = point;
-  let isInside = false;
-
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [latI, lngI] = polygon[i];
-    const [latJ, lngJ] = polygon[j];
-
-    const intersect = ((lngI > lng) !== (lngJ > lng))
-        && (lat < (latJ - latI) * (lng - lngI) / (lngJ - lngI) + latI);
-        
-    if (intersect) isInside = !isInside;
-  }
-
-  return isInside;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,91 +65,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Obtener leads compradores activos
-    const { data: leads, error: leadsError } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('type', 'buyer')
-      .in('status', ['new', 'contacted', 'qualified']);
+    // 2. Obtener TODAS las demands de compradores (fuente canónica del perfil).
+    const { data: demands, error: demandsError } = await supabase
+      .from('buyers_demands')
+      .select('id, lead_id, name, phone, email, max_budget, property_type, rooms, bathrooms');
 
-    if (leadsError || !leads) {
-      console.error('[N8N Diffusion Backend] Error obteniendo leads:', leadsError);
+    if (demandsError || !demands) {
+      console.error('[N8N Diffusion Backend] Error obteniendo buyers_demands:', demandsError);
       return NextResponse.json(
-        { error: 'Failed to retrieve buyer leads' },
+        { error: 'Failed to retrieve buyer demands' },
         { status: 500 }
       );
     }
 
-    // 3. Ejecutar algoritmo de coincidencia (Smart Matchmaker) seguro en servidor
+    // 3. JOIN con leads por lead_id: funnel (status) + datos geo (preferences).
+    const leadIds = demands
+      .map((d: any) => d.lead_id)
+      .filter((id: string | null): id is string => !!id);
+    const leadsById = new Map<string, any>();
+    if (leadIds.length > 0) {
+      const { data: linkedLeads, error: leadsError } = await supabase
+        .from('leads')
+        .select('id, name, phone, email, status, preferences')
+        .in('id', leadIds);
+      if (leadsError) {
+        console.error('[N8N Diffusion Backend] Error obteniendo leads vinculados:', leadsError);
+        return NextResponse.json(
+          { error: 'Failed to retrieve linked leads' },
+          { status: 500 }
+        );
+      }
+      (linkedLeads || []).forEach((l: any) => leadsById.set(l.id, l));
+    }
+
+    // 4. Ejecutar el matching puro (ver src/lib/diffusionMatch.ts).
     // Las coordenadas viven en el jsonb `features` y pueden venir como string;
     // las forzamos a número para que la geometría (Haversine / point-in-polygon)
     // no opere sobre strings. (#5: endurecido 2026-06-04.)
-    const propLatRaw = property.features?.latitude;
-    const propLngRaw = property.features?.longitude;
-    const propLatNum = Number(propLatRaw);
-    const propLngNum = Number(propLngRaw);
-    const propLat = Number.isFinite(propLatNum) ? propLatNum : undefined;
-    const propLng = Number.isFinite(propLngNum) ? propLngNum : undefined;
-    const propPrice = Number(property.price);
-    const propType = property.features?.propertyType;
-    const propRooms = Number(property.features?.rooms || 0);
-    const propBaths = Number(property.features?.baths || 0);
+    const propLatNum = Number(property.features?.latitude);
+    const propLngNum = Number(property.features?.longitude);
+    const propertyParams = {
+      price: Number(property.price),
+      propertyType: property.features?.propertyType,
+      rooms: Number(property.features?.rooms || 0),
+      baths: Number(property.features?.baths || 0),
+      lat: Number.isFinite(propLatNum) ? propLatNum : undefined,
+      lng: Number.isFinite(propLngNum) ? propLngNum : undefined,
+    };
 
-    const matches = leads.filter((buyer: any) => {
-      const prefs = buyer.preferences || {};
-      const polygons = prefs.polygons;
-      const area = prefs.area;
-
-      // Filtro Espacial (Customizable Radius)
-      if (propLat !== undefined && propLng !== undefined) {
-        let locationMatch = false;
-        let hasLocationPreferences = false;
-
-        if (polygons && Array.isArray(polygons) && polygons.length > 0) {
-          hasLocationPreferences = true;
-          locationMatch = polygons.some((poly: any) => {
-            if (!Array.isArray(poly) || poly.length < 3) return false;
-            if (isPointInPolygon([propLat, propLng], poly as [number, number][])) return true;
-            const [cLat, cLng] = getPolygonCentroid(poly);
-            return getDistance(propLat, propLng, cLat, cLng) <= geo_radius;
-          });
-        } else if (area && Array.isArray(area) && area.length >= 3) {
-          hasLocationPreferences = true;
-          if (isPointInPolygon([propLat, propLng], area as [number, number][])) {
-            locationMatch = true;
-          } else {
-            const [cLat, cLng] = getPolygonCentroid(area);
-            locationMatch = getDistance(propLat, propLng, cLat, cLng) <= geo_radius;
-          }
-        } else if (prefs.latitude && prefs.longitude) {
-          hasLocationPreferences = true;
-          locationMatch = getDistance(propLat, propLng, prefs.latitude, prefs.longitude) <= geo_radius;
-        }
-
-        if (hasLocationPreferences && !locationMatch) return false;
+    const matches = demands.filter((demand: any) => {
+      const lead = demand.lead_id ? leadsById.get(demand.lead_id) || null : null;
+      const result = matchDemand({
+        demand,
+        lead,
+        property: propertyParams,
+        priceMargin: price_margin,
+        geoRadius: geo_radius,
+      });
+      if (!result.match) return false;
+      if (result.warnings.includes('no_lead')) {
+        console.warn(`[diffusion] demand ${demand.id} sin lead_id, incluida sin filtro de funnel/geo`);
       }
-
-      // Filtro de Margen de Presupuesto (negotiable up to ±PriceMargin%)
-      if (prefs.maxPrice) {
-        const minAcceptableBuyerBudget = propPrice * (1 - price_margin / 100);
-        if (Number(prefs.maxPrice) < minAcceptableBuyerBudget) return false;
+      if (result.warnings.includes('no_budget')) {
+        console.warn(`[diffusion] demand ${demand.id} sin presupuesto, incluida`);
       }
-
-      // Filtro de Tipo de Inmueble
-      if (prefs.propertyType && prefs.propertyType !== "Indiferente" && propType && propType !== "Indiferente" && prefs.propertyType !== propType) {
-        return false;
-      }
-
-      // Filtro de Habitaciones y Baños Mínimos
-      if (prefs.minRooms && propRooms < Number(prefs.minRooms)) return false;
-      if (prefs.minBaths && propBaths < Number(prefs.minBaths)) return false;
-
       return true;
     });
 
     console.log(`[N8N Diffusion Backend] Cruce seguro completado. Encontradas ${matches.length} coincidencias.`);
 
-    // 4. Construir payload enriquecido seguro (oculto del navegador)
+    // 5. Construir payload enriquecido seguro (oculto del navegador).
+    //    Mismo contrato que antes: el workflow n8n no se toca.
     const richPayload = {
       event: "real_estate_ai_diffusion",
       property: {
@@ -200,16 +155,19 @@ export async function POST(request: NextRequest) {
         priceMargin: price_margin,
         geoRadius: geo_radius
       },
-      recipients: matches.map(m => ({
-        lead_id: m.id,
-        name: m.name,
-        phone: m.phone,
-        email: m.email,
-        maxPricePreference: m.preferences?.maxPrice
-      }))
+      recipients: matches.map((m: any) => {
+        const lead = m.lead_id ? leadsById.get(m.lead_id) || null : null;
+        return {
+          lead_id: m.lead_id || null,
+          name: lead?.name || m.name,
+          phone: lead?.phone || m.phone,
+          email: lead?.email || m.email,
+          maxPricePreference: m.max_budget
+        };
+      })
     };
 
-    // 5. Reenviar payload enriquecido al Webhook de n8n
+    // 6. Reenviar payload enriquecido al Webhook de n8n
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
@@ -222,7 +180,7 @@ export async function POST(request: NextRequest) {
       return { ok: false, status: 500, statusText: 'Offline/Simulated' } as Response;
     });
 
-    // 6. Registrar en BD el log de auditoría completo con el payload completo
+    // 7. Registrar en BD el log de auditoría completo con el payload completo
     await supabase.from('n8n_webhook_logs').insert({
       webhook_name: "smart_ai_diffusion",
       source: "server_proxy",
