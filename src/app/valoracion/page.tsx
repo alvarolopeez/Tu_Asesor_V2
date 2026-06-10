@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { normalizeEsPhone } from '@/lib/phone'
 import Link from 'next/link'
 import { Check, ChevronLeft, ChevronRight, X, Building2, Home, Building, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -112,34 +113,86 @@ export default function ValoracionPage() {
       // (ver pestaña "Vendedores" → promoción a encargo en exclusiva).
       const addressFull = `${formData.street} ${formData.number}, Piso ${formData.floor}, ${formData.zipcode} ${formData.city}`
 
-      const { error: leadError } = await supabase
-        .from('leads')
-        .insert([{
-          name: `${formData.name} ${formData.surname}`.trim(),
-          phone: formData.phone,
-          email: formData.email,
-          type: 'seller',
-          source: 'Calculadora Valoración',
-          preferences: {
-            property_address: addressFull,
-            property_type: formData.propertyType,
-            street: formData.street,
-            number: formData.number,
-            floor: formData.floor,
-            elevator: formData.hasElevator,
-            city: formData.city,
-            zipcode: formData.zipcode,
-            sqm: formData.sqm ? Number(formData.sqm) : undefined,
-            rooms: formData.rooms,
-            baths: formData.baths,
-            condition: formData.condition,
-            hasTerrace: formData.hasTerrace,
-            hasGarage: formData.hasGarage,
-            rgpd_accepted: formData.privacyCheck
-          }
-        }])
+      // Brief #007 T5: dedupe por teléfono normalizado (E.164). Antes cada
+      // envío insertaba un lead nuevo; con el UNIQUE INDEX leads_phone_unique
+      // el segundo envío fallaba con 23505 y el usuario veía un error.
+      const normalizedPhone = normalizeEsPhone(formData.phone)
+      const fullName = `${formData.name} ${formData.surname}`.trim()
+      const newPreferences = {
+        property_address: addressFull,
+        property_type: formData.propertyType,
+        street: formData.street,
+        number: formData.number,
+        floor: formData.floor,
+        elevator: formData.hasElevator,
+        city: formData.city,
+        zipcode: formData.zipcode,
+        sqm: formData.sqm ? Number(formData.sqm) : undefined,
+        rooms: formData.rooms,
+        baths: formData.baths,
+        condition: formData.condition,
+        hasTerrace: formData.hasTerrace,
+        hasGarage: formData.hasGarage,
+        rgpd_accepted: formData.privacyCheck
+      }
 
-      if (leadError) throw leadError
+      // Merge sobre lead existente: las claves nuevas del formulario pisan
+      // las antiguas del mismo nombre; el resto (agent_valuation, notas...)
+      // se conserva.
+      const updateExistingLead = async (
+        leadId: string,
+        existingPrefs: Record<string, unknown> | null,
+      ) => {
+        const { error } = await supabase
+          .from('leads')
+          .update({
+            preferences: { ...(existingPrefs || {}), ...newPreferences },
+            ...(fullName ? { name: fullName } : {}),
+            ...(formData.email ? { email: formData.email } : {}),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', leadId)
+        if (error) throw error
+      }
+
+      const findExistingLead = async () => {
+        const { data, error } = await supabase
+          .from('leads')
+          .select('id, preferences')
+          .eq('phone', normalizedPhone)
+          .limit(1)
+        if (error) throw error
+        return data && data.length > 0 ? data[0] : null
+      }
+
+      const existing = await findExistingLead()
+      if (existing) {
+        await updateExistingLead(existing.id, existing.preferences as Record<string, unknown> | null)
+      } else {
+        const { error: leadError } = await supabase
+          .from('leads')
+          .insert([{
+            name: fullName,
+            phone: normalizedPhone,
+            email: formData.email,
+            type: 'seller',
+            source: 'Calculadora Valoración',
+            preferences: newPreferences
+          }])
+
+        if (leadError) {
+          // Race con el UNIQUE INDEX (dos envíos simultáneos del mismo
+          // teléfono): reintentar el SELECT y hacer el merge. Mismo patrón
+          // que findOrCreateLead en el webhook de WhatsApp.
+          if ((leadError as { code?: string }).code === '23505') {
+            const retry = await findExistingLead()
+            if (!retry) throw leadError
+            await updateExistingLead(retry.id, retry.preferences as Record<string, unknown> | null)
+          } else {
+            throw leadError
+          }
+        }
+      }
 
       nextStep()
     } catch (error) {
