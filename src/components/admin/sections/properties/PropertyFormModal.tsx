@@ -26,12 +26,6 @@ interface PropertyFormModalProps {
    * prerellenamos desde `leads.preferences`). Se ignora en modo edición.
    */
   initialValues?: Partial<PropertyFormValues>;
-  /**
-   * Si `true`, la propiedad creada/guardada se marca como encargo en exclusiva
-   * (`features.is_encargo = true`). Se usa desde "Subir encargo" y la promoción
-   * de leads. En modo edición normal se preserva el valor existente.
-   */
-  markAsEncargo?: boolean;
   /** Texto opcional del botón de envío (override del por defecto). */
   submitLabel?: string;
 }
@@ -69,7 +63,7 @@ const FORM_DEFAULTS: PropertyFormValues = {
  * El padre solo decide cuándo se monta (pasando `editingProperty`)
  * y reacciona al `onSaved` para refrescar listas o abrir el matchmaker.
  */
-export default function PropertyFormModal({ editingProperty, onClose, onSaved, initialValues, markAsEncargo, submitLabel }: PropertyFormModalProps) {
+export default function PropertyFormModal({ editingProperty, onClose, onSaved, initialValues, submitLabel }: PropertyFormModalProps) {
   // Media uploads
   const [uploadTab, setUploadTab] = useState<'images' | 'video' | 'plan'>('images');
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
@@ -253,9 +247,9 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
           address: featData.address,
           latitude: featData.latitude,
           longitude: featData.longitude,
-          // Preservar el marcador de encargo: si se pide explícitamente (creación
-          // desde "Subir encargo"/promoción) o si ya lo era (edición de un encargo).
-          is_encargo: markAsEncargo || editingProperty?.features?.is_encargo || undefined,
+          // Brief #007 T3: `features.is_encargo` es un vestigio — los encargos
+          // viven en la tabla `encargos` (camino único POST /api/encargos).
+          // Ya no se escribe ni se preserva; el dato existente en BD no se borra.
           is_visitable_online: isVisitableOnline,
           visitable_slots: isVisitableOnline ? {
             days: AVAILABLE_DAYS.map(d => d.key).filter(day => (daySchedules[day] || []).length > 0),

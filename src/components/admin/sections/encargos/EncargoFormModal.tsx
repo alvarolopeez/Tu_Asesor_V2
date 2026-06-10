@@ -58,15 +58,26 @@ const KIND_LABELS: Record<EncargoDocumentKind, string> = {
   otros: "Otros (libre)",
 };
 
+/** Valores iniciales del formulario (promoción desde Vendedores, Brief #007 T3). */
+export interface EncargoInitialValues {
+  direccion?: string;
+  sqm?: number;
+  rooms?: number;
+  baths?: number;
+  precio_captacion?: number;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
   onCreated: (encargoId: string) => void;
   /** Lead pre-seleccionado si vienes desde "Promover a encargo" en Vendedores. */
   prefilledLeadId?: string;
+  /** Prefill opcional desde `leads.preferences` — retrocompatible. */
+  initialValues?: EncargoInitialValues;
 }
 
-export default function EncargoFormModal({ open, onClose, onCreated, prefilledLeadId }: Props) {
+export default function EncargoFormModal({ open, onClose, onCreated, prefilledLeadId, initialValues }: Props) {
   // ── Selectores ──
   const [sellerLeads, setSellerLeads] = useState<Lead[]>([]);
   const [notas, setNotas] = useState<NotaEncargoOption[]>([]);
@@ -146,6 +157,19 @@ export default function EncargoFormModal({ open, onClose, onCreated, prefilledLe
     })();
     return () => { cancelled = true; };
   }, [open]);
+
+  // Prefill al abrir desde "Promover a Encargo" (Brief #007 T3). Solo campos
+  // informados; el usuario puede editarlos antes de guardar.
+  useEffect(() => {
+    if (!open || !initialValues) return;
+    if (initialValues.direccion) setDireccion(initialValues.direccion);
+    if (initialValues.sqm != null && initialValues.sqm > 0) setSqm(String(initialValues.sqm));
+    if (initialValues.rooms != null && initialValues.rooms > 0) setRooms(String(initialValues.rooms));
+    if (initialValues.baths != null && initialValues.baths > 0) setBaths(String(initialValues.baths));
+    if (initialValues.precio_captacion != null && initialValues.precio_captacion > 0) {
+      setPrecio(String(initialValues.precio_captacion));
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset al cerrar
   useEffect(() => {
