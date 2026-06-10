@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { processMessage } from '@/lib/chatbot/engine';
 import { sendWhatsAppMessage, markWhatsAppRead } from '@/lib/whatsapp';
 import { normalizeEsPhone } from '@/lib/phone';
+import { advanceLeadStatus } from '@/lib/leadFunnel';
 
 /**
  * Webhook receptor de WhatsApp Cloud API (Meta Business).
@@ -274,6 +275,12 @@ export async function POST(request: NextRequest) {
     // 6. Enviar respuesta por WhatsApp Cloud API
     if (chatbotResponseText) {
       await sendWhatsAppMessage(parsed.phoneNumber, chatbotResponseText);
+
+      // Funnel (Brief #007 T2.4): la respuesta de Paula es el primer contacto
+      // saliente → new → contacted (forward-only, no-op si está más avanzado).
+      if (leadId) {
+        await advanceLeadStatus(leadId, 'contacted');
+      }
     }
 
     return NextResponse.json({

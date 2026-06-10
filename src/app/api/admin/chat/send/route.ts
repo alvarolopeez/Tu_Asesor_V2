@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/lib/whatsapp';
+import { advanceLeadStatus } from '@/lib/leadFunnel';
 
 const ADMIN_API_SECRET = process.env.ADMIN_API_SECRET || process.env.NEXT_PUBLIC_ADMIN_API_SECRET || '';
 
@@ -93,6 +94,12 @@ export async function POST(request: NextRequest) {
       if (!success) {
         return NextResponse.json({ error: 'Failed to send message via WhatsApp Cloud API' }, { status: 502 });
       }
+    }
+
+    // Funnel (Brief #007 T2.4): el envío manual del asesor también cuenta
+    // como contacto saliente → new → contacted (no-op si está más avanzado).
+    if (conv.lead_id) {
+      await advanceLeadStatus(conv.lead_id, 'contacted');
     }
 
     return NextResponse.json({
