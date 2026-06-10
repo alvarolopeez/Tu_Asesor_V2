@@ -282,7 +282,8 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
         if (data && data[0]) {
           await supabase.from('buyer_activity_logs').insert([{
             buyer_id: data[0].id,
-            event_type: 'Llamada telefónica',
+            // Brief #008 T5: antes 'Llamada telefónica' (no hubo llamada).
+            event_type: 'Alta en CRM',
             title: 'Perfil registrado en CRM',
             notes: `Se ha dado de alta a ${formName} con una demanda de compra de tipo ${formPropertyType} por un presupuesto máximo de ${Number(formMaxBudget).toLocaleString('es-ES')}€.`,
             event_date: new Date().toISOString()
@@ -537,6 +538,16 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
         return { color: 'bg-amber-500 border-amber-600', textColor: 'text-amber-400', label: '💰 Oferta' };
       case 'Contrato firmado':
         return { color: 'bg-emerald-500 border-emerald-600', textColor: 'text-emerald-400', label: '✍️ Contrato' };
+      // Brief #008 T5: tipos legibles por origen. Los antiguos ('IA WhatsApp',
+      // 'Llamada telefónica' como auto) se conservan por filas legacy.
+      case 'Registro web':
+        return { color: 'bg-sky-500 border-sky-600', textColor: 'text-sky-400', label: '🌐 Registro web' };
+      case 'Actualización web':
+        return { color: 'bg-sky-500 border-sky-600', textColor: 'text-sky-400', label: '🌐 Actualización web' };
+      case 'Reserva web':
+        return { color: 'bg-cyan-500 border-cyan-600', textColor: 'text-cyan-400', label: '📅 Reserva web' };
+      case 'Alta en CRM':
+        return { color: 'bg-teal-500 border-teal-600', textColor: 'text-teal-400', label: '📋 Alta en CRM' };
       case 'IA WhatsApp':
         return { color: 'bg-purple-500 border-purple-600', textColor: 'text-purple-400', label: '🤖 IA WhatsApp' };
       case 'Visita web':

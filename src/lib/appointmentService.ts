@@ -177,7 +177,8 @@ export async function bookPublicAppointment(
             .from('buyer_activity_logs')
             .insert([{
               buyer_id: newBuyer.id,
-              event_type: 'IA WhatsApp',
+              // Brief #008 T5: antes 'IA WhatsApp' (mentía sobre el origen).
+              event_type: 'Reserva web',
               title: 'Reserva de visita desde la web',
               notes: `Reservó visita al inmueble "${data.propertyTitle}". Perfil completo pendiente (lo recopilará el bot o Álvaro).`,
               event_date: new Date().toISOString(),

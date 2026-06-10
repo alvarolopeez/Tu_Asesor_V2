@@ -446,7 +446,8 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
           .insert([
             {
               buyer_id: existingBuyers[0].id,
-              event_type: 'IA WhatsApp',
+              // Brief #008 T5: antes 'IA WhatsApp' (mentía sobre el origen).
+              event_type: 'Actualización web',
               title: 'Actualización de perfil online',
               notes: 'El comprador ha actualizado sus preferencias desde la web pública.\nPreferencia en zonas: ' + preferredZones.join(', ') + (formData.additionalNotes ? '\n\nComentario del comprador:\n' + formData.additionalNotes : ''),
               event_date: new Date().toISOString()
@@ -492,7 +493,8 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
             .insert([
               {
                 buyer_id: newBuyer.id,
-                event_type: 'IA WhatsApp',
+                // Brief #008 T5: antes 'IA WhatsApp' (mentía sobre el origen).
+                event_type: 'Registro web',
                 title: 'Registro público online',
                 notes: 'Se ha registrado de forma autónoma desde la web pública con preferencia en zonas: ' + preferredZones.join(', ') + (formData.additionalNotes ? '\n\nComentario del comprador:\n' + formData.additionalNotes : ''),
                 event_date: new Date().toISOString()
