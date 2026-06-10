@@ -20,6 +20,21 @@ interface AppointmentFormModalProps {
   onSaved: () => void;
 }
 
+/**
+ * Funnel (Brief #007 T2.3): al cancelar/eliminar una cita desde el CRM, el
+ * lead revierte de visit_scheduled a su estado previo. El helper es
+ * server-side (service-role) → pasamos por POST /api/leads/funnel.
+ * Fire-and-soft: si falla, la cita ya quedó cancelada igualmente.
+ */
+function revertLeadVisitStatus(leadId: string | null | undefined): void {
+  if (!leadId) return;
+  void fetch("/api/leads/funnel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ leadId, action: "revert_visit" }),
+  }).catch((err) => console.warn("[AppointmentFormModal] revert funnel falló:", err));
+}
+
 /** Convierte una fecha a `YYYY-MM-DD` en horario local. */
 function toLocalDateStr(date: Date): string {
   const offset = date.getTimezoneOffset();
@@ -133,6 +148,11 @@ export default function AppointmentFormModal({
           .update(payload)
           .eq("id", editingAppointment.id);
         if (error) throw error;
+
+        // Cancelación manual → revertir el funnel del lead (Brief #007 T2.3).
+        if (formData.status === "cancelled" && editingAppointment.status !== "cancelled") {
+          revertLeadVisitStatus(editingAppointment.lead_id || formData.lead_id);
+        }
       } else {
         const { error } = await supabase
           .from("appointments")
@@ -157,6 +177,11 @@ export default function AppointmentFormModal({
         .delete()
         .eq("id", editingAppointment.id);
       if (error) throw error;
+
+      // Borrado físico → mismo efecto de funnel que una cancelación.
+      if (editingAppointment.status !== "cancelled") {
+        revertLeadVisitStatus(editingAppointment.lead_id);
+      }
 
       onSaved();
     } catch (err) {

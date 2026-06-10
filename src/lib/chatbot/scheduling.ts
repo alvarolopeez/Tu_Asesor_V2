@@ -1587,6 +1587,10 @@ export async function tryHandleCancelVisit(input: CancelHookInput): Promise<Sche
   // Limpiar flag.
   await setConversationMetadata(input.conversationId, { cancel_flow: null });
 
+  // Funnel (Brief #007 T2.3): la cancelación revierte visit_scheduled al
+  // estado previo (solo si no queda otra cita activa — lo comprueba el helper).
+  await revertVisitStatus(leadId);
+
   // G5: notificar a Álvaro.
   await notifyAdvisorOfCancellation({
     appointmentId: cancelFlow.appointmentId,
