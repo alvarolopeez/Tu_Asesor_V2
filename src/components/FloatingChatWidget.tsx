@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MessageSquare, X, Send, Bot } from "lucide-react";
+import { MessageSquare, X, Send, Bot, PhoneCall } from "lucide-react";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+}
+
+interface VisitorContact {
+  name: string;
+  phone: string;
 }
 
 export default function FloatingChatWidget() {
@@ -15,6 +20,14 @@ export default function FloatingChatWidget() {
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  // Brief #008 T7: captura opcional de contacto. Si el visitante lo deja,
+  // el route crea/vincula un lead source='web_widget'. Todo opcional: sin
+  // teléfono el chat sigue siendo anónimo como siempre.
+  const [contact, setContact] = useState<VisitorContact | null>(null);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactDismissed, setContactDismissed] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize from localStorage and add welcome message
@@ -23,7 +36,14 @@ export default function FloatingChatWidget() {
     if (savedConvId) {
       setConversationId(savedConvId);
     }
-    
+
+    try {
+      const savedContact = localStorage.getItem("chatbot_contact");
+      if (savedContact) setContact(JSON.parse(savedContact) as VisitorContact);
+    } catch {
+      // contacto corrupto en localStorage — se ignora, el chat sigue anónimo
+    }
+
     // Add welcome message only if no messages exist
     if (messages.length === 0) {
       setMessages([
@@ -48,18 +68,17 @@ export default function FloatingChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
+  const sendMessage = async (content: string, contactOverride?: VisitorContact) => {
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: inputValue.trim(),
+      content,
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInputValue("");
     setIsTyping(true);
+
+    const effectiveContact = contactOverride ?? contact;
 
     try {
       const res = await fetch("/api/chatbot/message", {
@@ -68,14 +87,18 @@ export default function FloatingChatWidget() {
         body: JSON.stringify({
           message: userMsg.content,
           conversation_id: conversationId,
-          channel: "web_widget"
+          channel: "web_widget",
+          // Campos opcionales (Brief #008 T7): el route crea/vincula el lead.
+          ...(effectiveContact?.phone
+            ? { visitor_name: effectiveContact.name, visitor_phone: effectiveContact.phone }
+            : {}),
         }),
       });
 
       if (!res.ok) throw new Error("Error en la respuesta del servidor");
 
       const data = await res.json();
-      
+
       if (data.conversation_id) {
         setConversationId(data.conversation_id);
       }
@@ -87,6 +110,12 @@ export default function FloatingChatWidget() {
       };
 
       setMessages((prev) => [...prev, botMsg]);
+
+      // Tras el primer intercambio real, ofrecer (una sola vez) dejar contacto.
+      const userCount = messages.filter((m) => m.role === "user").length + 1;
+      if (userCount >= 2 && !effectiveContact && !contactDismissed) {
+        setShowContactForm(true);
+      }
     } catch (error) {
       console.error("Chat error:", error);
       const errorMsg: Message = {
@@ -98,6 +127,32 @@ export default function FloatingChatWidget() {
     } finally {
       setIsTyping(false);
     }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim()) return;
+    const content = inputValue.trim();
+    setInputValue("");
+    await sendMessage(content);
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = contactName.trim();
+    const phone = contactPhone.trim();
+    if (!phone) return;
+
+    const newContact: VisitorContact = { name, phone };
+    setContact(newContact);
+    localStorage.setItem("chatbot_contact", JSON.stringify(newContact));
+    setShowContactForm(false);
+
+    // El contacto viaja como mensaje real: el route crea/vincula el lead y
+    // Paula responde con naturalidad. Sin tocar el engine.
+    await sendMessage(
+      `Quiero que me contacte un asesor. Soy ${name || "visitante web"} y mi teléfono es ${phone}.`,
+      newContact,
+    );
   };
 
   return (
@@ -167,9 +222,62 @@ export default function FloatingChatWidget() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Contacto opcional (Brief #008 T7) */}
+        {showContactForm && !contact && (
+          <div className="px-4 py-3 bg-[#0f172a] border-t border-[#FBBF24]/20 shrink-0">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <p className="text-xs text-slate-300">
+                <span className="text-[#FBBF24] font-bold">¿Quieres que te contacte Álvaro?</span>{" "}
+                Déjanos tu nombre y teléfono (opcional).
+              </p>
+              <button
+                type="button"
+                onClick={() => { setShowContactForm(false); setContactDismissed(true); }}
+                className="text-slate-500 hover:text-white transition-colors shrink-0"
+                aria-label="Cerrar formulario de contacto"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <form onSubmit={handleContactSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                placeholder="Nombre"
+                className="w-1/3 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-white text-xs focus:outline-none focus:border-[#FBBF24] transition-colors"
+              />
+              <input
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder="Teléfono *"
+                required
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-white text-xs focus:outline-none focus:border-[#FBBF24] transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!contactPhone.trim() || isTyping}
+                className="bg-[#FBBF24] text-[#2C3E50] text-xs font-bold px-3 py-1.5 rounded-full hover:bg-yellow-500 transition-colors disabled:opacity-50 shrink-0"
+              >
+                Enviar
+              </button>
+            </form>
+          </div>
+        )}
+
         {/* Input */}
         <div className="p-4 bg-[#0f172a] border-t border-white/10 shrink-0">
-          <form 
+          {!contact && !showContactForm && (
+            <button
+              type="button"
+              onClick={() => setShowContactForm(true)}
+              className="w-full flex items-center justify-center gap-1.5 text-[10px] text-slate-400 hover:text-[#FBBF24] transition-colors mb-2"
+            >
+              <PhoneCall size={11} /> Quiero que me contacte un asesor
+            </button>
+          )}
+          <form
             onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
             className="flex gap-2"
           >
