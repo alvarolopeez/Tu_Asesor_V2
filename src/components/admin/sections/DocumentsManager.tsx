@@ -43,6 +43,17 @@ import { detectKind, detectBuyerDocType, mergeBody } from "./DocumentsManager.ut
  * con soporte de varios propietarios y representación. Guarda en
  * `generated_documents` y permite enviar a firmar con Documenso.
  */
+/** Comprador de Pedidos (buyers_demands) seleccionable en la Propuesta — Brief #008 T3. */
+interface BuyerDemandOption {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  max_budget: number | string | null;
+  lead_id: string | null;
+  status: string;
+}
+
 export default function DocumentsManager() {
   const [view, setView] = useState<"generar" | "plantillas">("generar");
   const [loading, setLoading] = useState(true);
@@ -50,12 +61,15 @@ export default function DocumentsManager() {
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [sellerLeads, setSellerLeads] = useState<SellerLead[]>([]);
   const [generated, setGenerated] = useState<GeneratedDocument[]>([]);
+  const [buyerDemands, setBuyerDemands] = useState<BuyerDemandOption[]>([]);
 
   // Selección inicial (paso 1)
   const [genTemplateId, setGenTemplateId] = useState("");
   const [genLeadId, setGenLeadId] = useState("");
   /** Sólo para contratos: id de la propuesta a usar como origen del autorrelleno. */
   const [genProposalId, setGenProposalId] = useState("");
+  /** Sólo para propuestas: comprador de Pedidos (opcional) que firmará. Brief #008 T3. */
+  const [genBuyerId, setGenBuyerId] = useState("");
 
   // Página previa de edición (paso 2)
   const [form, setForm] = useState<GenForm | null>(null);
@@ -72,15 +86,17 @@ export default function DocumentsManager() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [{ data: tpls }, { data: leadsData }, { data: gens }] = await Promise.all([
+      const [{ data: tpls }, { data: leadsData }, { data: gens }, { data: demands }] = await Promise.all([
         supabase.from("document_templates").select("*").order("created_at", { ascending: false }),
         supabase.from("leads").select("id, name, phone, email, property_id, preferences").eq("type", "seller").order("created_at", { ascending: false }),
         supabase.from("generated_documents").select("*").order("created_at", { ascending: false }),
+        supabase.from("buyers_demands").select("id, name, phone, email, max_budget, lead_id, status").order("last_activity_at", { ascending: false }),
       ]);
 
       setTemplates((tpls || []) as DocumentTemplate[]);
       setSellerLeads((leadsData || []) as SellerLead[]);
       setGenerated((gens || []) as GeneratedDocument[]);
+      setBuyerDemands((demands || []) as BuyerDemandOption[]);
 
       if (tpls && tpls.length > 0) setGenTemplateId((tpls[0] as DocumentTemplate).id);
       if (leadsData && leadsData.length > 0) setGenLeadId((leadsData[0] as SellerLead).id);
@@ -118,15 +134,31 @@ export default function DocumentsManager() {
       direccion: "",
     };
 
+    // Brief #008 T3: si se eligió un comprador de Pedidos, pre-rellenamos
+    // owners[0] desde la demand (editable: DNI, dirección, más owners...) y
+    // el INSERT guardará buyer_id → generated_documents deja de ir a NULL.
+    const selectedDemand = isPropuesta && genBuyerId
+      ? buyerDemands.find((d) => d.id === genBuyerId)
+      : undefined;
+    const ownerFromDemand: OwnerInput | null = selectedDemand
+      ? {
+          nombre: selectedDemand.name || "",
+          dni: "",
+          telefono: selectedDemand.phone || "",
+          email: selectedDemand.email || "",
+          direccion: "",
+        }
+      : null;
+
     setForm({
       kind: isPropuesta ? "propuesta" : "nota",
       sourceProposalId: undefined,
       templateId: template.id,
       leadId: lead.id,
-      buyerId: "",
+      buyerId: selectedDemand?.id ?? "",
       lugar: p.city || "Sevilla",
       fecha: today,
-      owners: isPropuesta ? [emptyOwner()] : [ownerFromLead],
+      owners: isPropuesta ? [ownerFromDemand ?? emptyOwner()] : [ownerFromLead],
       sellers: isPropuesta ? [{ nombre: lead.name || "", nif: "", email: lead.email || "" }] : [],
       repEnabled: false,
       repNombre: "",
@@ -803,15 +835,29 @@ export default function DocumentsManager() {
                 }
 
                 return (
-                  <div>
-                    <label className={labelCls}>Lead vendedor</label>
-                    <select value={genLeadId} onChange={(e) => setGenLeadId(e.target.value)} className={inputCls}>
-                      {sellerLeads.length === 0 && <option value="">Sin leads vendedores</option>}
-                      {sellerLeads.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}{l.preferences?.property_address ? ` — ${l.preferences.property_address}` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className={labelCls}>Lead vendedor</label>
+                      <select value={genLeadId} onChange={(e) => setGenLeadId(e.target.value)} className={inputCls}>
+                        {sellerLeads.length === 0 && <option value="">Sin leads vendedores</option>}
+                        {sellerLeads.map((l) => (
+                          <option key={l.id} value={l.id}>{l.name}{l.preferences?.property_address ? ` — ${l.preferences.property_address}` : ""}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {kind === "propuesta" && (
+                      <div>
+                        <label className={labelCls}>Comprador (de Pedidos) <span className="text-slate-500 font-normal">(opcional)</span></label>
+                        <select value={genBuyerId} onChange={(e) => setGenBuyerId(e.target.value)} className={inputCls}>
+                          <option value="">— Teclear comprador a mano —</option>
+                          {buyerDemands.map((d) => (
+                            <option key={d.id} value={d.id}>{d.name}{d.phone ? ` · ${d.phone}` : ""}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-slate-500 mt-1">Si lo eliges, se pre-rellena el comprador firmante y el documento queda vinculado a su ficha de Pedidos.</p>
+                      </div>
+                    )}
+                  </>
                 );
               })()}
             </div>
