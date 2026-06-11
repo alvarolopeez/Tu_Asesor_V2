@@ -309,6 +309,40 @@ export default function ComprarPage() {
     loadAppointmentsAndSetCalendar();
   }, [selectedProperty]);
 
+  // D10/R18 (Brief #011 F1.4): el detalle del inmueble es un MODAL y no cambia
+  // la URL, así que AnalyticsTracker (usePathname) nunca registraba estas
+  // vistas y los contadores de "visitas del inmueble" salían a 0. Track
+  // explícito con page_path virtual que contiene el id (Publicación web y
+  // Operaciones cuentan filas cuyo page_path incluye el property_id). Mismo
+  // shape y session_id de localStorage que AnalyticsTracker — el endpoint
+  // devuelve 400 silencioso si falta session_id.
+  const selectedPropertyId = selectedProperty?.id;
+  useEffect(() => {
+    if (!selectedPropertyId) return;
+    try {
+      let sessionId = localStorage.getItem("analytics_session_id");
+      if (!sessionId) {
+        sessionId = typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem("analytics_session_id", sessionId);
+      }
+      void fetch("/api/analytics/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          page_path: `/comprar/p/${selectedPropertyId}`,
+          referrer: document.referrer || null,
+          user_agent: navigator.userAgent || null,
+          full_url: window.location.href,
+        }),
+      }).catch((err) => console.error("Failed to track property view:", err));
+    } catch (err) {
+      console.error("Failed to track property view:", err);
+    }
+  }, [selectedPropertyId]);
+
   const filteredProperties = properties.filter((p) => {
     const details = getPropertyDetails(p);
 
