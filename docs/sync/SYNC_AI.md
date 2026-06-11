@@ -5,6 +5,44 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Brief #011 SESIÓN C: flujo de propuesta con gate manual + flecos (F4/F5)
+
+**Commits**: `chore(gitnexus): reindex (3349 nodos, 134 flujos)` (044dded) · `feat(propuesta): firma solo comprador + buyer_signed (F4.2)` (8032726) · `feat(propuestas): gate Aceptar propuesta + cierre contrato comprador (F4.3/F4.4)` (a1dfe55) · `chore(ui): elimina Chatwoot de los filtros de canal (F5.2)` (3339a4e) · esta entrada de docs.
+
+**F4.0 — SPIKE Documenso**: verificado API v1 (`https://app.documenso.com/api/v1`). v2/v2-beta da 404 en esta cuenta. Flujo create→upload→send OK contra la cuenta real. ⚠️ `.env.local` ya corregido a `api/v1`; Netlify ya tenía `api/v1` correctamente.
+
+**F4.2 — Propuesta: firma solo comprador → `buyer_signed`**:
+- `shouldAdvisorSign` en `documenso.ts` excluye categoría "propuesta" (D7: Álvaro NO firma la propuesta).
+- Webhook `/api/webhooks/documenso` reestructurado: DOS queries independientes (no PostgREST embed — sin FK declarada). Si `status === "completed"` + categoría "propuesta" → `finalStatus = "buyer_signed"`. UPDATE usa `finalStatus`. Aviso WhatsApp a Álvaro diferenciado: mensaje propuesta ≠ mensaje doc genérico.
+
+**F4.3 — Gate "Aceptar propuesta" en el encargo**:
+- `EncargoProfileClient.tsx`: sección "Propuestas recibidas" en tab Resumen. Carga `generated_documents` con `signature_status IN ('buyer_signed','completed')` + `seller_lead_id = encargo.seller_lead_id` + `template_id = 64b8da33-e0ba-41fd-af94-4e3afde2dfc3` (único template "Propuesta de compraventa"). Muestra comprador (name de `buyers_demands`) + fecha + estado. Si hay varias, lista TODAS.
+- Botón "Aceptar propuesta" → `POST /api/proposals/[proposalId]/accept` (nuevo route).
+- `/api/proposals/[proposalId]/accept`: genera PDF "Aceptación de Propuesta" (variant legal, firmante SOLO vendedor). Idempotente (comprueba si ya existe un doc con `__source_proposal_id`). Devuelve 422 si el vendedor no tiene email. Almacena nuevo `generated_document` con `merged_data.__source_proposal_id = proposalId` y `signature_status = 'sent'`.
+- Webhook: SELECT ahora incluye `merged_data`. Si `finalStatus === "completed"` y `merged_data.__source_proposal_id` existe → UPDATE propuesta original a `completed` + evento `'Propuesta aceptada'` en `seller_activity_logs` (idempotente por marker).
+
+**F4.4 — Contrato privado + cierre comprador**:
+- Botón "Generar Contrato privado" aparece en el gate cuando la propuesta tiene `signature_status = 'completed'`. Es un Link a `?docKind=contrato&docLeadId=&docBuyerId=&docEncargoId=` (puente DocIntent existente).
+- Webhook: cuando `DOCUMENT_COMPLETED` + categoría contrato (`detectKind === 'contrato'`) + hay `buyer_id` → `closeContractBuyer(buyer_id)`: busca `buyers_demands.lead_id` → UPDATE `leads.status = 'closed'` (idempotente) + UPDATE `buyers_demands.status = 'Desactivado'` (idempotente). UPDATE DIRECTO, sin helper leadFunnel (estados terminales).
+- `shouldAdvisorSign` excluye también "aceptacion" (la firma del vendedor sobre la aceptación es solo suya).
+
+**F5.1 — Retirar nodos log_interaction de n8n**: PENDIENTE confirmación de Álvaro. No tocar workflows de producción sin su OK explícito.
+
+**F5.2 — Chatwoot cosmético**: ⚠️ existe `chatbot_conversations_channel_check` CHECK constraint con 'chatwoot' → NO se puede eliminar de la BD ni estrechar el TS type sin migración. Solo se retiró la `<option>` de los dropdowns de filtro en `ChatManager.tsx` y `WebhooksManager.tsx`. El `case 'chatwoot'` del ícono se conserva para compatibilidad con filas existentes.
+
+**Verificación**: `npm run build` verde antes de cada commit. `gitnexus_detect_changes` HIGH en F4.3/F4.4 (procesos esperados: webhook POST + EncargoProfileBody) — avisado y aceptado.
+
+**Pendiente tras Sesión C**:
+- F5.1: retirar nodos log_interaction de n8n (requiere OK explícito de Álvaro).
+- E2E manual de F4: abrir un encargo con un vendedor que tenga email → simular propuesta `buyer_signed` → clicar "Aceptar propuesta" → verificar que Documenso recibe el doc de aceptación · firmar como vendedor → verificar `signature_status = 'completed'` en propuesta + evento "Propuesta aceptada" · click "Generar Contrato privado" → verificar que DocIntent aterriza en Documentos con contrato preseleccionado.
+
+**Gotchas para futuros agentes**:
+- `generated_documents` no tiene FK explícita `template_id → document_templates.id` en PostgREST → siempre dos queries por separado (patrón establecido en `/api/documents/send` y replicado en el webhook).
+- El gate de propuestas filtra por `template_id` hardcoded (`64b8da33-e0ba-41fd-af94-4e3afde2dfc3`). Si se crea un segundo template de propuesta habrá que actualizar la query.
+- `closeContractBuyer` cae silencioso si `buyers_demands` no tiene `lead_id` (demanda sin lead asociado).
+
+---
+
 ### 2026-06-11 — Hotfix post-Sesión B (feedback directo de Álvaro) — ⚠️ F4.1 YA HECHA
 
 **Commits**: `feat(documentos): clausulas adicionales en la previa + editar/eliminar/titulo descriptivo` (773959b) · `fix(encargos): actividad del comprador visible en el timeline del encargo` (a8ed133) · `docs(brief): marca F4.1 como adelantada` (2a1160e) · esta entrada.
