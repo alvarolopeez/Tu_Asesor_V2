@@ -78,7 +78,6 @@ export default function WebhooksManager() {
             <option value="all">Todas las fuentes</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="n8n">N8N</option>
-            <option value="chatwoot">Chatwoot</option>
             <option value="web">Web</option>
           </select>
         </div>

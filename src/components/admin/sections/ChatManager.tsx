@@ -281,7 +281,6 @@ export default function ChatManager() {
               <option value="all">Canal: Todos</option>
               <option value="whatsapp">WhatsApp</option>
               <option value="web_widget">Web Widget</option>
-              <option value="chatwoot">Chatwoot</option>
             </select>
             
             <select 
