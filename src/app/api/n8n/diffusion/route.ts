@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { matchDemand } from '@/lib/diffusionMatch';
+
+// Cliente service-role para los registros de impacto (R19): diffusion_impacts
+// tiene RLS solo-authenticated y esta ruta corre server-side sin sesión.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
 
 /**
  * Proxy server-side para la difusión IA de campañas WhatsApp vía n8n.
@@ -208,6 +216,39 @@ export async function POST(request: NextRequest) {
       console.warn('[N8N Diffusion Proxy] HTTP post failed:', err.message);
       return { ok: false, status: 500, statusText: 'Offline/Simulated' } as Response;
     });
+
+    // 6b. Registro de impactos (R19, Brief #011 F1.2): una fila por destinatario
+    //     en diffusion_impacts + evento 'Difusión' en el timeline del comprador.
+    //     Fire-and-soft: si el registro falla, el envío NO se rompe.
+    if (response.ok && finalMatches.length > 0) {
+      try {
+        const now = new Date().toISOString();
+        const impactRows = finalMatches.map((m: any) => {
+          const lead = m.lead_id ? leadsById.get(m.lead_id) || null : null;
+          return {
+            property_id: property.id,
+            buyer_demand_id: m.id,
+            lead_id: m.lead_id || null,
+            phone: lead?.phone || m.phone || null,
+          };
+        });
+        const { error: impactsError } = await supabaseAdmin.from('diffusion_impacts').insert(impactRows);
+        if (impactsError) console.warn('[diffusion] insert diffusion_impacts falló:', impactsError.message);
+
+        const logRows = finalMatches.map((m: any) => ({
+          buyer_id: m.id,
+          event_type: 'Difusión',
+          title: `Difusión WhatsApp: ${property.title}`,
+          notes: 'Incluido como destinatario en la campaña Smart Matchmaker de este inmueble.',
+          event_date: now,
+          property_id: property.id,
+        }));
+        const { error: logsError } = await supabaseAdmin.from('buyer_activity_logs').insert(logRows);
+        if (logsError) console.warn('[diffusion] insert buyer_activity_logs falló:', logsError.message);
+      } catch (e) {
+        console.warn('[diffusion] registro de impactos lanzó excepción:', e);
+      }
+    }
 
     // 7. Registrar en BD el log de auditoría completo con el payload completo
     await supabase.from('n8n_webhook_logs').insert({

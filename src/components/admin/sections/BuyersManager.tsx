@@ -550,6 +550,9 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
         return { color: 'bg-cyan-500 border-cyan-600', textColor: 'text-cyan-400', label: '📅 Reserva web' };
       case 'Alta en CRM':
         return { color: 'bg-teal-500 border-teal-600', textColor: 'text-teal-400', label: '📋 Alta en CRM' };
+      // Brief #011 F1.2 (R19): impacto de difusión registrado por /api/n8n/diffusion.
+      case 'Difusión':
+        return { color: 'bg-fuchsia-500 border-fuchsia-600', textColor: 'text-fuchsia-400', label: '📣 Difusión' };
       case 'IA WhatsApp':
         return { color: 'bg-purple-500 border-purple-600', textColor: 'text-purple-400', label: '🤖 IA WhatsApp' };
       case 'Visita web':
