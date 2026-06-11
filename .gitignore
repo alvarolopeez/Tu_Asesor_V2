@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Backups locales de workflows n8n (rollback F5.1, no commitear)
+docs/sync/n8n-backups/

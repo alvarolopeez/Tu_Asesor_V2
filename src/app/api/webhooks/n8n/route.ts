@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase';
  * - update_lead_status: Cambiar estado de un lead
  * - create_appointment: Agendar una cita
  * - get_properties: Listar propiedades activas
- * - log_interaction: DEPRECADA (tombstone no-op desde Brief #009 — ver el case)
  * - send_chatbot_response: Guardar respuesta del chatbot en BD
  * 
  * Seguridad: Header "x-api-key" obligatorio
@@ -194,22 +193,10 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // ─── Registrar Interacción IA — TOMBSTONE (Brief #009 T1) ──────────
-      // La tabla `ai_interactions` está retirada (DROP 2026-06-11, decisión 6
-      // + OK de Álvaro); la telemetría real vive en
-      // `chatbot_messages.intent_detected`. Este case se conserva como no-op
-      // porque 3 workflows n8n activos (Difusión, Seguimiento, Bienvenida)
-      // aún envían la acción — y en Difusión/Seguimiento el nodo va DENTRO
-      // del loop de envíos sin neverError: un 400 abortaría la difusión tras
-      // el primer WhatsApp. Cuando se retiren esos nodos Log de n8n (brief
-      // futuro), eliminar también este tombstone.
-      case 'log_interaction': {
-        console.warn('[n8n bridge] acción deprecada log_interaction recibida (no-op):', {
-          lead_id: data?.lead_id,
-          intent: data?.intent,
-        });
-        return NextResponse.json({ success: true, deprecated: true });
-      }
+      // (El tombstone de `log_interaction` se eliminó en Brief #011 F5.1 —
+      //  2026-06-12 — tras retirar y verificar los nodos Log de los 3
+      //  workflows n8n que aún lo invocaban. Un llamador residual recibe el
+      //  400 "Unknown action" del default, que es el comportamiento correcto.)
 
       // ─── Guardar Respuesta del Chatbot ──────────────
       case 'send_chatbot_response': {
@@ -392,7 +379,6 @@ export async function POST(request: NextRequest) {
               'update_lead_status',
               'create_appointment',
               'get_properties',
-              'log_interaction',
               'send_chatbot_response',
               'get_pending_followups',
               'get_pending_visit_followups',
