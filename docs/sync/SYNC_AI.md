@@ -5,6 +5,45 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-12 — Difusión a 1 paso + fix lectura visitas web + envs blog
+
+**1. Difusión inteligente reescrita a UN SOLO PASO** (`SmartMatchmakerModal.tsx`).
+- **Bug raíz**: el modal tenía dos fuentes de datos divergentes. La 1ª lista (RPC
+  `get_matching_leads_for_property`) leía `leads.preferences.maxPrice/minRooms/propertyType` —que la
+  entrevista de Paula nunca rellena— y mostraba todo como "Sin límite / Cualquiera / -", clasificando
+  a todos como "negociable". La 2ª lista (dry_run server) sí leía `buyers_demands.max_budget` y daba
+  el dato real (ej. David 290.000€). No cuadraban.
+- **Fix**: el modal ahora usa **una sola fuente** = el matching server-side real (`/api/n8n/diffusion`
+  dry_run sobre `buyers_demands`). Lista directa de compradores cualificados con sus características
+  reales (presupuesto/tipo/hab), checkbox para excluir de la campaña, y **un único botón "Difundir"**.
+  Eliminado el flujo de 2 pasos (Revisar Destinatarios → Lanzar). Re-cruza con debounce 350ms al mover
+  los sliders.
+- **Backend**: el `dry_run` de `/api/n8n/diffusion/route.ts` ahora devuelve también
+  `propertyType, rooms, bathrooms, funnelStatus`. El payload real hacia n8n NO cambia (mismo contrato).
+
+**2. Visitas web del encargo siempre a 0** (`EncargoProfileClient.tsx`).
+- **Diagnóstico**: NO era bug de código. El tracking del detalle de inmueble (commit `92c4d9f`,
+  `/comprar/p/<id>`) se desplegó el 2026-06-11 22:14; desde entonces no hubo tráfico a ningún detalle,
+  así que `web_visits` no tenía ninguna fila `/comprar/p/%` (0 de 101). Las 4 citas del inmueble eran
+  anteriores al tracking. **Verificado end-to-end**: POST a prod `/api/analytics/track` con
+  `/comprar/p/<id>` → la query del encargo cuenta 1 (fila de prueba luego eliminada).
+- **Mejora aplicada**: la lectura pasa de "traer TODAS las filas de `web_visits` y filtrar en cliente"
+  (frágil al cap de 1000 filas) a un **count server-side con `ilike page_path`**. Misma semántica,
+  escalable. ⚠️ `OperacionesTab.tsx` mantiene el patrón fetch-all (necesita el mapa de todas las
+  propiedades; 101 filas hoy) — límite conocido a migrar si `web_visits` supera ~1000 filas.
+
+**3. Envs del blog (Brief #010)**: `CRON_SECRET` ya existía en Netlify (creado 2026-06-11 por el
+ejecutor). Añadido **`BLOG_LLM_MODEL=gemini-2.5-flash`** (scopes builds/functions/runtime). El código
+ya usaba ese modelo por defecto, así que es explicitud/future-proofing.
+⚠️ **El workflow n8n `Blog Diario Noticias` (MkaXNPdireWCIGmS) reporta 0 ejecuciones** — el scheduler
+no ha disparado nunca (revisar timezone Europe/Madrid y que no colisione con el workflow viejo
+"Generador Diario Blog"). No se auto-publicó ningún post para no generar contenido público sin OK.
+
+Build verde. Impact LOW en ambos componentes (solo los usa su importador directo). `detect_changes`:
+3 ficheros, scope esperado.
+
+---
+
 ### 2026-06-12 — Auditoría del Brief #011 + cierre de F5.1/F5.3 (brief COMPLETO al 100%)
 
 **Auditoría completa de las 3 sesiones** (commits, BD, n8n, código crítico de F4 línea a línea,

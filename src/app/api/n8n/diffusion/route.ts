@@ -146,6 +146,9 @@ export async function POST(request: NextRequest) {
 
     // 4b. dry_run (R19): devuelve los destinatarios para la preview del CRM
     //     SIN llamar a n8n, sin registrar impactos y sin log de auditoría.
+    //     Enriquecido (2026-06-12): tipo, habitaciones, baños y estado de
+    //     funnel para que el modal muestre las características reales del
+    //     comprador (la fuente canónica es buyers_demands, no leads.preferences).
     if (dry_run === true) {
       return NextResponse.json({
         success: true,
@@ -159,6 +162,10 @@ export async function POST(request: NextRequest) {
             phone: lead?.phone || m.phone,
             email: lead?.email || m.email,
             maxPricePreference: m.max_budget,
+            propertyType: m.property_type ?? null,
+            rooms: m.rooms ?? null,
+            bathrooms: m.bathrooms ?? null,
+            funnelStatus: lead?.status ?? null,
           };
         }),
       });

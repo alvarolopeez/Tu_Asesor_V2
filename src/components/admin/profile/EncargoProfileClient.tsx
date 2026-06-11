@@ -271,12 +271,18 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
         if (encargo.property_id) {
           const linked = (props || []).find((p: any) => p.id === encargo.property_id) || null;
           if (!cancelled) setLinkedProperty(linked);
+          // Visitas web = filas de web_visits cuyo page_path contiene el id del
+          // inmueble (el detalle de /comprar trackea `/comprar/p/<id>`). Count
+          // server-side con ilike: robusto al cap de 1000 filas del select y sin
+          // traer toda la tabla al cliente (fix 2026-06-12).
           const [visitsRes, apptsRes] = await Promise.all([
-            supabase.from("web_visits").select("page_path"),
+            supabase
+              .from("web_visits")
+              .select("*", { count: "exact", head: true })
+              .ilike("page_path", `%${encargo.property_id}%`),
             supabase.from("appointments").select("id").eq("property_id", encargo.property_id),
           ]);
-          const visits = ((visitsRes.data as { page_path: string }[]) || [])
-            .filter((v) => v.page_path?.includes(encargo.property_id as string)).length;
+          const visits = visitsRes.count ?? 0;
           if (!cancelled) setPropMetrics({ visits, appointments: (apptsRes.data || []).length });
         } else {
           if (!cancelled) {

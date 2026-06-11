@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, MapPin, Sparkles, Send, Settings } from "lucide-react";
 import toast from "react-hot-toast";
-import { supabase } from "@/lib/supabase";
-import type { LeadRow } from "../dashboard/types";
 import type { Property } from "./types";
 import { formatPrice } from "./propertyUtils";
 
@@ -20,7 +18,12 @@ const DEFAULT_GEO_RADIUS = 5;    // km
 // eso el workflow tenía 0 ejecuciones. Fix 2026-06-01.
 const DEFAULT_N8N_WEBHOOK = "https://alvaroolopez.app.n8n.cloud/webhook/smart-diffusion";
 
-/** Destinatario devuelto por /api/n8n/diffusion en modo dry_run (R19). */
+/**
+ * Destinatario devuelto por /api/n8n/diffusion en modo dry_run.
+ * Fuente canónica del perfil comprador: `buyers_demands` (max_budget,
+ * property_type, rooms…). NO se lee `leads.preferences` (la entrevista de Paula
+ * nunca la rellenaba → salía "Sin límite / Cualquiera" en el modal antiguo).
+ */
 interface DiffusionRecipient {
   demand_id: string;
   lead_id: string | null;
@@ -28,106 +31,104 @@ interface DiffusionRecipient {
   phone: string | null;
   email: string | null;
   maxPricePreference: number | string | null;
+  propertyType: string | null;
+  rooms: number | string | null;
+  bathrooms: number | string | null;
+  funnelStatus: string | null;
 }
 
 /**
- * Modal de difusión inteligente. Cruza la propiedad seleccionada con leads
- * compatibles (por presupuesto y radio geográfico) y permite lanzar una
- * campaña de WhatsApp vía el webhook n8n configurado.
+ * Modal de difusión inteligente — UN SOLO PASO (rediseño 2026-06-12).
  *
- * El cruce real se ejecuta server-side en Supabase RPC `get_matching_leads_for_property`
- * y el envío se enruta por `/api/n8n/diffusion` para no exponer credenciales al cliente.
+ * Cruza el inmueble con los compradores cualificados (matching server-side real
+ * sobre `buyers_demands`) y muestra DIRECTAMENTE la lista de destinatarios con
+ * sus características reales (presupuesto, tipo, habitaciones). Cada uno trae un
+ * checkbox para excluirlo de ESTA campaña; un único botón "Difundir" lanza la
+ * campaña de WhatsApp vía el webhook n8n.
+ *
+ * El cruce y el envío se ejecutan server-side en `/api/n8n/diffusion` para no
+ * exponer datos confidenciales de leads ni credenciales al navegador. El modo
+ * `dry_run` devuelve los destinatarios sin llamar a n8n ni registrar impactos.
  */
 export default function SmartMatchmakerModal({ property, onClose }: SmartMatchmakerModalProps) {
-  const [leads, setLeads] = useState<LeadRow[]>([]);
-  const [loadingLeads, setLoadingLeads] = useState(false);
   const [priceMargin, setPriceMargin] = useState<number>(DEFAULT_PRICE_MARGIN);
   const [geoRadius, setGeoRadius] = useState<number>(DEFAULT_GEO_RADIUS);
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string>(DEFAULT_N8N_WEBHOOK);
+
+  // Destinatarios reales (dry_run). Exclusión solo para ESTA campaña.
+  const [recipients, setRecipients] = useState<DiffusionRecipient[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [campaignLaunching, setCampaignLaunching] = useState(false);
 
-  // R19 (Brief #011 F1.1): preview del matching real (dry_run) con exclusión
-  // por campaña. null = aún no se ha pedido la preview.
-  const [previewRecipients, setPreviewRecipients] = useState<DiffusionRecipient[] | null>(null);
-  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
-  const [previewLoading, setPreviewLoading] = useState(false);
-
-  // Cargar leads coincidentes via RPC cuando cambian propiedad o filtros
+  // Cruce real server-side cuando cambian propiedad o filtros. Debounce 350ms
+  // para no martillear el endpoint al arrastrar los sliders.
   useEffect(() => {
-    const loadMatchmakerLeads = async () => {
-      setLoadingLeads(true);
+    let cancelled = false;
+    const controller = new AbortController();
+    setLoading(true);
+    const timer = setTimeout(async () => {
       try {
-        const { data, error } = await supabase.rpc("get_matching_leads_for_property", {
-          p_property_id: property.id,
-          p_price_margin: priceMargin,
-          p_geo_radius: geoRadius
+        const res = await fetch("/api/n8n/diffusion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            webhookUrl: n8nWebhookUrl,
+            payload: {
+              event: "real_estate_ai_diffusion",
+              property_id: property.id,
+              price_margin: priceMargin,
+              geo_radius: geoRadius,
+              dry_run: true
+            }
+          })
         });
-        if (error) throw error;
-        setLeads((data || []) as LeadRow[]);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setRecipients((data.recipients || []) as DiffusionRecipient[]);
+          // Al recalcular el cruce, reseteamos la exclusión a "todos incluidos".
+          setExcludedIds(new Set());
+        }
       } catch (err) {
-        console.error("Error loading matching leads via RPC:", err);
-        toast.error("Error al cruzar compradores con el inmueble");
+        if (!cancelled && (err as { name?: string })?.name !== "AbortError") {
+          console.error("Error al cruzar destinatarios de difusión:", err);
+          toast.error("Error al cruzar compradores con el inmueble");
+        }
       } finally {
-        setLoadingLeads(false);
+        if (!cancelled) setLoading(false);
       }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearTimeout(timer);
     };
-    loadMatchmakerLeads();
+    // n8nWebhookUrl no afecta al cruce (dry_run lo ignora) pero se envía como
+    // requisito del endpoint; lo dejamos fuera de deps a propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [property.id, priceMargin, geoRadius]);
 
-  // Métricas reactivas del cruce: under (sobrado) / target (ajustado) / over (negociable)
-  const matchmakingResult = useMemo(() => {
+  // Desglose de presupuestos (holgado / ajustado / negociable) sobre los
+  // destinatarios reales — ahora con max_budget de verdad.
+  const metrics = useMemo(() => {
     const propPrice = Number(property.price);
-
-    let under = 0;
-    let target = 0;
-    let over = 0;
-
-    leads.forEach((buyer: any) => {
-      const maxP = Number(buyer.preferences?.maxPrice || 0);
-      if (maxP >= propPrice * 1.1) {
-        under++;
-      } else if (maxP >= propPrice) {
-        target++;
-      } else {
-        over++;
-      }
+    let under = 0, target = 0, over = 0;
+    recipients.forEach((r) => {
+      const maxP = Number(r.maxPricePreference || 0);
+      if (maxP >= propPrice * 1.1) under++;
+      else if (maxP >= propPrice) target++;
+      else over++; // incluye "sin presupuesto declarado"
     });
+    return { under, target, over };
+  }, [property.price, recipients]);
 
-    return { matches: leads, metrics: { under, target, over } };
-  }, [property.price, leads]);
-
-  // R19: pide al server la lista REAL de destinatarios (dry_run) antes de lanzar.
-  const openPreview = async () => {
-    setPreviewLoading(true);
-    try {
-      const res = await fetch("/api/n8n/diffusion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          webhookUrl: n8nWebhookUrl,
-          payload: {
-            event: "real_estate_ai_diffusion",
-            property_id: property.id,
-            price_margin: priceMargin,
-            geo_radius: geoRadius,
-            dry_run: true
-          }
-        })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setPreviewRecipients((data.recipients || []) as DiffusionRecipient[]);
-      setExcludedIds(new Set());
-    } catch (err) {
-      console.error("Error al previsualizar destinatarios de difusión:", err);
-      toast.error("Error al previsualizar los destinatarios");
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
+  const includedCount = recipients.length - excludedIds.size;
 
   const toggleExcluded = (demandId: string) => {
-    setExcludedIds(prev => {
+    setExcludedIds((prev) => {
       const next = new Set(prev);
       if (next.has(demandId)) next.delete(demandId);
       else next.add(demandId);
@@ -135,17 +136,17 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
     });
   };
 
-  // Dispara la campaña via /api/n8n/diffusion (el server resuelve leads + envía a n8n)
+  // Lanza la campaña real via /api/n8n/diffusion (el server resuelve leads +
+  // envía a n8n). Excluye los destinatarios desmarcados de ESTA campaña.
   const launchWhatsAppCampaign = async () => {
+    if (includedCount === 0) return;
     setCampaignLaunching(true);
-
     const loadingToast = toast.loading("Enviando webhook y programando campaña en n8n...");
     const payload = {
       event: "real_estate_ai_diffusion",
       property_id: property.id,
       price_margin: priceMargin,
       geo_radius: geoRadius,
-      // Exclusión solo de ESTA campaña (default Q5: no se persiste).
       excluded_demand_ids: Array.from(excludedIds)
     };
 
@@ -154,21 +155,21 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ webhookUrl: n8nWebhookUrl, payload })
-      }).catch(err => {
+      }).catch((err) => {
         console.warn("N8N proxy call failed, details:", err);
         return { ok: false, status: 500, statusText: "Offline/Simulated" } as Response;
       });
-      const response = proxyResponse.ok ? await proxyResponse.json() : { ok: false, status: 500, statusText: "Proxy error" };
+      const response = proxyResponse.ok ? await proxyResponse.json() : { ok: false };
 
       toast.dismiss(loadingToast);
 
       if (proxyResponse.ok) {
-        toast.success(`¡Campaña lanzada con éxito para ${response.match_count || 0} leads!`);
+        toast.success(`¡Campaña lanzada con éxito para ${response.match_count ?? includedCount} leads!`);
         onClose();
       } else {
         toast.error("Error al lanzar la campaña en el servidor.");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast.dismiss(loadingToast);
       toast.error("Error al lanzar la campaña.");
@@ -193,7 +194,7 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
           </div>
           <div>
             <h3 className="text-2xl font-bold text-white font-heading">Cruzar Inmueble con IA (Matchmaker)</h3>
-            <p className="text-xs text-purple-300">Cruzando filtros con clientes compradores activos en base de datos</p>
+            <p className="text-xs text-purple-300">Compradores cualificados que encajan con este inmueble</p>
           </div>
         </div>
 
@@ -268,32 +269,32 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
         </div>
 
         {/* Matched Count & Visual Stacked Budget Meter */}
-        <div className="space-y-4 mb-6">
+        <div className="space-y-4 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-300 font-bold">
-              Compradores Coincidentes: <span className="text-white text-base bg-purple-500/20 px-2.5 py-1 rounded-lg border border-purple-500/30">{matchmakingResult.matches.length} leads</span>
+              Compradores cualificados: <span className="text-white text-base bg-purple-500/20 px-2.5 py-1 rounded-lg border border-purple-500/30">{recipients.length}</span>
             </span>
-            <span className="text-xs text-slate-400">Desglose de presupuestos coincidente</span>
+            <span className="text-xs text-slate-400">Desmarca a quien no quieras incluir</span>
           </div>
 
           {/* Stacked Percentage bar metric */}
           <div className="w-full h-3.5 bg-slate-800 rounded-full overflow-hidden flex">
-            {matchmakingResult.matches.length > 0 ? (
+            {recipients.length > 0 ? (
               <>
                 <div
-                  style={{ width: `${(matchmakingResult.metrics.under / matchmakingResult.matches.length) * 100}%` }}
+                  style={{ width: `${(metrics.under / recipients.length) * 100}%` }}
                   className="bg-emerald-500 h-full transition-all duration-300"
-                  title={`Comprador Premium (Presupuesto Sobrado): ${matchmakingResult.metrics.under}`}
+                  title={`Comprador Premium (Presupuesto Sobrado): ${metrics.under}`}
                 />
                 <div
-                  style={{ width: `${(matchmakingResult.metrics.target / matchmakingResult.matches.length) * 100}%` }}
+                  style={{ width: `${(metrics.target / recipients.length) * 100}%` }}
                   className="bg-[#FBBF24] h-full transition-all duration-300"
-                  title={`Presupuesto Objetivo Ajustado: ${matchmakingResult.metrics.target}`}
+                  title={`Presupuesto Objetivo Ajustado: ${metrics.target}`}
                 />
                 <div
-                  style={{ width: `${(matchmakingResult.metrics.over / matchmakingResult.matches.length) * 100}%` }}
+                  style={{ width: `${(metrics.over / recipients.length) * 100}%` }}
                   className="bg-rose-500 h-full transition-all duration-300"
-                  title={`Presupuesto Marginal (Negociable): ${matchmakingResult.metrics.over}`}
+                  title={`Presupuesto Marginal (Negociable): ${metrics.over}`}
                 />
               </>
             ) : (
@@ -305,63 +306,74 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
           <div className="flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 bg-emerald-500 rounded-full" />
-              <span className="text-slate-400">Presupuesto Holgado ({matchmakingResult.metrics.under})</span>
+              <span className="text-slate-400">Presupuesto Holgado ({metrics.under})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 bg-[#FBBF24] rounded-full" />
-              <span className="text-slate-400">Presupuesto Ajustado ({matchmakingResult.metrics.target})</span>
+              <span className="text-slate-400">Presupuesto Ajustado ({metrics.target})</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 bg-rose-500 rounded-full" />
-              <span className="text-slate-400">Presupuesto Negociable ({matchmakingResult.metrics.over})</span>
+              <span className="text-slate-400">Presupuesto Negociable ({metrics.over})</span>
             </div>
           </div>
         </div>
 
-        {/* List of matched buyers */}
-        <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar mb-6">
-          {loadingLeads ? (
-            <div className="p-6 bg-[#1E293B]/40 backdrop-blur-md rounded-xl border border-white/5 space-y-4 animate-pulse">
-              <div className="flex justify-between items-center">
-                <div className="h-4 bg-slate-700 rounded w-1/3"></div>
-                <div className="h-6 bg-slate-700 rounded w-16"></div>
-              </div>
-              <div className="space-y-3">
-                {[1, 2, 3].map((n) => (
-                  <div key={n} className="bg-[#0F172A]/50 p-4 rounded-xl border border-white/5 flex justify-between items-center">
-                    <div className="space-y-2 flex-1">
-                      <div className="h-4 bg-slate-800 rounded w-1/4"></div>
-                      <div className="h-3 bg-slate-800 rounded w-1/2"></div>
-                    </div>
-                    <div className="h-5 bg-slate-800 rounded w-20"></div>
+        {/* List of matched buyers — checkbox para incluir/excluir de la campaña */}
+        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-2 custom-scrollbar mb-6">
+          {loading ? (
+            <div className="space-y-3 animate-pulse">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-[#0F172A]/50 p-4 rounded-xl border border-white/5 flex justify-between items-center">
+                  <div className="space-y-2 flex-1">
+                    <div className="h-4 bg-slate-800 rounded w-1/4"></div>
+                    <div className="h-3 bg-slate-800 rounded w-2/3"></div>
                   </div>
-                ))}
-              </div>
-            </div>
-          ) : matchmakingResult.matches.length > 0 ? (
-            matchmakingResult.matches.map((buyer) => (
-              <div key={buyer.id} className="bg-[#0F172A] p-4 rounded-xl border border-white/5 flex justify-between items-center hover:border-purple-500/20 transition-all">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-sm">{buyer.name}</span>
-                    {buyer.phone && <span className="text-[10px] text-slate-500">{buyer.phone}</span>}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-x-3">
-                    <span>Pref: <strong className="text-slate-300">{String(buyer.preferences?.propertyType || "Cualquiera")}</strong></span>
-                    <span>Presupuesto Máx: <strong className="text-[#FBBF24]">{buyer.preferences?.maxPrice ? formatPrice(Number(buyer.preferences.maxPrice)) : "Sin límite"}</strong></span>
-                    <span>Dormitorios: <strong className="text-slate-300">{String(buyer.preferences?.minRooms || "-")}</strong></span>
-                  </div>
+                  <div className="h-5 bg-slate-800 rounded w-20"></div>
                 </div>
-                {buyer.phone && (
-                  <span className="px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-[10px] font-bold">
-                    WhatsApp Activo
-                  </span>
-                )}
-              </div>
-            ))
+              ))}
+            </div>
+          ) : recipients.length > 0 ? (
+            recipients.map((r) => {
+              const excluded = excludedIds.has(r.demand_id);
+              const maxP = Number(r.maxPricePreference || 0);
+              return (
+                <label
+                  key={r.demand_id}
+                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                    excluded
+                      ? "border-white/5 bg-[#0F172A]/40 opacity-50"
+                      : "border-white/5 bg-[#0F172A] hover:border-purple-500/20"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!excluded}
+                    onChange={() => toggleExcluded(r.demand_id)}
+                    className="accent-purple-500 w-4 h-4 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-sm truncate">{r.name}</span>
+                      {r.phone && <span className="text-[10px] text-slate-500">{r.phone}</span>}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>Tipo: <strong className="text-slate-300">{r.propertyType || "Cualquiera"}</strong></span>
+                      <span>Presupuesto: <strong className={maxP > 0 ? "text-[#FBBF24]" : "text-slate-500"}>{maxP > 0 ? formatPrice(maxP) : "Sin declarar"}</strong></span>
+                      <span>Hab: <strong className="text-slate-300">{r.rooms ? String(r.rooms) : "-"}</strong></span>
+                    </div>
+                  </div>
+                  {r.phone && (
+                    <span className="px-2.5 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded-full text-[10px] font-bold shrink-0">
+                      WhatsApp Activo
+                    </span>
+                  )}
+                </label>
+              );
+            })
           ) : (
             <div className="p-8 bg-[#0F172A] rounded-xl text-center text-slate-500 text-sm">
-              Prueba a ampliar los sliders de rango de precio o distancia geográfica para encontrar coincidencias.
+              No hay compradores cualificados con estos parámetros. Amplía los sliders de presupuesto o de distancia geográfica.
             </div>
           )}
         </div>
@@ -380,106 +392,31 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
           />
         </div>
 
-        {/* Preview de destinatarios reales con exclusión por campaña (R19) */}
-        {previewRecipients !== null && (
-          <div className="bg-[#0F172A] p-4 rounded-xl border border-purple-500/20 space-y-3 mb-6">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-300 uppercase tracking-wide">
-                Destinatarios de la campaña ({previewRecipients.length - excludedIds.size} de {previewRecipients.length})
-              </span>
-              <span className="text-[10px] text-slate-500">Desmarca a quien no quieras incluir (solo esta campaña)</span>
-            </div>
-            {previewRecipients.length === 0 ? (
-              <div className="text-center text-slate-500 text-sm py-4">
-                El matching del servidor no encontró destinatarios con estos parámetros.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-52 overflow-y-auto pr-2 custom-scrollbar">
-                {previewRecipients.map((r) => (
-                  <label
-                    key={r.demand_id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                      excludedIds.has(r.demand_id)
-                        ? 'border-white/5 bg-[#1E293B]/40 opacity-50'
-                        : 'border-purple-500/20 bg-[#1E293B]'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!excludedIds.has(r.demand_id)}
-                      onChange={() => toggleExcluded(r.demand_id)}
-                      className="accent-purple-500 w-4 h-4 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <span className="font-bold text-white text-sm block truncate">{r.name}</span>
-                      <span className="text-[10px] text-slate-400">
-                        {r.phone || "Sin teléfono"}
-                        {r.maxPricePreference && Number(r.maxPricePreference) > 0
-                          ? ` · Máx: ${formatPrice(Number(r.maxPricePreference))}`
-                          : " · Sin presupuesto"}
-                      </span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Action Buttons */}
+        {/* Action Buttons — un solo paso */}
         <div className="flex gap-4">
-          {previewRecipients === null ? (
-            <>
-              <button
-                onClick={onClose}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all text-center"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={openPreview}
-                disabled={previewLoading}
-                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/20 disabled:text-purple-700 text-white font-extrabold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/15"
-              >
-                {previewLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                    Cruzando destinatarios...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={18} /> Revisar Destinatarios
-                  </>
-                )}
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => setPreviewRecipients(null)}
-                disabled={campaignLaunching}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all text-center"
-              >
-                Volver
-              </button>
-              <button
-                onClick={launchWhatsAppCampaign}
-                disabled={campaignLaunching || previewRecipients.length - excludedIds.size === 0}
-                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/20 disabled:text-purple-700 text-white font-extrabold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/15"
-              >
-                {campaignLaunching ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                    Lanzando...
-                  </>
-                ) : (
-                  <>
-                    <Send size={18} /> Lanzar a {previewRecipients.length - excludedIds.size} destinatarios
-                  </>
-                )}
-              </button>
-            </>
-          )}
+          <button
+            onClick={onClose}
+            disabled={campaignLaunching}
+            className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all text-center"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={launchWhatsAppCampaign}
+            disabled={campaignLaunching || loading || includedCount === 0}
+            className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/20 disabled:text-purple-700 text-white font-extrabold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/15"
+          >
+            {campaignLaunching ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                Difundiendo...
+              </>
+            ) : (
+              <>
+                <Send size={18} /> Difundir a {includedCount} destinatario{includedCount === 1 ? "" : "s"}
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
