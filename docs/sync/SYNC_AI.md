@@ -5,6 +5,49 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Brief #008: limpieza de deuda + timeline con efecto (documentos)
+
+**Commits** (en orden):
+- `chore(gitnexus): reindex` (7335b26)
+- T1: `fix(leads): leadService normaliza y deduplica phone` (4c80a2b)
+- T2: `feat(rentabilidad): el inversor entra en buyers_demands (visible en Pedidos)` (b02031e)
+- T3: `feat(documentos): selector de comprador (buyers_demands) en la propuesta` (564066c)
+- T4: `feat(timeline): eventos transaccionales abren el modal de documento prerellenado` (be5dd01)
+- T5: `refactor(timeline): event_types legibles por origen + migración` (925de4c)
+- T7: `feat(widget): captura opcional de contacto en el chat web (sin tocar engine)` (7515f4a)
+
+**T1 — leadService dedupe** (`src/lib/leadService.ts` + 5 tests): `submitLeadWithCalculation` normaliza a E.164 antes de buscar/insertar; race 23505 con retry del SELECT (patrón del webhook WhatsApp). Firma pública intacta — `plusvalia`/`rentabilidad` no cambian.
+
+**T2 — `/rentabilidad` crea `buyers_demands`**: nuevo helper **`upsertMinimalBuyerDemand(leadId, {name, phone, maxBudget, propertyType})`** en `leadService` (reutilizable). Dedupe por `lead_id` y phone normalizado; NO pisa `max_budget` > 0 informado por otra vía; fire-and-soft. `/rentabilidad` lo llama tras el submit con `max_budget = precioCompra` y `property_type='Indiferente'`.
+- **RLS verificada vía MCP (NO se tocó ninguna policy)**: `buyers_demands` tiene policy `Allow all public for buyers_demands` (`ALL`, using/check = true) → el anon key de la calculadora puede insertar/actualizar (mismo modelo que `BuyerRegistrationModal`). `status` sin CHECK en BD; valor vigente: `'Búsqueda activa'` (el #007 no migró estados).
+
+**T3 — Selector de comprador en Documentos** (`DocumentsManager.tsx`): `fetchAll` carga `buyers_demands` (id, name, phone, email, max_budget, lead_id, status). En el paso 1 de la **Propuesta** hay selector opcional "Comprador (de Pedidos)": pre-rellena `owners[0]` (editable) y fija `form.buyerId` → **`generated_documents.buyer_id` deja de ser siempre NULL**. Camino manual intacto (`""`→NULL). `merged_data.__owners` no cambia de shape.
+
+**T4 — Navegación timeline → Documentos**:
+- Nuevo tipo **`DocIntent`** (`DocumentsManager.types.ts`): `{kind: 'propuesta'|'contrato'|'nota', leadId?, buyerId?, encargoId?}`.
+- `AdminDashboard`: estado `docIntent` + callback `goToDocuments(intent)` (setea intent + cambia a tab documents), pasado como prop opcional `onGoToDocuments` a `BuyersManager` y `WarmLeadsManager`. `DocumentsManager` recibe `docIntent` + `onIntentConsumed`.
+- `DocumentsManager` consume el intent en un `useEffect` cuando `!loading` (el componente se monta al cambiar de tab): preselecciona la plantilla por `detectKind` y abre el editor. `nota` → lead vendedor del intent; `propuesta` → comprador del intent prerellenado (el lead VENDEDOR queda en el default del paso 1, editable en el editor); `contrato` → si el comprador tiene propuesta vinculada por `buyer_id` (T3) la usa como origen, si no deja el paso 1 con la plantilla preseleccionada + toast.
+- Refactor interno: `openEditor` delega en `openEditorSellerDoc(template, leadId, buyerId)` y `openEditorFromProposal(template, proposalId?)` — parametrizados para no depender del re-render de setState.
+- Cableado (tras insertar el log narrativo, que se conserva): Pedidos → 'Oferta presentada' = propuesta, 'Contrato firmado' = contrato; Vendedores → 'Adquisición' = nota.
+
+**T5 — event_types legibles por origen** (decisión D13):
+- Renombrados los 4 puntos de escritura AUTO: `BuyerRegistrationModal` alta → **'Registro web'**, update → **'Actualización web'**; `appointmentService` reserva → **'Reserva web'**; `BuyersManager` alta manual CRM → **'Alta en CRM'** (antes 'Llamada telefónica' sin llamada).
+- `getTimelineIconConfig` (BuyersManager) con iconos para los 4 nuevos; los antiguos ('IA WhatsApp', 'Llamada telefónica') se conservan en el switch (filas legacy) y en el dropdown manual (no se tocó). El timeline de VENDEDORES no recibe tipos nuevos → sin cambios en WarmLeadsManager.
+- **Migración vía MCP** (SELECT previo: 4 filas en `buyer_activity_logs`, solo 1 'IA WhatsApp'): `UPDATE ... SET event_type='Reserva web' WHERE event_type='IA WhatsApp' AND title='Reserva de visita desde la web'` → 1 fila. Verificado: 0 'IA WhatsApp' restantes (queda: 1 Reserva web, 1 Oferta presentada, 2 Visita física realizada).
+
+**T6 — 'Valoración' adjunta PDF: ⚠️ DIFERIDO (sin código en este brief)**. La parte de estado ya la hizo el #007 (T6.2 → contacted). El adjunto necesita la infraestructura de documentos de perfil (tabla `lead_documents`/equivalente + bucket privado) que pide el PDF "Optimización flujo de trabajo CRM" (§1.2, §2) — se diseñará de una vez en el brief de UI/perfiles. **Dependencia marcada: no crear infra parcial.**
+
+**T7 — Widget web de Paula captura contacto** (`FloatingChatWidget.tsx` + `api/chatbot/message/route.ts`; **engine.ts y scheduling.ts SIN tocar**):
+- Widget: panel opcional nombre+teléfono tras el 2º mensaje del visitante (descartable, una sola vez) o vía botón "Quiero que me contacte un asesor". Al enviarlo, el contacto viaja como mensaje real (`visitor_name`/`visitor_phone` en el body) y se persiste en `localStorage.chatbot_contact` para mensajes posteriores.
+- Route: `visitor_phone` (campo opcional nuevo, contrato existente intacto) → `normalizeEsPhone` + crea/reutiliza lead `type='buyer', source='web_widget'` (dedupe + race 23505) y vincula `chatbot_conversations.lead_id` SOLO si era NULL. Sin teléfono → flujo anónimo de siempre. NO dispara bienvenida n8n (contacto saliente del cliente).
+
+**Gotchas para futuros agentes**:
+- `upsertMinimalBuyerDemand` vive en `leadService.ts` — usarlo para cualquier calculadora/formulario público nuevo que deba aparecer en Pedidos (no duplicar el patrón de `appointmentService`/`BuyerRegistrationModal`).
+- El intent de Documentos se consume UNA vez (`onIntentConsumed` lo limpia en AdminDashboard); si se añade otra pestaña que lance documentos, reutilizar `goToDocuments`.
+- Los `event_type` antiguos pueden seguir existiendo en BD de otros entornos: el switch de iconos conserva los casos legacy a propósito.
+
+---
+
 ### 2026-06-10 — Fix cita duplicada: reserva web → entrevista WhatsApp (`mode: 'web_booking'`)
 
 **Bug** (pre-existente, detectado durante Brief #007 — ver gotcha de la entrada de abajo): `startInterviewFromWebBooking` creaba el `interview_state` SIN campo `mode`. Al completar el cliente la entrevista de 3 preguntas por WhatsApp, `finalizeScheduling` caía en la rama pre_schedule (`mode` undefined) y ejecutaba un SEGUNDO INSERT en `appointments` con el mismo lead/property/scheduled_at que la cita ya creada por `bookPublicAppointment` → cita duplicada en el CRM.
