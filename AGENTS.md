@@ -35,7 +35,6 @@ CRM + public website for an independent real estate advisor in Seville, Spain. S
 | `src/app/api/webhooks/whatsapp/route.ts` | Meta inbound webhook (verify + receive + reply) |
 | `src/app/api/webhooks/whatsapp/status/route.ts` | Meta credentials check |
 | `src/app/api/webhooks/n8n/route.ts` | n8n bridge |
-| `src/app/api/webhooks/chatwoot/route.ts` | Chatwoot receiver |
 | `src/app/api/n8n/diffusion/route.ts` | Smart Matchmaker (server-side lead matching for broadcast) |
 | `src/app/api/chatbot/message/route.ts` | Web widget endpoint |
 | `src/app/admin/dashboard/` | Admin CRM UI |
