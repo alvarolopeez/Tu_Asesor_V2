@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Users, 
@@ -15,7 +15,6 @@ import {
   LogOut,
   LayoutDashboard,
   ExternalLink,
-  Lock,
   Calendar as CalendarIcon,
   Home,
   FileText,
@@ -28,6 +27,7 @@ import {
   DollarSign,
   Server
 } from "lucide-react";
+import AdminAuthGate from "./AdminAuthGate";
 import DashboardOverview from "./sections/DashboardOverview";
 import PropertiesManager from "./sections/PropertiesManager";
 import ReviewsManager from "./sections/ReviewsManager";
@@ -49,12 +49,6 @@ import type { DocIntent } from "./sections/DocumentsManager.types";
 type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'encargos' | 'sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
 
 export default function AdminDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState("");
-
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   // Brief #008 T4: intent de documento lanzado desde un evento de timeline
   // (Pedidos/Vendedores). DocumentsManager lo consume al montar y lo limpia.
@@ -68,46 +62,6 @@ export default function AdminDashboard() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [calculations, setCalculations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  const checkSession = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      setIsAuthenticated(true);
-      fetchData();
-    } else {
-      setIsAuthenticated(false);
-      setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError("");
-    
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setAuthError("Credenciales incorrectas.");
-      setAuthLoading(false);
-    } else {
-      setIsAuthenticated(true);
-      fetchData();
-      setAuthLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsAuthenticated(false);
-  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -128,72 +82,6 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-4">
-        <div className="bg-[#1E293B] p-8 rounded-2xl border border-white/10 w-full max-w-md shadow-2xl">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-[#FBBF24] rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock size={32} className="text-[#2C3E50]" />
-            </div>
-            <h1 className="text-2xl font-bold text-white">Acceso Administrativo</h1>
-            <p className="text-slate-400 text-sm mt-2">Introduce tus credenciales para acceder al panel.</p>
-          </div>
-          
-          <form onSubmit={handleLogin} className="space-y-4">
-            {authError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg text-center">
-                {authError}
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
-              <input 
-                type="email" 
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
-                placeholder="tu@email.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Contraseña</label>
-              <input 
-                type="password" 
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0F172A] border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-[#FBBF24] transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={authLoading}
-              className="w-full bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-bold py-3 rounded-xl transition-all disabled:opacity-50 mt-4"
-            >
-              {authLoading ? 'Verificando...' : 'Entrar al Dashboard'}
-            </button>
-            
-            {process.env.NODE_ENV === "development" && (
-              <button 
-                type="button" 
-                onClick={() => {
-                  setIsAuthenticated(true);
-                  fetchData();
-                }}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-[#FBBF24] font-bold py-2.5 rounded-xl border border-white/5 transition-all mt-2 text-xs"
-              >
-                🛠️ Auto-Bypass (Desarrollo)
-              </button>
-            )}
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   const TABS: { id: TabType; label: string; icon: React.ElementType }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
@@ -213,7 +101,12 @@ export default function AdminDashboard() {
     { id: 'webhooks', label: 'Webhook Logs', icon: Server },
   ];
 
+  // Brief #011 F3.0: el gate de auth vive en AdminAuthGate (reutilizado por
+  // las páginas completas /admin/buyers|sellers|encargos/[id]). fetchData se
+  // dispara via onAuthenticated — mismo momento que antes (sesión/login/bypass).
   return (
+    <AdminAuthGate onAuthenticated={fetchData}>
+      {({ logout }) => (
     <div className="min-h-screen bg-[#0F172A] text-slate-200 flex flex-col md:flex-row">
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between px-5 py-4 bg-[#1E293B] border-b border-white/5 sticky top-0 z-30 shadow-md">
@@ -286,9 +179,9 @@ export default function AdminDashboard() {
         </nav>
 
         <div className="p-4 border-t border-white/5">
-          <button 
+          <button
             onClick={() => {
-              handleLogout();
+              logout();
               setIsSidebarOpen(false);
             }}
             className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
@@ -361,5 +254,7 @@ export default function AdminDashboard() {
         )}
       </main>
     </div>
+      )}
+    </AdminAuthGate>
   );
 }
