@@ -3,6 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { mapDocumensoEvent } from "@/lib/documenso";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+// Función pura compartida con el CRM: mismo criterio de categoría en client
+// y server (F4.2 paso 0 lo exige así).
+import { detectKind } from "@/components/admin/sections/DocumentsManager.utils";
+import type { DocumentTemplate } from "@/components/admin/sections/DocumentsManager.types";
 
 /** Comparación en tiempo constante (evita timing attacks). */
 function secretsMatch(a: string, b: string): boolean {
@@ -57,7 +61,7 @@ export async function POST(req: NextRequest) {
       .from("generated_documents")
       .update({ signature_status: status, updated_at: new Date().toISOString() })
       .eq("documenso_id", String(documensoId))
-      .select("id, template_id, document_templates(name)")
+      .select("id, template_id, seller_lead_id, buyer_id, property_id, document_templates(name, category)")
       .maybeSingle();
     if (error) throw error;
 
@@ -72,12 +76,79 @@ export async function POST(req: NextRequest) {
           { normalize: true },
         ).catch(() => {});
       }
+
+      // Brief #011 F3.4 (R17): auto-eventos de firma en los timelines según
+      // la categoría de la plantilla. SOLO inserta eventos — el flujo de
+      // status de arriba queda intacto (la bifurcación buyer_signed es F4.2).
+      // Fire-and-soft: cualquier fallo aquí no rompe la firma. Idempotente
+      // ante reintentos de Documenso: el id del documento viaja en notes y
+      // se comprueba antes de insertar.
+      await insertSignatureEvents(updated as any).catch((err) =>
+        console.warn("[Documenso webhook] auto-eventos de firma fallaron:", err?.message || err),
+      );
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error("[Documenso webhook] error:", err?.message);
     return NextResponse.json({ error: "Error procesando webhook" }, { status: 500 });
+  }
+}
+
+interface CompletedDocRow {
+  id: string;
+  seller_lead_id: string | null;
+  buyer_id: string | null;
+  property_id: string | null;
+  document_templates: { name: string | null; category: string | null } | null;
+}
+
+/**
+ * F3.4: eventos de firma por categoría de plantilla (criterio detectKind):
+ *   nota      → 'Nota de Encargo firmada'   → timeline del vendedor
+ *   propuesta → 'Propuesta firmada'         → comprador + vendedor
+ *   contrato  → 'Contrato privado firmado'  → comprador + vendedor
+ * Los eventos del vendedor llevan lead_id + property_id (filtro del encargo, F3.3).
+ */
+async function insertSignatureEvents(doc: CompletedDocRow): Promise<void> {
+  const tpl = doc.document_templates;
+  const kind = detectKind({ name: tpl?.name || "", category: tpl?.category || "" } as DocumentTemplate);
+
+  const marker = `ref doc: ${doc.id}`;
+  const events: { table: "buyer_activity_logs" | "seller_activity_logs"; eventType: string; title: string }[] = [];
+
+  if (kind === "nota" && doc.seller_lead_id) {
+    events.push({ table: "seller_activity_logs", eventType: "Nota de Encargo firmada", title: tpl?.name || "Nota de Encargo firmada" });
+  } else if (kind === "propuesta" || kind === "contrato") {
+    const eventType = kind === "propuesta" ? "Propuesta firmada" : "Contrato privado firmado";
+    const title = tpl?.name || eventType;
+    if (doc.buyer_id) events.push({ table: "buyer_activity_logs", eventType, title });
+    if (doc.seller_lead_id) events.push({ table: "seller_activity_logs", eventType, title });
+  }
+
+  for (const ev of events) {
+    const ownerColumn = ev.table === "buyer_activity_logs" ? "buyer_id" : "lead_id";
+    const ownerId = ev.table === "buyer_activity_logs" ? doc.buyer_id! : doc.seller_lead_id!;
+
+    // Dedupe ante reintentos del webhook: mismo doc + mismo tipo + mismo dueño.
+    const { data: existing } = await supabaseAdmin
+      .from(ev.table)
+      .select("id")
+      .eq(ownerColumn, ownerId)
+      .eq("event_type", ev.eventType)
+      .ilike("notes", `%${marker}%`)
+      .limit(1);
+    if (existing && existing.length > 0) continue;
+
+    const { error } = await supabaseAdmin.from(ev.table).insert({
+      [ownerColumn]: ownerId,
+      event_type: ev.eventType,
+      title: ev.title,
+      notes: `Firmado en Documenso (${marker}).`,
+      event_date: new Date().toISOString(),
+      property_id: doc.property_id || null,
+    });
+    if (error) console.warn(`[Documenso webhook] insert evento en ${ev.table} falló:`, error.message);
   }
 }
 

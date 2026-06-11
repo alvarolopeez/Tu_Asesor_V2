@@ -693,6 +693,40 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
         signature_status: "draft",
       });
       if (error) throw error;
+
+      // Brief #011 F3.4 (R4/P11): al generar una PROPUESTA con comprador
+      // seleccionado, auto-evento 'Propuesta' en el timeline del comprador
+      // (y del vendedor si lo hay). Fire-and-soft: la generación no se rompe.
+      if (form.kind === "propuesta") {
+        try {
+          if (form.buyerId) {
+            const { error: buyerLogErr } = await supabase.from("buyer_activity_logs").insert({
+              buyer_id: form.buyerId,
+              event_type: "Propuesta",
+              title: `Propuesta generada: ${template.name}`,
+              notes: `Propuesta de compraventa generada desde Documentos${lead ? ` (vendedor: ${lead.name})` : ""}.`,
+              event_date: new Date().toISOString(),
+              property_id: lead?.property_id || null,
+            });
+            if (buyerLogErr) console.warn("[Documentos] evento Propuesta (buyer) falló:", buyerLogErr.message);
+          }
+          if (form.leadId) {
+            // F3.3: los eventos del vendedor llevan lead_id + property_id para
+            // que el timeline del encargo los filtre.
+            const { error: sellerLogErr } = await supabase.from("seller_activity_logs").insert({
+              lead_id: form.leadId,
+              event_type: "Propuesta",
+              title: `Propuesta generada: ${template.name}`,
+              notes: "Propuesta de compraventa generada desde Documentos.",
+              property_id: lead?.property_id || null,
+            });
+            if (sellerLogErr) console.warn("[Documentos] evento Propuesta (seller) falló:", sellerLogErr.message);
+          }
+        } catch (logErr: any) {
+          console.warn("[Documentos] auto-eventos Propuesta fallaron:", logErr?.message || logErr);
+        }
+      }
+
       toast.success("Documento generado (borrador guardado)");
       setForm(null);
       setPreviewDoc({ name: template.name, html });
