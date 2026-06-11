@@ -344,6 +344,11 @@ prueba al acabar. Anota el resultado (opción a o b) en SYNC_AI y sigue con la o
 
 ### F4.1 — Cláusulas adicionales en el editor (R15, par de F0.5)
 
+> ✅ **HECHA (adelantada el 2026-06-11, hotfix post-Sesión B a petición de Álvaro — ver SYNC_AI).**
+> No repetir en Sesión C. En el mismo hotfix: borrado/edición de borradores de
+> `generated_documents` (snapshot `__form` en merged_data) + título descriptivo con dirección
+> + actividad del comprador fusionada (read-only) en el timeline del encargo.
+
 `DocumentsManager.tsx`: campo textarea "Cláusulas adicionales" en la página previa de Nota, Propuesta y
 Contrato → clave `clausulas_adicionales` en el ctx del merge (vacío → "Ninguna.", no "________").
 
