@@ -49,7 +49,7 @@ interface BuyerDemand {
   property_type: string;
   funding_type: 'Contado' | 'Hipoteca';
   savings_contribution: number;
-  status: 'Búsqueda activa' | 'En negociación' | 'Con piso reservado' | 'Inactivo';
+  status: 'Activo' | 'Desactivado';
   created_at: string;
   updated_at: string;
   last_activity_at: string;
@@ -78,7 +78,8 @@ const SEVILLA_ZONAS_PUEBLOS = Object.entries(SEVILLA_TAXONOMY)
   .sort((a, b) => a.localeCompare(b, 'es'));
 
 const PROPERTY_TYPES = ["Piso", "Casa", "Ático", "Dúplex", "Chalet", "Local", "Oficina", "Cualquiera"];
-const STATUS_OPTIONS = ['Búsqueda activa', 'En negociación', 'Con piso reservado', 'Inactivo'] as const;
+// Brief #011 F0.1 (D2/R5): estados de la demand reducidos a Activo/Desactivado.
+const STATUS_OPTIONS = ['Activo', 'Desactivado'] as const;
 
 interface BuyersManagerProps {
   /** Brief #008 T4: navegar a Documentos con un intent de documento prerellenado. */
@@ -95,7 +96,8 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
   // Filters state
   const [searchTerm, setSearchTerm] = useState("");
   const [filterZone, setFilterZone] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  // Brief #011 F0.1: vista por defecto = Activos; "Archivo" lista los Desactivados.
+  const [viewArchive, setViewArchive] = useState(false);
   const [filterMaxBudget, setFilterMaxBudget] = useState<number | "">("");
   const [filterActivityDays, setFilterActivityDays] = useState<string>("");
 
@@ -118,7 +120,7 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
   const [formPreferredZones, setFormPreferredZones] = useState<string[]>([]);
   const [formFundingType, setFormFundingType] = useState<'Contado' | 'Hipoteca'>('Contado');
   const [formSavingsContribution, setFormSavingsContribution] = useState<number>(0);
-  const [formStatus, setFormStatus] = useState<BuyerDemand['status']>('Búsqueda activa');
+  const [formStatus, setFormStatus] = useState<BuyerDemand['status']>('Activo');
 
   // Timeline New Event Form state
   const [showLogForm, setShowLogForm] = useState(false);
@@ -214,7 +216,7 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
       setFormPreferredZones(Array.isArray(buyer.preferred_zones) ? buyer.preferred_zones : []);
       setFormFundingType(buyer.funding_type || "Hipoteca");
       setFormSavingsContribution(buyer.savings_contribution || 0);
-      setFormStatus(buyer.status || "Búsqueda activa");
+      setFormStatus(buyer.status || "Activo");
     } else {
       setEditingBuyer(null);
       setFormName("");
@@ -229,7 +231,7 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
       setFormPreferredZones([]);
       setFormFundingType("Hipoteca");
       setFormSavingsContribution(30000);
-      setFormStatus("Búsqueda activa");
+      setFormStatus("Activo");
     }
     setShowFormModal(true);
   };
@@ -502,8 +504,9 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
       return false;
     }));
 
-    // 3. Status Filter
-    const matchesStatus = !filterStatus || b.status === filterStatus;
+    // 3. Status Filter — vista Activos (default) vs Archivo (Desactivados).
+    // En la vista activa entran también posibles estados legacy desconocidos.
+    const matchesStatus = viewArchive ? b.status === 'Desactivado' : b.status !== 'Desactivado';
 
     // 4. Max Budget Filter
     const matchesBudget = !filterMaxBudget || (b.max_budget || 0) <= Number(filterMaxBudget);
@@ -522,10 +525,9 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
   });
 
   // Calculate high-level metrics for dashboard cards
-  const activeCount = buyers.filter(b => b.status === 'Búsqueda activa').length;
-  const negotiationCount = buyers.filter(b => b.status === 'En negociación').length;
-  const reservedCount = buyers.filter(b => b.status === 'Con piso reservado').length;
-  const totalVolume = buyers.reduce((sum, b) => sum + Number(b.max_budget), 0);
+  const activeCount = buyers.filter(b => b.status !== 'Desactivado').length;
+  const archivedCount = buyers.filter(b => b.status === 'Desactivado').length;
+  const totalVolume = buyers.filter(b => b.status !== 'Desactivado').reduce((sum, b) => sum + Number(b.max_budget), 0);
 
   // Timeline item visual mapping (Colors/Design elements)
   const getTimelineIconConfig = (type: string) => {
@@ -564,7 +566,7 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-[#1E293B] border border-white/5 p-5 rounded-2xl flex items-center justify-between shadow-lg">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Búsqueda Activa</span>
+            <span className="text-xs text-slate-400 font-medium block">Compradores Activos</span>
             <span className="text-3xl font-extrabold text-white mt-1 block">{activeCount}</span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -574,18 +576,18 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
 
         <div className="bg-[#1E293B] border border-white/5 p-5 rounded-2xl flex items-center justify-between shadow-lg">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">En Negociación</span>
-            <span className="text-3xl font-extrabold text-white mt-1 block">{negotiationCount}</span>
+            <span className="text-xs text-slate-400 font-medium block">En Archivo</span>
+            <span className="text-3xl font-extrabold text-white mt-1 block">{archivedCount}</span>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <div className="w-12 h-12 rounded-xl bg-slate-500/10 border border-slate-500/20 flex items-center justify-center text-slate-400">
             <TrendingUp size={24} />
           </div>
         </div>
 
         <div className="bg-[#1E293B] border border-white/5 p-5 rounded-2xl flex items-center justify-between shadow-lg">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Pisos Reservados</span>
-            <span className="text-3xl font-extrabold text-[#FBBF24] mt-1 block">{reservedCount}</span>
+            <span className="text-xs text-slate-400 font-medium block">Total Demandas</span>
+            <span className="text-3xl font-extrabold text-[#FBBF24] mt-1 block">{buyers.length}</span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-[#FBBF24]">
             <CheckCircle size={24} />
@@ -660,16 +662,22 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
             </select>
           </div>
 
-          {/* Status filter dropdown */}
-          <div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#FBBF24] appearance-none transition-all"
+          {/* Vista Activos / Archivo (Brief #011 F0.1) */}
+          <div className="flex bg-[#0F172A] border border-white/10 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setViewArchive(false)}
+              className={`flex-1 px-3 py-2.5 text-xs font-bold transition-all cursor-pointer ${!viewArchive ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-slate-400 hover:text-white'}`}
             >
-              <option value="">Todos los estados</option>
-              {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
+              Activos
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewArchive(true)}
+              className={`flex-1 px-3 py-2.5 text-xs font-bold transition-all cursor-pointer ${viewArchive ? 'bg-[#FBBF24] text-[#2C3E50]' : 'text-slate-400 hover:text-white'}`}
+            >
+              Archivo
+            </button>
           </div>
 
           {/* Max Budget filter input */}
@@ -731,9 +739,7 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
               <tbody className="divide-y divide-white/5">
                 {filteredBuyers.map((buyer) => {
                   let statusBg = "bg-slate-500/10 text-slate-400 border-slate-500/20";
-                  if (buyer.status === 'Búsqueda activa') statusBg = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-                  else if (buyer.status === 'En negociación') statusBg = "bg-blue-500/10 text-blue-400 border-blue-500/20";
-                  else if (buyer.status === 'Con piso reservado') statusBg = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                  if (buyer.status === 'Activo') statusBg = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
                   return (
                     <tr 
@@ -865,12 +871,10 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
                     <span className="flex items-center gap-1 text-xs text-slate-400"><Mail size={12} className="text-[#FBBF24]" /> {selectedBuyer.email || "Sin email"}</span>
                     
                     <select
-                      value={selectedBuyer.status || "Búsqueda activa"}
+                      value={selectedBuyer.status || "Activo"}
                       onChange={(e) => saveMatchingCriteria(selectedBuyer, { status: e.target.value as BuyerDemand['status'] })}
                       className={`bg-[#0F172A] border border-white/10 rounded-full px-2.5 py-0.5 text-[10px] font-bold focus:outline-none focus:border-[#FBBF24] cursor-pointer transition-all ${
-                        selectedBuyer.status === 'Búsqueda activa' ? 'text-emerald-400 border-emerald-500/20' :
-                        selectedBuyer.status === 'En negociación' ? 'text-blue-400 border-blue-500/20' :
-                        selectedBuyer.status === 'Con piso reservado' ? 'text-amber-400 border-amber-500/20' :
+                        selectedBuyer.status === 'Activo' ? 'text-emerald-400 border-emerald-500/20' :
                         'text-slate-400 border-slate-500/20'
                       }`}
                     >

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     // 2. Obtener TODAS las demands de compradores (fuente canónica del perfil).
     const { data: demands, error: demandsError } = await supabase
       .from('buyers_demands')
-      .select('id, lead_id, name, phone, email, max_budget, property_type, rooms, bathrooms');
+      .select('id, lead_id, name, phone, email, max_budget, property_type, rooms, bathrooms, status');
 
     if (demandsError || !demands) {
       console.error('[N8N Diffusion Backend] Error obteniendo buyers_demands:', demandsError);

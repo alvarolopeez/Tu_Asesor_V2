@@ -7,6 +7,8 @@
  * `leads.preferences` y llegan aquí vía el JOIN por `lead_id`.
  *
  * Reglas:
+ *  - Estado de la demand (Brief #011 F0.1): descarta `status='Desactivado'`
+ *    (archivada en Pedidos). Cualquier otro valor (Activo, legacy, null) entra.
  *  - Funnel: descarta solo leads en closed/lost. Una demand SIN lead se
  *    incluye (no hay funnel que la excluya) — el caller loguea el caso.
  *  - Presupuesto: `max_budget > 0` → exige `max_budget >= price*(1-margen%)`.
@@ -79,6 +81,7 @@ export interface DiffusionDemand {
   property_type?: string | null;
   rooms?: number | null;
   bathrooms?: number | null;
+  status?: string | null;
 }
 
 export interface DiffusionLead {
@@ -87,7 +90,7 @@ export interface DiffusionLead {
 }
 
 export type DemandMatchResult =
-  | { match: false; reason: 'funnel' | 'budget' | 'type' | 'rooms' | 'baths' | 'geo' }
+  | { match: false; reason: 'demand_status' | 'funnel' | 'budget' | 'type' | 'rooms' | 'baths' | 'geo' }
   | { match: true; warnings: Array<'no_lead' | 'no_budget'> };
 
 // ─── Matching ───────────────────────────────────────────────────────────────
@@ -102,6 +105,11 @@ export function matchDemand(params: {
 }): DemandMatchResult {
   const { demand, lead, property, priceMargin, geoRadius } = params;
   const warnings: Array<'no_lead' | 'no_budget'> = [];
+
+  // Demand archivada (Brief #011 F0.1): 'Desactivado' queda fuera de la difusión.
+  if (demand.status === 'Desactivado') {
+    return { match: false, reason: 'demand_status' };
+  }
 
   // Funnel (decisión 3): solo closed/lost quedan fuera. visit_scheduled ENTRA
   // (una cita para UN piso no descarta al comprador para otros).

@@ -32,6 +32,20 @@ function run(overrides: {
   });
 }
 
+describe('matchDemand — estado de la demand (Brief #011 F0.1)', () => {
+  it("demand 'Desactivado' → descartada aunque todo lo demás matchee", () => {
+    expect(run({ demand: { status: 'Desactivado' } })).toEqual({ match: false, reason: 'demand_status' });
+  });
+
+  it("demand 'Activo' → incluida", () => {
+    expect(run({ demand: { status: 'Activo' } }).match).toBe(true);
+  });
+
+  it('demand sin status (legacy/null) → incluida', () => {
+    expect(run({ demand: { status: null } }).match).toBe(true);
+  });
+});
+
 describe('matchDemand — funnel', () => {
   it('lead closed → descartado', () => {
     expect(run({ lead: { status: 'closed', preferences: {} } })).toEqual({ match: false, reason: 'funnel' });

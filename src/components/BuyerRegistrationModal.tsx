@@ -431,7 +431,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
             preferred_zones: preferredZones,
             funding_type: formData.paymentMethod,
             savings_contribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
-            status: "Búsqueda activa",
+            status: "Activo",
             ...(resolvedLeadId ? { lead_id: resolvedLeadId } : {}),
             updated_at: new Date().toISOString(),
             last_activity_at: new Date().toISOString()
@@ -474,7 +474,7 @@ export default function BuyerRegistrationModal({ isOpen, onClose }: BuyerRegistr
               preferred_zones: preferredZones,
               funding_type: formData.paymentMethod,
               savings_contribution: formData.paymentMethod === "Hipoteca" ? Number(formData.savingsContribution) || 0 : Number(formData.maxPrice),
-              status: "Búsqueda activa",
+              status: "Activo",
               ...(resolvedLeadId ? { lead_id: resolvedLeadId } : {}),
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),

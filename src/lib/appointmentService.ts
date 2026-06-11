@@ -144,7 +144,7 @@ export async function bookPublicAppointment(
           .update({
             name: cleanName,
             email: cleanEmail,
-            status: 'Búsqueda activa',
+            status: 'Activo',
             updated_at: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),
             // R9 Ola 5: escribir FK lead_id ahora que la columna existe.
@@ -162,7 +162,7 @@ export async function bookPublicAppointment(
             max_budget: 0,
             min_budget: 0,
             min_sqm: 0,
-            status: 'Búsqueda activa',
+            status: 'Activo',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             last_activity_at: new Date().toISOString(),

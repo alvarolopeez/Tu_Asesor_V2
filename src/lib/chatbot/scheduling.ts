@@ -742,7 +742,7 @@ async function upsertBuyerDemand(input: {
     min_sqm: 0,
     funding_type: fundingTypeForCRM,
     savings_contribution: input.answers.savings ?? 0,
-    status: 'Búsqueda activa',
+    status: 'Activo',
     last_activity_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     // Vinculamos el comprador con su lead solo cuando el ID es conocido.

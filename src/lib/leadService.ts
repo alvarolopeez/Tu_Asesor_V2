@@ -224,7 +224,7 @@ export async function upsertMinimalBuyerDemand(
       min_budget: 0,
       min_sqm: 0,
       property_type: data.propertyType || 'Indiferente',
-      status: 'Búsqueda activa', // valor vigente en BD (el #007 no migró estados)
+      status: 'Activo', // Brief #011 F0.1: estados migrados a Activo/Desactivado
       created_at: now,
       updated_at: now,
       last_activity_at: now,
