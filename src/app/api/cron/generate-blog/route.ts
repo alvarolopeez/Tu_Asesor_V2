@@ -1,0 +1,150 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { timingSafeEqual } from 'crypto';
+import { generateNewsPost } from '@/lib/blog/generateNewsPost';
+import { validateDraft } from '@/lib/blog/validateDraft';
+
+/**
+ * POST /api/cron/generate-blog — Brief #010 T2.
+ *
+ * Generación automática diaria de un post de noticias del sector (Gemini +
+ * Google Search grounding). Lo dispara el workflow n8n `Blog Diario Noticias`
+ * (Schedule 08:00 Europe/Madrid). Publica DIRECTO (`is_published=true`,
+ * decisión 1 de Álvaro) → guardarraíl duro: si la generación no pasa la
+ * validación (`validateDraft`), responde 422 y NO inserta nada ese día.
+ *
+ * Auth: header `x-cron-secret` comparado en tiempo constante contra
+ * `process.env.CRON_SECRET` (mismo patrón que /api/webhooks/documenso).
+ *
+ * Respuestas:
+ *  - 401 sin secreto / secreto incorrecto · 503 sin CRON_SECRET configurado
+ *  - 200 { skipped: true }  si ya hay post generado hoy (idempotencia)
+ *  - 422 { published: false, reason }  si Gemini falla o el draft no valida
+ *  - 200 { published: true, slug, title }  si se publicó
+ */
+
+export const dynamic = 'force-dynamic';
+
+/** Comparación en tiempo constante (evita timing attacks). */
+function secretsMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+);
+
+/** Log de trazabilidad en n8n_webhook_logs (fire-and-soft). */
+async function logResult(payload: Record<string, unknown>, status: number): Promise<void> {
+  try {
+    await supabaseAdmin.from('n8n_webhook_logs').insert({
+      webhook_name: 'cron_generate_blog',
+      source: 'cron',
+      payload,
+      response_status: status,
+    });
+  } catch (err) {
+    console.warn('[cron blog] no se pudo registrar el log:', err);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  // ── Auth ──
+  const cronSecret = process.env.CRON_SECRET || '';
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'Falta CRON_SECRET en el servidor.' }, { status: 503 });
+  }
+  const provided = request.headers.get('x-cron-secret') || '';
+  if (!provided || !secretsMatch(provided, cronSecret)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    // ── Paso 1: idempotencia + títulos recientes (anti-repetición) ──
+    // "Hoy" en UTC: a las 08:00 Madrid (06:00/07:00 UTC) el día UTC y el día
+    // Madrid coinciden, y los reintentos de n8n caen en el mismo día UTC.
+    const now = new Date();
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+    const { data: recentPosts, error: recentErr } = await supabaseAdmin
+      .from('posts')
+      .select('title, created_at')
+      .gte('created_at', sevenDaysAgo)
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    if (recentErr) {
+      console.error('[cron blog] error leyendo posts recientes:', recentErr.message);
+      return NextResponse.json({ error: recentErr.message }, { status: 500 });
+    }
+
+    const alreadyToday = (recentPosts || []).some((p) => p.created_at >= startOfToday);
+    if (alreadyToday) {
+      return NextResponse.json({ skipped: true, reason: 'already_generated_today' });
+    }
+
+    const recentTitles = (recentPosts || []).map((p) => p.title).filter(Boolean);
+
+    // ── Paso 2: generar ──
+    const draft = await generateNewsPost(recentTitles);
+
+    // ── Paso 3: guardarraíl (T3) — sin draft válido NO se publica nada ──
+    if (!draft) {
+      const reason = 'generation_failed_or_invalid';
+      console.warn('[cron blog] generación fallida o inválida — hoy no se publica');
+      await logResult({ published: false, reason }, 422);
+      return NextResponse.json({ published: false, reason }, { status: 422 });
+    }
+    const validation = validateDraft(draft);
+    if (!validation.ok) {
+      console.warn(`[cron blog] draft rechazado: ${validation.reason}`);
+      await logResult({ published: false, reason: validation.reason }, 422);
+      return NextResponse.json({ published: false, reason: validation.reason }, { status: 422 });
+    }
+
+    // ── Paso 4: slug único (sufija -2, -3… si colisiona) ──
+    let slug = draft.slug;
+    for (let i = 2; i <= 20; i++) {
+      const { data: clash } = await supabaseAdmin
+        .from('posts')
+        .select('id')
+        .eq('slug', slug)
+        .limit(1);
+      if (!clash || clash.length === 0) break;
+      slug = `${draft.slug}-${i}`;
+    }
+
+    // ── Paso 5: insertar publicado ──
+    const { error: insertErr } = await supabaseAdmin.from('posts').insert([{
+      title: draft.title,
+      slug,
+      content: draft.content,
+      excerpt: draft.excerpt,
+      cover_image: null,
+      is_published: true,
+      seo_title: draft.seo_title,
+      seo_description: draft.seo_description,
+      created_at: new Date().toISOString(),
+    }]);
+
+    if (insertErr) {
+      console.error('[cron blog] insert falló:', insertErr.message);
+      await logResult({ published: false, reason: `insert: ${insertErr.message}` }, 500);
+      return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    }
+
+    await logResult(
+      { published: true, slug, title: draft.title, source_urls: draft.source_urls },
+      200,
+    );
+    return NextResponse.json({ published: true, slug, title: draft.title });
+  } catch (err) {
+    console.error('[cron blog] error inesperado:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
