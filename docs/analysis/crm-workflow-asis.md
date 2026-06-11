@@ -1,5 +1,10 @@
 # Análisis as-is del flujo de trabajo del CRM — Tu Asesor V2
 
+> ⚠️ **Documento as-is a fecha 2026-06-10 — FOTO HISTÓRICA, no estado actual.** Los problemas
+> #1–#17 identificados aquí se abordaron en los briefs ejecutores #007–#009 (2026-06-10/11) —
+> ver el estado real y los cambios aplicados en `docs/sync/SYNC_AI.md` y en la cabecera de
+> `docs/CRM-GUIDE.md`. Este análisis NO se reescribe a propósito.
+
 > **Tipo:** ingeniería inversa documental (read-only). **Fecha:** 2026-06-10.
 > **Commit de referencia:** `4a57369` (master). **Encargo:** `docs/prompts/analisis-flujo-crm.md`.
 > **Método:** lectura directa del código + introspección del schema Supabase (proyecto `hmzqgtitlonaxbwlhcob`)

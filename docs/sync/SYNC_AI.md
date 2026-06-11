@@ -5,6 +5,38 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Brief #009: cleanup final (tablas muertas, código huérfano, coherencia)
+
+**Commits** (en orden):
+- `chore(gitnexus): reindex` (5b464bf)
+- T2: `chore(webhooks): elimina receptor Chatwoot sin uso` (380247a)
+- T1: `refactor(n8n): retira accion log_interaction (ai_interactions deprecada)` (d16494a)
+- T3: `refactor(admin): ids de pestana coherentes (encargos/sellers)` (36f3bb9)
+- T5: `docs(sync): actualiza CRM-GUIDE/SYNC_AI/AGENTS tras refactor #007-#009`
+
+**T1 — `ai_interactions` retirada (decisión 6) — ⚠️ DESVIACIÓN del plan del brief, con OK explícito de Álvaro**:
+- La verificación obligatoria pre-DROP (n8n MCP read-only) encontró que **3 workflows ACTIVOS** envían `action=log_interaction` al bridge: `Difusion Inteligente` (nodo "Log Difusion CRM"), `Seguimiento Leads Diario` ("Log Seguimiento CRM") y `Notificacion Nuevo Lead` ("Log Bienvenida CRM"). En Difusión y Seguimiento el nodo va **dentro del loop de envíos sin `neverError`** → el plan original (eliminar el case y dejar el 400 por defecto) habría **abortado las difusiones tras el primer WhatsApp**.
+- Resolución elegida por Álvaro: **TOMBSTONE + DROP**. El `case 'log_interaction'` se conserva como no-op (`{success:true, deprecated:true}` + `console.warn`); la tabla se eliminó.
+- **Migración en prod**: `drop_ai_interactions_brief_009` — `DROP TABLE public.ai_interactions` (0 filas verificadas antes y `to_regclass` NULL después; `chatbot_conversations`/`chatbot_messages` intactas). Eliminado también el tipo muerto `AIInteraction` de `src/types/index.ts` (`AIIntent` se conserva — lo usa el engine).
+- **Pendiente para un brief futuro**: retirar los 3 nodos "Log * CRM" de los workflows n8n (duplicando a test primero) y entonces eliminar el tombstone.
+
+**T2 — Receptor Chatwoot eliminado** (`src/app/api/webhooks/chatwoot/route.ts`): sin callers (impact LOW) y 0 conversaciones `channel='chatwoot'` en BD. Quitado de Critical files en AGENTS.md. Quedan menciones cosméticas sin efecto (filtros UI en ChatManager/WebhooksManager y el union `ChatChannel`) — candidatas a un brief de UI, no rompen nada.
+
+**T3 — Ids de pestaña coherentes** (AdminDashboard): `'sellers'`→`'encargos'` (EncargosManager) y `'warm_sellers'`→`'sellers'` (WarmLeadsManager) en TabType, TABS y renders. `activeTab` NO se persiste (verificado) → sin mapeo de compatibilidad.
+
+**T4 — `tool_calculations` verificada: NO hay bug** (diagnóstico, sin commit de código):
+- Método (no hay staging; para no generar leads falsos vía web): insert directo por PostgREST con el **anon key** real, fila de prueba `tool_type='diagnostico_brief009'`, borrada después (tabla vuelve a 0).
+- Resultado: el INSERT anon **funciona** (policy `Validated public insert` correcta). **Conclusión: 0 filas = sin uso real desde el wipe del 2026-06-04.**
+- Matiz descubierto: con `Prefer: return=representation` el insert anon da **401** porque anon NO tiene policy SELECT — ⚠️ no encadenar `.select()` al insert de `tool_calculations` en código público (leadService inserta sin `.select()` → `return=minimal` → OK).
+
+**T5 — Docs sincronizadas**:
+- **Corrección explícita a la entrada "2026-06-08 Ola 5/R9"** de este archivo: aquella entrada afirmaba que la difusión ya leía `buyers_demands`; en realidad seguía leyendo `leads.preferences`. La difusión lee **`buyers_demands` JOIN `leads`** desde el Brief #007 T4 (commit c255490) — esa es la fecha real del cambio.
+- Recordatorio de estado: `offers` y `property_documents` siguen eliminadas (Ola 2, 2026-06-08), `ai_interactions` eliminada (#009), y **`SellersManager` no existe** (lo reemplazó `EncargosManager` el 2026-06-03).
+- `CRM-GUIDE.md`: bloque "Actualización 2026-06-11" en cabecera + matriz/inventario/ER/gotchas puestos al día (difusión→buyers_demands, funnel doble 6/4, event_types nuevos, `/api/leads/funnel` y `/api/encargos` en la matriz, M2/R3 cerrados, nota de tests).
+- `crm-workflow-asis.md`: solo nota de cabecera "foto histórica" (no se reescribió, a propósito).
+
+---
+
 ### 2026-06-11 — Brief #008: limpieza de deuda + timeline con efecto (documentos)
 
 **Commits** (en orden):

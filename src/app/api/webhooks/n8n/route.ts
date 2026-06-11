@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase';
  * - update_lead_status: Cambiar estado de un lead
  * - create_appointment: Agendar una cita
  * - get_properties: Listar propiedades activas
- * - log_interaction: Registrar interacción IA
+ * - log_interaction: DEPRECADA (tombstone no-op desde Brief #009 — ver el case)
  * - send_chatbot_response: Guardar respuesta del chatbot en BD
  * 
  * Seguridad: Header "x-api-key" obligatorio
