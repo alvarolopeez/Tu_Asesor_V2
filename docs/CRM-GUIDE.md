@@ -3,9 +3,22 @@
 > **Propósito**: referencia para agentes IA que trabajen sobre este proyecto. Incluye mapa del sistema, fichas por área, matriz de dependencias, informe de calidad y reglas de oro.
 >
 > **Generado**: 2026-06-08 | Schema verificado vía Supabase MCP | `master` commit `07dbbef`
-> **Actualizado**: 2026-06-11 tras los briefs #007–#009 (ver bloque siguiente y SYNC_AI.md)
+> **Actualizado**: 2026-06-12 tras los briefs #007–#011 (ver bloques siguientes y SYNC_AI.md)
 
-### ⚡ Actualización 2026-06-11 — briefs #007–#009 (estado vigente)
+### ⚡ Actualización 2026-06-12 — briefs #010–#011 (estado vigente)
+
+- **Blog automático diario** (#010): `POST /api/cron/generate-blog` (auth `x-cron-secret`, Gemini 2.5-flash + grounding, guardarraíl `validateDraft`, idempotencia diaria) + workflow n8n `Blog Diario Noticias` (08:00, patrón llamada→Wait→verificación por el timeout del proxy de Netlify). El antiguo `Generador Diario Blog` está DESACTIVADO.
+- **Estados del comprador** (#011 F0.1): `buyers_demands.status` = `'Activo'`/`'Desactivado'` (default Activo). Pedidos lista Activos + vista "Archivo". La difusión descarta `Desactivado` (`matchDemand`, reason `demand_status`).
+- **Tablas nuevas**: `diffusion_impacts` (registro de cada envío de difusión; lo consume el informe IA) y `buyer_documents` + bucket privado `buyer-files` (documentación del comprador). RLS authenticated en ambas. `buyer_documents` usa **`uploaded_at`**.
+- **Difusión 2.0** (#011 F1): la ruta acepta `dry_run` (preview de destinatarios) y `excluded_demand_ids` (exclusión por campaña); registra impactos + evento 'Difusión' en el timeline. El payload a n8n NO cambió. Los workflows ya NO llevan nodos "Log * CRM" (F5.1, 2026-06-12) y la acción `log_interaction` del bridge fue eliminada (un llamador residual recibe 400).
+- **Inmuebles**: subida múltiple de imágenes; las vistas del detalle de `/comprar` se trackean (`/comprar/p/<id>` + session_id) → "Publicación web" y Operaciones cuentan de verdad.
+- **UI vendedor** (#011 F2): funnel de 4 estados en WarmLeadsManager (badge legacy para filas viejas), alta manual de vendedores, botón "Firmar Nota de Encargo" (DocIntent).
+- **Perfiles a página completa** (#011 F3): `/admin/buyers/[id]`, `/admin/sellers/[id]`, `/admin/encargos/[id]` tras `AdminAuthGate` (la protección sigue siendo client-side; proxy.ts no protege). Piezas compartidas en `src/components/admin/profile/` (`ActivityTimeline`, `timelineIcons`). Los drawers de las listas se conservan como vista rápida. Eventos del ENCARGO = `seller_activity_logs` con `lead_id + property_id` SIEMPRE informados.
+- **Flujo de Propuesta** (#011 F4): la propuesta la firma SOLO el comprador (`shouldAdvisorSign` excluye propuesta/aceptación) → webhook Documenso escribe `buyer_signed` → gate "Aceptar propuesta" en el encargo → `POST /api/proposals/[id]/accept` genera el doc de Aceptación (firma vendedor, `__source_proposal_id`) → al completarse, la propuesta pasa a `completed` → "Generar Contrato privado" (DocIntent) → contrato firmado cierra al COMPRADOR (`leads.status='closed'` + demand `'Desactivado'`, idempotente). `encargos.status` NO cambia automáticamente (default Q3). Auto-eventos de firma por categoría en los timelines (F3.4).
+- **Cláusulas adicionales**: textarea en la previa de Nota/Propuesta/Contrato → `{{clausulas_adicionales}}` (vacío → "Ninguna."). Los documentos generados guardan snapshot `__form` (edición de borradores); los anteriores al hotfix no son editables.
+- **Chatwoot**: queda solo el union `ChatChannel` y el case del icono (hay CHECK en BD `chatbot_conversations_channel_check` con 'chatwoot' — no se estrecha sin migración). Filtros de UI retirados.
+
+### ⚡ Actualización 2026-06-11 — briefs #007–#009 (estado histórico de la ola anterior)
 
 - **Difusión** (`POST /api/n8n/diffusion`): matchea contra **`buyers_demands` JOIN `leads`** (presupuesto = `max_budget`; funnel descarta solo `closed`/`lost`; geo desde `leads.preferences` vía `lead_id`). Lógica pura en `src/lib/diffusionMatch.ts`. *(#007 T4 — antes leía `leads.preferences`.)*
 - **Funnel doble** (#007): comprador con 6 estados y transiciones automáticas (`new→contacted→qualified→visit_scheduled` + terminales `closed`/`lost`, helper `src/lib/leadFunnel.ts`); vendedor con 4 estados manuales (`new`/`contacted`/`closed`/`lost` — `qualified`/`visit_scheduled` NO se usan para vendedores). Claves de reversión en `leads.preferences`: `_prev_status` (encargos) y `_visit_prev_status` (citas) — NO confundir.

@@ -5,6 +5,45 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-12 — Auditoría del Brief #011 + cierre de F5.1/F5.3 (brief COMPLETO al 100%)
+
+**Auditoría completa de las 3 sesiones** (commits, BD, n8n, código crítico de F4 línea a línea,
+build + 115/115 tests): resultado correcto salvo dos huecos, cerrados hoy.
+
+**⚠️ CORRECCIÓN a la entrada "Sesión C" de abajo (F5.1)**: afirmaba que solo `Notificacion Nuevo
+Lead` tenía nodo `log_interaction` y que el resto no. **Era falso**: `Difusion Inteligente`
+(`6E0AP0gqLUliPQtN`, nodo "Log Difusion CRM") y `Seguimiento Leads Diario` (`VnXhrEh2G8AeR0DT`,
+"Log Seguimiento CRM") seguían teniéndolos DENTRO de sus loops (verificado contra el JSON real:
+`updatedAt` de ambos era anterior a la Sesión C). El acierto de aquella sesión fue NO retirar el
+tombstone — por eso nada se rompió.
+
+**F5.1 completado hoy (con OK explícito de Álvaro)**:
+1. Backups locales pre-edición en `docs/sync/n8n-backups/` (gitignored).
+2. `Difusion Inteligente`: removeNode "Log Difusion CRM" + reconexión `Enviar WhatsApp Meta → Loop
+   Destinatarios`. ⚠️ `update_workflow` deja la edición en BORRADOR — hubo que `publish_workflow`
+   (activeVersionId `9996442a`). Gotcha para futuros agentes: **editar un workflow activo NO publica;
+   verificar siempre `versionId == activeVersionId`** (la Sesión C sí publicó el suyo).
+3. `Seguimiento Leads Diario`: ídem ("Log Seguimiento CRM", reconexión `WhatsApp Seguimiento → Loop
+   Seguimiento`) + publish (activeVersionId `10fb1db8`). **Efecto colateral deliberado**: su borrador
+   pre-existente (versión con plantilla HSM `seguimiento_lead`, la intención documentada el
+   2026-05-31 que nunca se publicó) entró en producción al publicar — el cron de las 9AM ahora usa
+   la plantilla, no el texto libre viejo.
+4. Verificación: ejecución real de Difusión con `recipients: []` → **execution 56 `success`** sobre la
+   versión nueva (webhook→extraer→separar→loop vacío→fin, sin envíos).
+5. Solo entonces: **eliminado el tombstone `case 'log_interaction'`** del bridge
+   (`api/webhooks/n8n/route.ts`) + entrada en `available_actions` + comentario de cabecera. Un
+   llamador residual recibiría el 400 "Unknown action" del default (correcto: ya no hay llamadores).
+
+**F5.3 completado hoy**: bloque "Actualización 2026-06-12 (#010–#011)" en `docs/CRM-GUIDE.md`
+(estados Activo/Desactivado, tablas nuevas, difusión 2.0, perfiles, flujo de propuesta, blog) +
+nota "PLAN EJECUTADO AL 100% (briefs #007–#011)" en la cabecera de
+`docs/analysis/plan-implementacion-crm.md`.
+
+**Estado final del Brief #011: 100% ejecutado y verificado.** Pendiente solo el E2E manual de F4
+listado en la entrada de la Sesión C (propuesta → aceptar → contrato, con un vendedor con email).
+
+---
+
 ### 2026-06-11 — Brief #011 SESIÓN C: flujo de propuesta con gate manual + flecos (F4/F5)
 
 **Commits**: `chore(gitnexus): reindex (3349 nodos, 134 flujos)` (044dded) · `feat(propuesta): firma solo comprador + buyer_signed (F4.2)` (8032726) · `feat(propuestas): gate Aceptar propuesta + cierre contrato comprador (F4.3/F4.4)` (a1dfe55) · `chore(ui): elimina Chatwoot de los filtros de canal (F5.2)` (3339a4e) · esta entrada de docs.

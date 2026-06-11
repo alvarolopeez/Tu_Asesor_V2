@@ -1,5 +1,9 @@
 # Plan de implementación — Optimización del flujo de trabajo del CRM
 
+> ✅ **PLAN EJECUTADO AL 100%** por los briefs ejecutores **#007–#011** (2026-06-10 → 2026-06-12).
+> Estado real, desviaciones documentadas y gotchas: `docs/sync/SYNC_AI.md`. Resumen del estado
+> vigente: cabecera de `docs/CRM-GUIDE.md`. Este documento queda como referencia histórica del plan.
+
 > **Fecha:** 2026-06-10 · **Fuentes:** `Optimizacion flujo de trabajo CRM.pdf` (instrucciones de Álvaro)
 > cruzado con [crm-workflow-asis.md](crm-workflow-asis.md) (análisis as-is + inventario de 17 problemas).
 > **Objetivo:** ejecutar el flujo que define el PDF Y corregir los problemas del as-is, en fases
