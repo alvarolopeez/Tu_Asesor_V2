@@ -5,6 +5,41 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Brief #011 SESIÓN B: gate de auth + perfiles a página completa + auto-eventos (F3)
+
+**Commits** (en orden): `chore(gitnexus): reindex (3157 nodos, 125 flujos)` (db99803) · F3.0 `feat(admin): gate de auth reutilizable (AdminAuthGate)` (e0184e0) · F3.1 `feat(admin): perfil de comprador a pagina completa` (a148efc) · F3.2 `feat(admin): perfil de vendedor a pagina completa` (1c89df1) · F3.3 `feat(admin): encargo a pagina completa` (7ee0b25) · F3.4 `feat(timeline): auto-eventos desde documentos` (d591a1a) · esta entrada de docs.
+
+**Migración aplicada en producción (Supabase MCP, OK explícito de Álvaro, SELECT antes/después)**:
+- `seller_activity_logs_add_property_id`: columna **`seller_activity_logs.property_id uuid NULL REFERENCES properties(id) ON DELETE SET NULL`**. ⚠️ NO estaba en el brief (F0 no la incluyó) pero el diseño cerrado de F3.3 la exige (timeline del encargo = `lead_id + property_id`). 9 filas existentes quedaron en NULL; ningún lector se rompió. El tipo TS `SellerActivityLog` ya la incluye.
+
+**F3.0 — AdminAuthGate** (`src/components/admin/AdminAuthGate.tsx`): extracción FIEL del gate client-side de AdminDashboard (getSession + form login + bypass dev). Contrato: `onAuthenticated` (AdminDashboard cuelga ahí su fetchData, mismo momento que antes) y children como nodo o función `({logout}) => ...` (la sidebar usa el logout). proxy.ts intacto (sigue sin proteger nada — el gate client-side es la única barrera).
+
+**F3.1/F3.2/F3.3 — Páginas completas** (D12): rutas `/admin/buyers/[id]`, `/admin/sellers/[id]`, `/admin/encargos/[id]` (shell server con `params: Promise` + cliente envuelto en AdminAuthGate, `robots: noindex`). Piezas compartidas NUEVAS en `src/components/admin/profile/`:
+- `timelineIcons.ts`: configs de iconos buyer/seller extraídas de BuyersManager (que ahora la importa con alias) + tipos nuevos (Nota, Cita de venta/adquisición, Propuesta, firmas, Notaría...).
+- `ActivityTimeline.tsx`: timeline editable parametrizado (tabla, columna dueña, filtro property_id, insertExtras, side-effects vía `onEventCreated`). Lo usan las 3 páginas.
+- Comprador: Características (demand en caliente + `notes` + ZoneSelectorPremium), Documentación (**`buyer_documents` operativa**: bucket `buyer-files`, upload por kind `identificacion/solvencia/financiacion/otros`, signed URL 5 min, borrado), Actividad (Llamada/Nota/**Cita de venta**→appointment `visita`, default Q2), toggle Activo/Desactivado.
+- Vendedor: Perfil (contacto + funnel 4 estados con log 'Cambio Estado' + fallback legacy), Ficha inmueble (preferences + consola tasación + **Firmar Nota de Encargo**), Citas y anotaciones (Nota/Llamada/**Cita de adquisición**→appointment `captacion`).
+- Encargo: Resumen (PATCH `/api/encargos/[id]` + acciones de estado + **hueco visible del gate de propuestas F4.3/F4.4**), Documentos (nota + anexos + generated_documents), Actividad (**timeline editable filtrado por `lead_id+property_id`**; sin property_id → timeline del vendedor anotado en la UI; eventos Visita/Llamada/Nota/Contrato privado/**Notaría**→cita `type='cierre'`, D11; los INSERT llevan SIEMPRE ambos campos), Publicación web (vínculo + métricas).
+- **Listas**: el click de fila en BuyersManager/WarmLeadsManager/EncargosManager ahora navega a la página completa. **Los drawers se CONSERVAN como vista rápida** (botón ojo/⧉): decisión documentada — quitarlos rompía DocIntent (#008 T4) y la promoción a Encargo, y la página es ADICIONAL.
+- **Puente DocIntent entre rutas**: AdminDashboard lee `?docKind=nota|propuesta|contrato&docLeadId=&docBuyerId=&docEncargoId=` al montar → setDocIntent + tab Documentos + limpieza de URL. Lo usa el botón Firmar Nota del perfil de vendedor.
+
+**F3.4 — Auto-eventos desde documentos**:
+- `handleGenerate` (DocumentsManager): al generar una PROPUESTA → evento 'Propuesta' en buyer_activity_logs (si buyerId) y seller_activity_logs (lead_id+property_id). Fire-and-soft.
+- Webhook Documenso (`completed`): eventos de firma por categoría con `detectKind` **importado en el server** (mismo criterio client/server, preparado para F4.2): nota→'Nota de Encargo firmada' (seller), propuesta→'Propuesta firmada' (buyer+seller), contrato→'Contrato privado firmado' (ambos). SOLO inserts aditivos — **el update de signature_status quedó intacto** (la bifurcación buyer_signed es F4.2). Idempotente ante reintentos: `ref doc: <id>` en notes + check previo. ⚠️ detect_changes dio CRITICAL (fan-out de DocumentsManager/webhook) — avisado a Álvaro y aprobado.
+
+**Verificación**: `npm run build` + `npm test` (115/115) verdes antes de CADA commit · detect_changes por commit (LOW/MEDIUM salvo el CRITICAL avisado de F3.4).
+
+**E2E manual pendiente para Álvaro (Sesión B)**: abrir cada perfil desde su lista (click de fila) · crear/editar/borrar un evento en cada timeline (comprador, vendedor, encargo) · subir/descargar/borrar un documento del comprador · toggle Activo/Desactivado desde el perfil · "Firmar Nota de Encargo" desde el perfil de vendedor (debe aterrizar en Documentos con la nota prerellenada) · evento Notaría en el encargo crea cita de cierre en el Calendario.
+
+**Pendiente (Sesión C del brief #011)**: F4 (SPIKE Documenso + cláusulas en editor + propuesta buyer_signed + gate Aceptar propuesta en el hueco del Resumen del encargo + contrato/cierre comprador) · F5 (retirar nodos log_interaction de n8n con OK + Chatwoot cosmético + cierre docs CRM-GUIDE/plan).
+
+**Gotchas para futuros agentes**:
+- Los eventos del ENCARGO se insertan SIEMPRE con `lead_id` + `property_id` (F3.4 y F4 deben respetarlo); si el encargo no tiene property, el timeline muestra todo el historial del vendedor (anotado en la UI).
+- `ActivityTimeline` pasa `property_id` en el payload solo si recibe `properties` (select de vincular) o `insertExtras` — no asume columnas.
+- El puente DocIntent por URL solo corre al montar AdminDashboard; si el dashboard ya está abierto en otra pestaña no se entera (navegación normal sí funciona).
+
+---
+
 ### 2026-06-11 — Brief #011 SESIÓN A: migraciones F0 + difusión 2.0 + UI vendedor
 
 **Commits** (en orden): `chore(gitnexus): reindex (3115 nodos, 123 flujos)` (2a989df) · F0.1 `feat(db): estados Activo/Desactivado en buyers_demands + ola de escritores` (b40a73c) · F1.1 `feat(diffusion): preview con exclusion de destinatarios (dry_run)` (013be02) · F1.2 `feat(diffusion): registro de impactos + evento Difusion en timeline` (4ab1ca6) · F1.3 `feat(properties): subida multiple de imagenes` (f9fb342) · F1.4 `fix(analytics): track de vistas del detalle de inmueble` (92c4d9f) · F1.5 `feat(ai-report): incluye impactos de difusion` (7ce5b11) · F2.1 `feat(sellers): funnel de 4 estados en la UI + recalibrado de dashboards` (2ac325b) · F2.2 `feat(sellers): alta manual de vendedores` (3bfe322) · F2.3 `feat(sellers): boton firmar nota de encargo (DocIntent)` (6f09c50) · esta entrada de docs.
