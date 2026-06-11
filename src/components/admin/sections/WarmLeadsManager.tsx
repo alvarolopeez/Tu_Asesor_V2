@@ -1069,6 +1069,19 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
               {drawerTab === 'property' && (
                 <div className="space-y-5">
 
+                  {/* Brief #011 F2.3 (R9): abre Documentos con la Nota de
+                      Encargo prerellenada vía DocIntent (#008). Oculto si el
+                      lead ya está closed (captado: vive en Encargos). */}
+                  {selectedLead.status !== 'closed' && (
+                    <button
+                      onClick={() => onGoToDocuments?.({ kind: 'nota', leadId: selectedLead.id })}
+                      className="w-full flex items-center justify-center gap-2 bg-[#FBBF24]/10 border border-[#FBBF24]/30 hover:bg-[#FBBF24]/20 text-[#FBBF24] font-bold py-3 rounded-xl transition-all text-sm cursor-pointer"
+                    >
+                      <FileText size={16} />
+                      Firmar Nota de Encargo
+                    </button>
+                  )}
+
                   {/* Address (hot edit onBlur / Enter) */}
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Dirección del Inmueble</label>
