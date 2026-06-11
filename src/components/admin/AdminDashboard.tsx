@@ -42,7 +42,11 @@ import WebhooksManager from "./sections/WebhooksManager";
 import DocumentsManager from "./sections/DocumentsManager";
 import type { DocIntent } from "./sections/DocumentsManager.types";
 
-type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'sellers' | 'warm_sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
+// Brief #009 T3: ids coherentes con lo que renderizan — 'encargos' →
+// EncargosManager y 'sellers' → WarmLeadsManager (antes 'sellers' abría
+// Encargos y 'warm_sellers' abría Vendedores: trampa de mantenimiento).
+// activeTab no se persiste en ningún sitio → sin mapeo de compatibilidad.
+type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'encargos' | 'sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
 
 export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -195,8 +199,8 @@ export default function AdminDashboard() {
     { id: 'calendar', label: 'Calendario', icon: CalendarIcon },
     { id: 'properties', label: 'Inmuebles', icon: Home },
     { id: 'buyers', label: 'Pedidos', icon: Users },
-    { id: 'sellers', label: 'Encargos', icon: Briefcase },
-    { id: 'warm_sellers', label: 'Vendedores', icon: UserPlus },
+    { id: 'encargos', label: 'Encargos', icon: Briefcase },
+    { id: 'sellers', label: 'Vendedores', icon: UserPlus },
     { id: 'documents', label: 'Documentos', icon: FileText },
     { id: 'chat', label: 'Live Chat (IA)', icon: MessageCircle },
     { id: 'reviews', label: 'Reseñas', icon: Star },
@@ -328,10 +332,10 @@ export default function AdminDashboard() {
             {activeTab === 'buyers' && <BuyersManager onGoToDocuments={goToDocuments} />}
 
             {/* 5. ENCARGOS (VENDEDORES EXCLUSIVOS) */}
-            {activeTab === 'sellers' && <EncargosManager />}
+            {activeTab === 'encargos' && <EncargosManager />}
 
             {/* 6. VENDEDORES (WARM LEADS) */}
-            {activeTab === 'warm_sellers' && <WarmLeadsManager leads={leads} onGoToDocuments={goToDocuments} />}
+            {activeTab === 'sellers' && <WarmLeadsManager leads={leads} onGoToDocuments={goToDocuments} />}
 
             {/* 7. LIVE CHAT */}
             {activeTab === 'chat' && <ChatManager />}
