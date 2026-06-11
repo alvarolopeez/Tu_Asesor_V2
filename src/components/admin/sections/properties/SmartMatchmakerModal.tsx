@@ -20,6 +20,16 @@ const DEFAULT_GEO_RADIUS = 5;    // km
 // eso el workflow tenía 0 ejecuciones. Fix 2026-06-01.
 const DEFAULT_N8N_WEBHOOK = "https://alvaroolopez.app.n8n.cloud/webhook/smart-diffusion";
 
+/** Destinatario devuelto por /api/n8n/diffusion en modo dry_run (R19). */
+interface DiffusionRecipient {
+  demand_id: string;
+  lead_id: string | null;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  maxPricePreference: number | string | null;
+}
+
 /**
  * Modal de difusión inteligente. Cruza la propiedad seleccionada con leads
  * compatibles (por presupuesto y radio geográfico) y permite lanzar una
@@ -35,6 +45,12 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
   const [geoRadius, setGeoRadius] = useState<number>(DEFAULT_GEO_RADIUS);
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string>(DEFAULT_N8N_WEBHOOK);
   const [campaignLaunching, setCampaignLaunching] = useState(false);
+
+  // R19 (Brief #011 F1.1): preview del matching real (dry_run) con exclusión
+  // por campaña. null = aún no se ha pedido la preview.
+  const [previewRecipients, setPreviewRecipients] = useState<DiffusionRecipient[] | null>(null);
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Cargar leads coincidentes via RPC cuando cambian propiedad o filtros
   useEffect(() => {
@@ -80,6 +96,45 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
     return { matches: leads, metrics: { under, target, over } };
   }, [property.price, leads]);
 
+  // R19: pide al server la lista REAL de destinatarios (dry_run) antes de lanzar.
+  const openPreview = async () => {
+    setPreviewLoading(true);
+    try {
+      const res = await fetch("/api/n8n/diffusion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          webhookUrl: n8nWebhookUrl,
+          payload: {
+            event: "real_estate_ai_diffusion",
+            property_id: property.id,
+            price_margin: priceMargin,
+            geo_radius: geoRadius,
+            dry_run: true
+          }
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setPreviewRecipients((data.recipients || []) as DiffusionRecipient[]);
+      setExcludedIds(new Set());
+    } catch (err) {
+      console.error("Error al previsualizar destinatarios de difusión:", err);
+      toast.error("Error al previsualizar los destinatarios");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const toggleExcluded = (demandId: string) => {
+    setExcludedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(demandId)) next.delete(demandId);
+      else next.add(demandId);
+      return next;
+    });
+  };
+
   // Dispara la campaña via /api/n8n/diffusion (el server resuelve leads + envía a n8n)
   const launchWhatsAppCampaign = async () => {
     setCampaignLaunching(true);
@@ -89,7 +144,9 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
       event: "real_estate_ai_diffusion",
       property_id: property.id,
       price_margin: priceMargin,
-      geo_radius: geoRadius
+      geo_radius: geoRadius,
+      // Exclusión solo de ESTA campaña (default Q5: no se persiste).
+      excluded_demand_ids: Array.from(excludedIds)
     };
 
     try {
@@ -323,30 +380,106 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
           />
         </div>
 
+        {/* Preview de destinatarios reales con exclusión por campaña (R19) */}
+        {previewRecipients !== null && (
+          <div className="bg-[#0F172A] p-4 rounded-xl border border-purple-500/20 space-y-3 mb-6">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-wide">
+                Destinatarios de la campaña ({previewRecipients.length - excludedIds.size} de {previewRecipients.length})
+              </span>
+              <span className="text-[10px] text-slate-500">Desmarca a quien no quieras incluir (solo esta campaña)</span>
+            </div>
+            {previewRecipients.length === 0 ? (
+              <div className="text-center text-slate-500 text-sm py-4">
+                El matching del servidor no encontró destinatarios con estos parámetros.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-2 custom-scrollbar">
+                {previewRecipients.map((r) => (
+                  <label
+                    key={r.demand_id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      excludedIds.has(r.demand_id)
+                        ? 'border-white/5 bg-[#1E293B]/40 opacity-50'
+                        : 'border-purple-500/20 bg-[#1E293B]'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!excludedIds.has(r.demand_id)}
+                      onChange={() => toggleExcluded(r.demand_id)}
+                      className="accent-purple-500 w-4 h-4 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <span className="font-bold text-white text-sm block truncate">{r.name}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {r.phone || "Sin teléfono"}
+                        {r.maxPricePreference && Number(r.maxPricePreference) > 0
+                          ? ` · Máx: ${formatPrice(Number(r.maxPricePreference))}`
+                          : " · Sin presupuesto"}
+                      </span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-4">
-          <button
-            onClick={onClose}
-            className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all text-center"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={launchWhatsAppCampaign}
-            disabled={matchmakingResult.matches.length === 0 || campaignLaunching}
-            className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/20 disabled:text-purple-700 text-white font-extrabold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/15"
-          >
-            {campaignLaunching ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                Lanzando...
-              </>
-            ) : (
-              <>
-                <Send size={18} /> Confirmar y Lanzar Campaña
-              </>
-            )}
-          </button>
+          {previewRecipients === null ? (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all text-center"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={openPreview}
+                disabled={previewLoading}
+                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/20 disabled:text-purple-700 text-white font-extrabold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/15"
+              >
+                {previewLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Cruzando destinatarios...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={18} /> Revisar Destinatarios
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setPreviewRecipients(null)}
+                disabled={campaignLaunching}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-xl transition-all text-center"
+              >
+                Volver
+              </button>
+              <button
+                onClick={launchWhatsAppCampaign}
+                disabled={campaignLaunching || previewRecipients.length - excludedIds.size === 0}
+                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900/20 disabled:text-purple-700 text-white font-extrabold py-3 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-600/15"
+              >
+                {campaignLaunching ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                    Lanzando...
+                  </>
+                ) : (
+                  <>
+                    <Send size={18} /> Lanzar a {previewRecipients.length - excludedIds.size} destinatarios
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

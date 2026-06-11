@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { property_id, price_margin = 10, geo_radius = 5 } = clientPayload;
+    // R19 (Brief #011 F1.1): dry_run y excluded_demand_ids son contrato
+    // CRM↔esta ruta; el payload hacia n8n NO cambia de shape.
+    const { property_id, price_margin = 10, geo_radius = 5, dry_run = false, excluded_demand_ids = [] } = clientPayload;
 
     if (!property_id) {
       return NextResponse.json(
@@ -134,6 +136,33 @@ export async function POST(request: NextRequest) {
 
     console.log(`[N8N Diffusion Backend] Cruce seguro completado. Encontradas ${matches.length} coincidencias.`);
 
+    // 4b. dry_run (R19): devuelve los destinatarios para la preview del CRM
+    //     SIN llamar a n8n, sin registrar impactos y sin log de auditoría.
+    if (dry_run === true) {
+      return NextResponse.json({
+        success: true,
+        dry_run: true,
+        recipients: matches.map((m: any) => {
+          const lead = m.lead_id ? leadsById.get(m.lead_id) || null : null;
+          return {
+            demand_id: m.id,
+            lead_id: m.lead_id || null,
+            name: lead?.name || m.name,
+            phone: lead?.phone || m.phone,
+            email: lead?.email || m.email,
+            maxPricePreference: m.max_budget,
+          };
+        }),
+      });
+    }
+
+    // 4c. Exclusión por campaña (R19, default Q5: no se persiste entre campañas).
+    const excludedSet = new Set<string>(Array.isArray(excluded_demand_ids) ? excluded_demand_ids : []);
+    const finalMatches = matches.filter((m: any) => !excludedSet.has(m.id));
+    if (excludedSet.size > 0) {
+      console.log(`[N8N Diffusion Backend] ${excludedSet.size} destinatarios excluidos manualmente; envío a ${finalMatches.length}.`);
+    }
+
     // 5. Construir payload enriquecido seguro (oculto del navegador).
     //    Mismo contrato que antes: el workflow n8n no se toca.
     const richPayload = {
@@ -155,7 +184,7 @@ export async function POST(request: NextRequest) {
         priceMargin: price_margin,
         geoRadius: geo_radius
       },
-      recipients: matches.map((m: any) => {
+      recipients: finalMatches.map((m: any) => {
         const lead = m.lead_id ? leadsById.get(m.lead_id) || null : null;
         return {
           lead_id: m.lead_id || null,
@@ -193,7 +222,7 @@ export async function POST(request: NextRequest) {
       success: response.ok,
       status: response.status,
       statusText: response.statusText || 'OK',
-      match_count: matches.length
+      match_count: finalMatches.length
     });
   } catch (error) {
     console.error('[N8N Diffusion Proxy] Error:', error);
