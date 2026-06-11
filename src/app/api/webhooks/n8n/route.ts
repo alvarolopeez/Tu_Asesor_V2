@@ -194,42 +194,21 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // ─── Registrar Interacción IA ───────────────────
+      // ─── Registrar Interacción IA — TOMBSTONE (Brief #009 T1) ──────────
+      // La tabla `ai_interactions` está retirada (DROP 2026-06-11, decisión 6
+      // + OK de Álvaro); la telemetría real vive en
+      // `chatbot_messages.intent_detected`. Este case se conserva como no-op
+      // porque 3 workflows n8n activos (Difusión, Seguimiento, Bienvenida)
+      // aún envían la acción — y en Difusión/Seguimiento el nodo va DENTRO
+      // del loop de envíos sin neverError: un 400 abortaría la difusión tras
+      // el primer WhatsApp. Cuando se retiren esos nodos Log de n8n (brief
+      // futuro), eliminar también este tombstone.
       case 'log_interaction': {
-        const {
-          lead_id,
-          summary,
-          intent,
-          channel = 'whatsapp',
-          raw_message,
-          response_text,
-          confidence_score,
-          session_id,
-        } = data;
-
-        if (!lead_id || !summary) {
-          return NextResponse.json(
-            { error: 'Missing lead_id or summary' },
-            { status: 400 }
-          );
-        }
-
-        const { error } = await supabase.from('ai_interactions').insert({
-          lead_id,
-          summary,
-          intent,
-          channel,
-          raw_message,
-          response_text,
-          confidence_score,
-          session_id,
+        console.warn('[n8n bridge] acción deprecada log_interaction recibida (no-op):', {
+          lead_id: data?.lead_id,
+          intent: data?.intent,
         });
-
-        if (error) {
-          return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, deprecated: true });
       }
 
       // ─── Guardar Respuesta del Chatbot ──────────────

@@ -129,21 +129,11 @@ export interface Appointment {
   created_at: string;
 }
 
-// ─── AI INTERACTIONS ─────────────────────────────────
+// ─── AI ──────────────────────────────────────────────
 export type AIIntent = 'schedule_visit' | 'cancel_visit' | 'ask_price' | 'valuation' | 'general_inquiry';
 
-export interface AIInteraction {
-  id: string;
-  lead_id: string;
-  summary: string;
-  intent: AIIntent | null;
-  channel: string | null;       // [2026-05-14] Añadido por Agente IA
-  raw_message: string | null;   // [2026-05-14] Añadido por Agente IA
-  response_text: string | null; // [2026-05-14] Añadido por Agente IA
-  confidence_score: number | null; // [2026-05-14] Añadido por Agente IA
-  session_id: string | null;    // [2026-05-14] Añadido por Agente IA → FK a chatbot_conversations
-  created_at: string;
-}
+// (AIInteraction eliminado en Brief #009 T1: la tabla ai_interactions fue
+//  retirada; la telemetría vive en chatbot_messages.intent_detected.)
 
 // ─── CHATBOT (Nuevo - Agente IA 2026-05-14) ──────────
 export type ChatChannel = 'whatsapp' | 'web_widget' | 'chatwoot';
