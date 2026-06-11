@@ -16,6 +16,7 @@ import {
   UserPlus,
   Users,
   Download,
+  Edit3,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -508,6 +509,10 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
       honorarios: honorarios > 0 ? `${honorarios.toLocaleString("es-ES")} €` : "________",
       fecha_inicio: fmtDate(f.fechaInicio),
       fecha_fin: fmtDate(f.fechaFin),
+      // F4.1 (R15/D9, adelantada de la Sesión C): el placeholder existe en las
+      // 3 plantillas desde F0.5. Siempre informado → el merge nunca pinta
+      // "________" para esta clave; vacío significa "Ninguna.".
+      clausulas_adicionales: f.clausulasAdicionales?.trim() || "Ninguna.",
     };
 
     // ── Propuesta de compraventa: añade placeholders y firmantes propios ──
@@ -684,14 +689,34 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
     );
 
     try {
-      const { error } = await supabase.from("generated_documents").insert({
+      // El snapshot __form permite reabrir el borrador en la previa para
+      // editarlo (hotfix post-Sesión B). __recipients lo usa el envío a firmar.
+      const row = {
         template_id: template.id,
         property_id: lead?.property_id || null,
         seller_lead_id: form.leadId,
         buyer_id: form.buyerId || null,
-        merged_data: { ...ctx, __recipients: recipients },
+        merged_data: { ...ctx, __recipients: recipients, __form: form },
         signature_status: "draft",
-      });
+      };
+
+      if (form.editingDocId) {
+        // Edición de un borrador existente: UPDATE, sin duplicar fila ni
+        // re-disparar los auto-eventos de F3.4.
+        const { error } = await supabase
+          .from("generated_documents")
+          .update({ ...row, updated_at: new Date().toISOString() })
+          .eq("id", form.editingDocId)
+          .eq("signature_status", "draft");
+        if (error) throw error;
+        toast.success("Borrador actualizado");
+        setForm(null);
+        setPreviewDoc({ name: template.name, html });
+        fetchAll();
+        return;
+      }
+
+      const { error } = await supabase.from("generated_documents").insert(row);
       if (error) throw error;
 
       // Brief #011 F3.4 (R4/P11): al generar una PROPUESTA con comprador
@@ -734,6 +759,48 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
     } catch (err) {
       console.error("Error generando documento:", err);
       toast.error("No se pudo guardar el documento generado");
+    }
+  };
+
+  // ─── GENERADOS: editar borrador / eliminar (hotfix post-Sesión B #011) ───
+  /**
+   * Reabre la página previa con el snapshot __form del documento. Solo para
+   * BORRADORES: una vez enviado a Documenso, editar la copia del CRM
+   * desincronizaría lo que firma la gente. Documentos generados antes de este
+   * hotfix no tienen __form → se avisa (borrar y regenerar).
+   */
+  const handleEditGenerated = (g: GeneratedDocument) => {
+    if (g.signature_status !== "draft") {
+      toast.error("Solo se pueden editar borradores (este ya está en proceso de firma)");
+      return;
+    }
+    const snapshot = (g.merged_data as any)?.__form as GenForm | undefined;
+    if (!snapshot || !snapshot.kind) {
+      toast.error("Este documento se generó antes de la función de edición. Elimínalo y genera uno nuevo.");
+      return;
+    }
+    setForm({ ...snapshot, templateId: g.template_id || snapshot.templateId, editingDocId: g.id });
+  };
+
+  const handleDeleteGenerated = async (g: GeneratedDocument) => {
+    const tplName = templates.find((t) => t.id === g.template_id)?.name || "documento";
+    const warn =
+      g.signature_status === "completed"
+        ? `⚠️ Este "${tplName}" está FIRMADO. Eliminarlo lo quita del CRM (y de los encargos que lo enlacen), aunque seguirá existiendo en Documenso. ¿Eliminar igualmente?`
+        : g.signature_status === "sent" || g.signature_status === "viewed"
+          ? `⚠️ Este "${tplName}" está en proceso de firma en Documenso. Eliminarlo del CRM NO cancela la firma allí. ¿Eliminar igualmente?`
+          : `¿Eliminar el borrador de "${tplName}"? Esta acción no se puede deshacer.`;
+    if (!confirm(warn)) return;
+    try {
+      // encargos.nota_encargo_doc_id es FK ON DELETE SET NULL (verificado):
+      // borrar solo desvincula, no rompe el expediente.
+      const { error } = await supabase.from("generated_documents").delete().eq("id", g.id);
+      if (error) throw error;
+      toast.success("Documento eliminado");
+      fetchAll();
+    } catch (err: any) {
+      console.error("Error eliminando documento:", err);
+      toast.error("No se pudo eliminar el documento");
     }
   };
 
@@ -1008,10 +1075,18 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
                   const tpl = templates.find((t) => t.id === g.template_id);
                   const lead = sellerLeads.find((l) => l.id === g.seller_lead_id);
                   const st = STATUS_LABEL[g.signature_status] || STATUS_LABEL.draft;
+                  // Título descriptivo (hotfix post-Sesión B): plantilla + dirección
+                  // del inmueble del snapshot, para distinguir documentos del mismo
+                  // tipo ("Nota de Encargo — Calle Coral 6, 3ºD").
+                  const dirRaw = String((g.merged_data as any)?.["inmueble.direccion"] || "");
+                  const direccion = dirRaw && dirRaw !== "________" ? dirRaw : "";
                   return (
                     <div key={g.id} className="flex items-center justify-between gap-3 bg-slate-900/40 border border-white/5 rounded-xl px-4 py-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate">{tpl?.name || "Plantilla eliminada"}</p>
+                        <p className="text-sm font-bold text-white truncate">
+                          {tpl?.name || "Plantilla eliminada"}
+                          {direccion && <span className="text-[#FBBF24]"> — {direccion}</span>}
+                        </p>
                         <p className="text-[11px] text-slate-400 truncate">
                           {lead?.name || (g.merged_data as any)?.["vendedor.nombre"] || "Sin vendedor"} · {new Date(g.created_at).toLocaleDateString("es-ES")}
                         </p>
@@ -1023,6 +1098,15 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
                         >
                           <Printer size={12} /> Ver / PDF
                         </button>
+                        {g.signature_status === "draft" && (
+                          <button
+                            onClick={() => handleEditGenerated(g)}
+                            className="text-[11px] font-bold text-slate-200 bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1"
+                            title="Reabrir la página previa y editar este borrador"
+                          >
+                            <Edit3 size={12} /> Editar
+                          </button>
+                        )}
                         {g.signature_status === "draft" && (
                           <button
                             onClick={() => handleSendToSign(g)}
@@ -1042,6 +1126,13 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
                           </a>
                         )}
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded ${st.cls}`}>{st.label}</span>
+                        <button
+                          onClick={() => void handleDeleteGenerated(g)}
+                          className="text-slate-500 hover:text-red-400 p-1.5 hover:bg-white/10 rounded-lg transition-all"
+                          title="Eliminar documento"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -1525,12 +1616,28 @@ export default function DocumentsManager({ docIntent, onIntentConsumed }: Docume
                 )}
               </section>
 
+              {/* CLÁUSULAS ADICIONALES (R15/D9 — F4.1 adelantada): rellena el
+                  placeholder {{clausulas_adicionales}} de Nota/Propuesta/Contrato
+                  (F0.5). Vacío → "Ninguna." */}
+              {(form.kind === "nota" || form.kind === "propuesta" || form.kind === "contrato") && (
+                <section className="space-y-2">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-[#FBBF24]">Cláusulas adicionales</h4>
+                  <textarea
+                    rows={4}
+                    className={`${inputCls} resize-y`}
+                    placeholder='Cláusulas extra pactadas para este documento (una por línea). Si lo dejas vacío, el documento dirá "Ninguna.".'
+                    value={form.clausulasAdicionales || ""}
+                    onChange={(e) => patch({ clausulasAdicionales: e.target.value })}
+                  />
+                </section>
+              )}
+
               <div className="flex gap-3 pt-2 border-t border-white/10">
                 <button onClick={() => setForm(null)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl transition-all">
                   Cancelar
                 </button>
                 <button onClick={handleGenerate} className="flex-1 flex items-center justify-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] font-extrabold py-2.5 rounded-xl transition-all active:scale-95">
-                  <FilePlus2 size={16} /> Generar documento
+                  <FilePlus2 size={16} /> {form.editingDocId ? "Guardar cambios del borrador" : "Generar documento"}
                 </button>
               </div>
             </div>

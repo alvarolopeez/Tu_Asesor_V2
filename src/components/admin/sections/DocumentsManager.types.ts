@@ -82,6 +82,16 @@ export interface GenForm {
   kind: "nota" | "propuesta" | "contrato" | "comprador";
   /** Solo en contrato: id de la propuesta de origen que pre-rellenó el form. */
   sourceProposalId?: string;
+  /**
+   * Si está informado, "Generar" hace UPDATE de este generated_documents
+   * en vez de INSERT (edición de borradores, hotfix post-Sesión B #011).
+   */
+  editingDocId?: string;
+  /**
+   * Cláusulas adicionales libres (R15/D9, F4.1 adelantada): van al placeholder
+   * {{clausulas_adicionales}} de Nota/Propuesta/Contrato. Vacío → "Ninguna.".
+   */
+  clausulasAdicionales?: string;
   templateId: string;
   leadId: string;
   buyerId: string;
