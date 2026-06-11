@@ -60,6 +60,10 @@ interface AIReportContext {
   web_visits: {
     total: number;
   };
+  /** R21 (Brief #011 F1.5): impactos de difusión WhatsApp (Smart Matchmaker). */
+  diffusion: {
+    impacts: number;
+  };
   similar_properties: {
     sample: number;
     avg_price: number;
@@ -71,7 +75,7 @@ interface AIReportContext {
 
 function buildPrompt(ctx: AIReportContext): string {
   return [
-    'Eres analista inmobiliario senior en Sevilla. A partir EXCLUSIVAMENTE de los datos del inmueble y de sus interacciones reales (visitas, anotaciones, propuestas, días en mercado, visitas web), produce un informe en markdown con esta estructura:',
+    'Eres analista inmobiliario senior en Sevilla. A partir EXCLUSIVAMENTE de los datos del inmueble y de sus interacciones reales (visitas, anotaciones, propuestas, días en mercado, visitas web, impactos de difusión por WhatsApp), produce un informe en markdown con esta estructura:',
     '',
     '1. **Diagnóstico de mercado** — qué dice la actividad real del inmueble.',
     '2. **Análisis de demanda** — cómo se comporta vs media de la plataforma (cuando aplique).',
@@ -184,6 +188,13 @@ export async function POST(
   const webVisitsTotal = ((visits as { page_path: string }[] | null) || [])
     .filter((v) => v.page_path?.includes(propertyId)).length;
 
+  // 4b. Impactos de difusión WhatsApp (R21, Brief #011 F1.5): cuántas veces se
+  //     ha enviado este inmueble por el Smart Matchmaker.
+  const { count: diffusionImpacts } = await supabaseAdmin
+    .from('diffusion_impacts')
+    .select('id', { count: 'exact', head: true })
+    .eq('property_id', propertyId);
+
   // 5. Comparables: properties activas con price ±15% y misma zona.
   const priceLow = Math.round(Number(prop.price) * 0.85);
   const priceHigh = Math.round(Number(prop.price) * 1.15);
@@ -240,6 +251,9 @@ export async function POST(
     },
     web_visits: {
       total: webVisitsTotal,
+    },
+    diffusion: {
+      impacts: diffusionImpacts || 0,
     },
     similar_properties: {
       sample: similarSample.length,
