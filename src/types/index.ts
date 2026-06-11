@@ -39,6 +39,8 @@ export interface SellerActivityLog {
   notes: string | null;
   event_date: string;
   created_at: string;
+  /** Brief #011 F3.3: los eventos del ENCARGO llevan lead_id + property_id. */
+  property_id: string | null;
 }
 
 // ─── ENCARGOS (expediente de exclusiva) ──────────────

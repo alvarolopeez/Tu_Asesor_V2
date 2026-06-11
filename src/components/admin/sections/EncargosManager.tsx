@@ -32,6 +32,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -104,6 +105,9 @@ function fmtDate(d: string | Date | null | undefined): string {
 }
 
 export default function EncargosManager() {
+  // Brief #011 F3.3 (D12): el click en la fila abre la página completa
+  // /admin/encargos/[id]. El drawer se CONSERVA como vista rápida (botón ⧉).
+  const router = useRouter();
   const [encargos, setEncargos] = useState<Encargo[]>([]);
   const [leadsById, setLeadsById] = useState<Map<string, Lead>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -282,7 +286,7 @@ export default function EncargosManager() {
                   return (
                     <tr
                       key={r.id}
-                      onClick={() => setSelectedId(r.id)}
+                      onClick={() => router.push(`/admin/encargos/${r.id}`)}
                       className="hover:bg-white/[0.03] cursor-pointer transition-all group"
                     >
                       <td className="py-3 px-5">
@@ -321,7 +325,7 @@ export default function EncargosManager() {
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedId(r.id); }}
                           className="p-2 rounded-lg bg-white/5 hover:bg-[#FBBF24]/10 text-slate-300 hover:text-[#FBBF24] border border-white/5"
-                          title="Abrir expediente"
+                          title="Vista rápida (drawer)"
                         >
                           <ExternalLink size={13} />
                         </button>
