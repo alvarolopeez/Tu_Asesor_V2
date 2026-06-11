@@ -5,6 +5,44 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Brief #011 SESIÓN A: migraciones F0 + difusión 2.0 + UI vendedor
+
+**Commits** (en orden): `chore(gitnexus): reindex (3115 nodos, 123 flujos)` (2a989df) · F0.1 `feat(db): estados Activo/Desactivado en buyers_demands + ola de escritores` (b40a73c) · F1.1 `feat(diffusion): preview con exclusion de destinatarios (dry_run)` (013be02) · F1.2 `feat(diffusion): registro de impactos + evento Difusion en timeline` (4ab1ca6) · F1.3 `feat(properties): subida multiple de imagenes` (f9fb342) · F1.4 `fix(analytics): track de vistas del detalle de inmueble` (92c4d9f) · F1.5 `feat(ai-report): incluye impactos de difusion` (7ce5b11) · F2.1 `feat(sellers): funnel de 4 estados en la UI + recalibrado de dashboards` (2ac325b) · F2.2 `feat(sellers): alta manual de vendedores` (3bfe322) · F2.3 `feat(sellers): boton firmar nota de encargo (DocIntent)` (6f09c50) · esta entrada de docs.
+
+**Migraciones F0 aplicadas en producción (Supabase MCP, OK explícito de Álvaro, SELECT antes/después en cada una)**:
+1. **F0.1** `UPDATE buyers_demands SET status=...` → 3 filas 'Búsqueda activa' → `'Activo'` (0 'Inactivo' existían) + migración `buyers_demands_status_default_activo` (DEFAULT de la columna pasó de 'Búsqueda activa' a 'Activo' — **añadido no listado en el brief**: sin él, cualquier INSERT sin status reintroducía el valor viejo).
+2. **F0.2** `create_diffusion_impacts`: tabla `diffusion_impacts` (FKs ON DELETE SET NULL a properties/buyers_demands/leads, status default 'sent') + RLS policy authenticated.
+3. **F0.3a** `create_buyer_documents_and_demand_notes`: tabla `buyer_documents` espejo FIEL de `encargo_documents` → usa **`uploaded_at`** (NO `created_at` como esbozaba el brief) y kind/file_url NOT NULL; RLS authenticated. + columna **`buyers_demands.notes text`** (verificado: NO existía ningún campo de descripción libre; F3.1 lo necesita).
+4. **F0.3b** `create_buyer_files_bucket_and_policies`: bucket `buyer-files` PRIVADO + 4 policies de storage espejo exacto de `encargo-files` (read/insert/update/delete, rol authenticated, filtro bucket_id; leídas con pg_policies ANTES de copiar: 4 filas).
+5. **F0.4** `signature_status_add_buyer_signed`: el CHECK existía (`generated_documents_signature_status_check` con draft/sent/viewed/completed/rejected) → DROP+ADD con `'buyer_signed'`. Verificado después.
+6. **F0.5** 3 UPDATEs en `document_templates` (Nota 9990224f / Propuesta 64b8da33 / Contrato f2ed3f42): sección `## Cláusulas adicionales` + `{{clausulas_adicionales}}` insertada ANTES de la fórmula de cierre de cada plantilla (marcadores únicos verificados: 'En Sevilla, a {{fecha}}.' / 'En {{lugar}}, a {{fecha}}.' / 'Y en prueba de su total conformidad'). Formato `## ` porque `brandedDoc.ts` lo renderiza como cabecera de sección. ⚠️ Hasta F4.2 el merge sustituye la clave vacía por "________" (en Sesión C pasa a "Ninguna.").
+
+**F0.1 ola de código** (mismo commit-wave): `appointmentService` (2 escrituras), `BuyerRegistrationModal` (insert+update), `leadService.upsertMinimalBuyerDemand`, `scheduling.upsertBuyerDemand` (⚠️ único cambio permitido en scheduling.ts: el string literal; impact HIGH avisado y aceptado), `BuyersManager` (union 2 valores, dropdown 2 opciones, **vista Activos por defecto + toggle "Archivo"** que lista Desactivados, métricas: Activos/En Archivo/Total). Sin fixtures de tests con el valor viejo (verificado). `matchDemand` (diffusionMatch.ts) descarta demands `'Desactivado'` (reason `demand_status`, +3 tests → suite 115).
+
+**F1 — Difusión 2.0 + bugs inmuebles**:
+- **F1.1 (R19)**: `/api/n8n/diffusion` acepta `dry_run` (devuelve `{recipients}` con demand_id SIN llamar a n8n ni loguear) y `excluded_demand_ids` (filtra el envío real). **El payload a n8n NO cambió de shape.** SmartMatchmakerModal: botón "Revisar Destinatarios" → preview del matching REAL del server con checkboxes → "Lanzar a N destinatarios". Exclusión POR CAMPAÑA, no se persiste (**default Q5 aplicado**).
+- **F1.2 (R19)**: en el envío real (webhook OK): INSERT por destinatario en `diffusion_impacts` + evento `'Difusión'` en `buyer_activity_logs` (title con el inmueble, property_id). Fire-and-soft. La ruta usa cliente service-role local (RLS de diffusion_impacts es authenticated-only). Caso 'Difusión' (📣 fucsia) en `getTimelineIconConfig`.
+- **F1.3 (R20)**: PropertyFormModal — input de fotos `multiple`, subida secuencial con progreso (n de m) y resumen éxitos/fallos; un fallo no aborta el resto. Vídeo/plano siguen mono-archivo.
+- **F1.4 (R18/D10, causa raíz)**: el detalle de `/comprar` es un modal sin cambio de URL → AnalyticsTracker (usePathname) no registraba nada. Fix: useEffect al abrir el modal → POST `/api/analytics/track` con `page_path: "/comprar/p/<property_id>"` + `session_id` de localStorage (`analytics_session_id`, mismo de AnalyticsTracker; crypto.randomUUID si no existe) + mismo shape. Verificado que EncargosManager (Publicación web) y Operaciones cuentan por `page_path.includes(property_id)` → estas filas cuentan.
+- **F1.5 (R21)**: ai-report cuenta `diffusion_impacts` del property y lo expone en `context.diffusion.impacts` + mención en el prompt.
+
+**F2 — UI vendedor**:
+- **F2.1 (R8/D1)**: WarmLeadsManager STATUS_CONFIG 6→4 (`new`=Nuevo Lead, `contacted`=Contacto Establecido, `closed`=Adquisición Hecha, `lost`=Inactivo/Perdido); dropdown+filtro con solo 4; fallback `LEGACY_STATUS_BADGE` (badge gris "Estado legacy") para filas qualified/visit_scheduled (hoy 0 en BD). Recalibrado: `computePipeline`/`PipelineCard` de 5 etapas a 3 (nuevos/contactados/adquisiciones); MarketingTab `qualifiedLeads` bifurca por type (seller: contacted/closed; buyer: intacto con 6). DashboardOverview no leía estados de vendedor (verificado).
+- **F2.2 (R6)**: botón "Nuevo Vendedor" + modal (nombre*, teléfono* con normalizeEsPhone, email, origen LEAD_SOURCE_OPTIONS default 'Alta Manual', dirección → preferences.property_address). Dedupe por phone: si existe muestra/abre el lead existente (seller→drawer; closed→aviso módulo Encargos; buyer→aviso sin crear); race 23505 con retry. INSERT `type='seller', status='new'` + log 'Alta en CRM' en seller_activity_logs.
+- **F2.3 (R9)**: botón "Firmar Nota de Encargo" en el tab Ficha Inmueble del drawer → `onGoToDocuments({kind:'nota', leadId})` (DocIntent #008). Oculto si closed.
+
+**Verificación**: `npm run build` + `npm test` (115/115) verdes antes de CADA commit · `gitnexus_detect_changes` por commit (HIGH en la ola F0.1 por fan-in del chatbot sobre upsertBuyerDemand/bookPublicAppointment — avisado, cambio = solo string literal; resto LOW/MEDIUM esperados).
+
+**Pendiente (Sesiones B y C del brief #011)**: F3 (gate AdminAuthGate + perfiles `/admin/buyers|sellers|encargos/[id]` + auto-eventos) · F4 (SPIKE Documenso + propuesta buyer_signed + gate Aceptar propuesta + contrato/cierre comprador) · F5 (retirar nodos log_interaction de n8n con OK + Chatwoot cosmético + cierre docs).
+
+**Gotchas para futuros agentes**:
+- `buyer_documents` usa `uploaded_at` (como encargo_documents) — NO `created_at`.
+- La preview de difusión (dry_run) responde `recipients[].demand_id`; la exclusión viaja como `excluded_demand_ids` dentro de `payload` (contrato CRM↔ruta; n8n no lo ve jamás).
+- El registro de impactos exige `SUPABASE_SERVICE_ROLE_KEY` en runtime (Netlify ya la tiene; la ruta cae a anon y loguea warn si falta).
+- Los eventos 'Difusión' usan `buyer_id` = id de la DEMAND (convención de buyer_activity_logs).
+
+---
+
 ### 2026-06-11 — Brief #010: blog automático diario con noticias del sector (cron 08:00)
 
 **Commits**: `chore(gitnexus): reindex` (b8634e8) · T0 `refactor(blog): extrae generateSlug a util compartida` (d69746a) · T1-T3 `feat(blog): generacion automatica diaria de posts de noticias` (264076c) · esta entrada de docs.
