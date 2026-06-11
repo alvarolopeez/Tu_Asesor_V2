@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     // que PostgREST pueda embedar de forma fiable — igual que en /api/documents/send).
     const { data: docRow, error: fetchErr } = await supabaseAdmin
       .from("generated_documents")
-      .select("id, template_id, seller_lead_id, buyer_id, property_id")
+      .select("id, template_id, seller_lead_id, buyer_id, property_id, merged_data")
       .eq("documenso_id", String(documensoId))
       .maybeSingle();
     if (fetchErr) throw fetchErr;
@@ -119,6 +119,56 @@ export async function POST(req: NextRequest) {
       await insertSignatureEvents(completedDoc).catch((err) =>
         console.warn("[Documenso webhook] auto-eventos de firma fallaron:", err?.message || err),
       );
+    }
+
+    // F4.3: aceptación de propuesta firmada → completar la propuesta origen + evento.
+    const mergedData = (docRow as any).merged_data as Record<string, any> | null;
+    if (finalStatus === "completed" && mergedData?.__source_proposal_id) {
+      const sourceId = String(mergedData.__source_proposal_id);
+      const { error: updPropErr } = await supabaseAdmin
+        .from("generated_documents")
+        .update({ signature_status: "completed", updated_at: new Date().toISOString() })
+        .eq("id", sourceId);
+      if (updPropErr) {
+        console.warn("[Documenso webhook] F4.3 completar propuesta origen falló:", updPropErr.message);
+      }
+
+      if (docRow.seller_lead_id) {
+        const marker = `ref propuesta: ${sourceId}`;
+        const { data: dup } = await supabaseAdmin
+          .from("seller_activity_logs")
+          .select("id")
+          .eq("lead_id", docRow.seller_lead_id)
+          .eq("event_type", "Propuesta aceptada")
+          .ilike("notes", `%${marker}%`)
+          .limit(1);
+        if (!dup || dup.length === 0) {
+          const { error: evErr } = await supabaseAdmin
+            .from("seller_activity_logs")
+            .insert({
+              lead_id: docRow.seller_lead_id,
+              event_type: "Propuesta aceptada",
+              title: "Propuesta de compraventa aceptada por el vendedor",
+              notes: `El vendedor firmó la aceptación. (${marker}).`,
+              event_date: new Date().toISOString(),
+              property_id: docRow.property_id || null,
+            });
+          if (evErr) {
+            console.warn("[Documenso webhook] F4.3 evento Propuesta aceptada falló:", evErr.message);
+          }
+        }
+      }
+    }
+
+    // F4.4: contrato privado firmado → cerrar lead comprador + desactivar demanda.
+    if (finalStatus === "completed" && docRow.buyer_id && tplRow) {
+      const kind = detectKind({
+        name: tplRow.name || "",
+        category: tplRow.category || "",
+      } as DocumentTemplate);
+      if (kind === "contrato") {
+        await closeContractBuyer(docRow.buyer_id);
+      }
     }
 
     return NextResponse.json({ ok: true });
@@ -182,6 +232,46 @@ async function insertSignatureEvents(doc: CompletedDocRow): Promise<void> {
       property_id: doc.property_id || null,
     });
     if (error) console.warn(`[Documenso webhook] insert evento en ${ev.table} falló:`, error.message);
+  }
+}
+
+/**
+ * F4.4: cierra el lead del comprador y desactiva su demanda al firmar contrato.
+ * Terminal idempotente — UPDATE directo, sin helper leadFunnel.
+ */
+async function closeContractBuyer(buyerId: string): Promise<void> {
+  const { data: demand } = await supabaseAdmin
+    .from("buyers_demands")
+    .select("id, lead_id, status")
+    .eq("id", buyerId)
+    .maybeSingle();
+  if (!demand) return;
+
+  if (demand.lead_id) {
+    const { data: leadRow } = await supabaseAdmin
+      .from("leads")
+      .select("id, status")
+      .eq("id", demand.lead_id)
+      .maybeSingle();
+    if (leadRow && leadRow.status !== "closed") {
+      const { error: closeErr } = await supabaseAdmin
+        .from("leads")
+        .update({ status: "closed", updated_at: new Date().toISOString() })
+        .eq("id", demand.lead_id);
+      if (closeErr) {
+        console.warn("[Documenso webhook] F4.4 cerrar lead comprador falló:", closeErr.message);
+      }
+    }
+  }
+
+  if (demand.status !== "Desactivado") {
+    const { error: deactErr } = await supabaseAdmin
+      .from("buyers_demands")
+      .update({ status: "Desactivado", updated_at: new Date().toISOString() })
+      .eq("id", buyerId);
+    if (deactErr) {
+      console.warn("[Documenso webhook] F4.4 desactivar demanda falló:", deactErr.message);
+    }
   }
 }
 

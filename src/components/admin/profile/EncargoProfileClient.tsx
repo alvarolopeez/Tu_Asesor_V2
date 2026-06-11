@@ -108,6 +108,18 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
   const [propMetrics, setPropMetrics] = useState<{ visits: number; appointments: number } | null>(null);
   const [linking, setLinking] = useState(false);
 
+  // F4.3/F4.4: propuestas buyer_signed o completed del vendedor de este encargo.
+  const [proposals, setProposals] = useState<Array<{
+    id: string;
+    created_at: string;
+    merged_data: Record<string, any>;
+    buyer_id: string | null;
+    signature_status: string;
+    buyerName?: string;
+  }>>([]);
+  const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(null);
+  const [sentProposals, setSentProposals] = useState<Set<string>>(new Set());
+
   // Actividad de COMPRADORES sobre el inmueble del encargo (read-only,
   // fusionada en el timeline — paridad con el drawer antiguo).
   const [buyerExtraLogs, setBuyerExtraLogs] = useState<ExtraTimelineLog[]>([]);
@@ -157,6 +169,37 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
   useEffect(() => {
     void fetchEncargo();
   }, [fetchEncargo]);
+
+  // F4.3: carga las propuestas buyer_signed/completed del vendedor de este encargo.
+  useEffect(() => {
+    if (!encargo?.seller_lead_id) return;
+    let cancelled = false;
+    const PROPUESTA_TEMPLATE_ID = "64b8da33-e0ba-41fd-af94-4e3afde2dfc3";
+    (async () => {
+      const { data } = await supabase
+        .from("generated_documents")
+        .select("id, created_at, merged_data, buyer_id, signature_status")
+        .eq("seller_lead_id", encargo.seller_lead_id)
+        .eq("template_id", PROPUESTA_TEMPLATE_ID)
+        .in("signature_status", ["buyer_signed", "completed"])
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      const rows = (data || []) as Array<{ id: string; created_at: string; merged_data: any; buyer_id: string | null; signature_status: string }>;
+      const buyerIds = [...new Set(rows.map((r) => r.buyer_id).filter(Boolean))] as string[];
+      let nameMap = new Map<string, string>();
+      if (buyerIds.length > 0) {
+        const { data: demands } = await supabase
+          .from("buyers_demands")
+          .select("id, name")
+          .in("id", buyerIds);
+        nameMap = new Map(((demands as any[]) || []).map((d: any) => [d.id, d.name as string]));
+      }
+      if (!cancelled) {
+        setProposals(rows.map((r) => ({ ...r, merged_data: r.merged_data || {}, buyerName: nameMap.get(r.buyer_id!) })));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [encargo?.seller_lead_id, encargo?.id]);
 
   // Carga por tab (patrón del drawer de EncargosManager)
   useEffect(() => {
@@ -382,6 +425,38 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
     }
   };
 
+  // F4.3: acepta una propuesta buyer_signed → genera doc Aceptación para el vendedor.
+  const handleAcceptProposal = async (proposalId: string) => {
+    if (!encargo || !lead?.email) {
+      toast.error("El vendedor no tiene email registrado. Añádelo en su ficha antes de aceptar.");
+      return;
+    }
+    if (!confirm("¿Enviar la aceptación de propuesta al vendedor para su firma?")) return;
+    setAcceptingProposalId(proposalId);
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/accept`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          encargoId: encargo.id,
+          sellerLeadId: encargo.seller_lead_id,
+          sellerName: lead.name,
+          sellerEmail: lead.email,
+          propertyId: encargo.property_id || null,
+          direccion: encargo.direccion || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Error al enviar la aceptación");
+      toast.success("Aceptación enviada al vendedor por email (Documenso).");
+      setSentProposals((prev) => new Set([...prev, proposalId]));
+    } catch (err: any) {
+      toast.error(err.message || "No se pudo enviar la aceptación");
+    } finally {
+      setAcceptingProposalId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
@@ -521,16 +596,69 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
               </div>
             </div>
 
-            {/* Hueco del gate de propuestas (F4.3/F4.4): aquí se listarán las
-                propuestas buyer_signed del vendedor con el botón "Aceptar
-                propuesta" cuando se ejecute la Sesión C del brief #011. */}
-            <div className="bg-[#1E293B]/60 border border-dashed border-white/10 rounded-2xl p-6 text-center">
-              <FileText className="mx-auto text-slate-500 mb-2" size={28} />
-              <p className="text-sm font-bold text-slate-300">Propuestas recibidas</p>
-              <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
-                Cuando un comprador firme una propuesta sobre este encargo, aparecerá aquí
-                con el botón «Aceptar propuesta» para lanzar la firma del vendedor (en preparación, F4).
-              </p>
+            {/* F4.3/F4.4: Gate de propuestas */}
+            <div className="bg-[#1E293B] border border-white/5 rounded-2xl p-6 shadow-xl">
+              <h2 className="text-xs font-black text-[#FBBF24] uppercase tracking-wider flex items-center gap-2 mb-4">
+                <FileText size={14} /> Propuestas recibidas
+              </h2>
+              {!encargo.seller_lead_id ? (
+                <p className="text-[11px] text-slate-500 italic">
+                  El encargo no tiene vendedor vinculado.
+                </p>
+              ) : proposals.length === 0 ? (
+                <p className="text-[11px] text-slate-500 italic">
+                  Ningún comprador ha firmado aún una propuesta sobre este encargo.
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {proposals.map((p) => (
+                    <li
+                      key={p.id}
+                      className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 border ${
+                        p.signature_status === "completed"
+                          ? "bg-emerald-500/5 border-emerald-500/20"
+                          : "bg-[#0F172A]/60 border-amber-500/20"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">
+                          {p.buyerName || p.merged_data?.["comprador.nombre"] || "Comprador desconocido"}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Firmada el {fmtDate(p.created_at)} ·{" "}
+                          {p.signature_status === "completed" ? (
+                            <span className="text-emerald-300 font-bold">Propuesta aceptada</span>
+                          ) : sentProposals.has(p.id) ? (
+                            <span className="text-amber-300 font-bold">Aceptación enviada al vendedor</span>
+                          ) : (
+                            <span className="text-amber-300 font-bold">Pendiente de aceptar</span>
+                          )}
+                        </p>
+                      </div>
+                      {p.signature_status === "completed" ? (
+                        <Link
+                          href={`/admin/dashboard?docKind=contrato&docLeadId=${encargo.seller_lead_id}&docEncargoId=${encargo.id}${p.buyer_id ? `&docBuyerId=${p.buyer_id}` : ""}`}
+                          className="text-xs font-extrabold text-[#2C3E50] bg-emerald-400 hover:bg-emerald-300 px-4 py-2 rounded-xl whitespace-nowrap"
+                        >
+                          Generar Contrato privado
+                        </Link>
+                      ) : sentProposals.has(p.id) ? (
+                        <span className="text-[11px] text-amber-300/70 italic whitespace-nowrap">
+                          En espera de firma del vendedor…
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => void handleAcceptProposal(p.id)}
+                          disabled={acceptingProposalId === p.id}
+                          className="text-xs font-extrabold text-[#2C3E50] bg-[#FBBF24] hover:bg-yellow-500 px-4 py-2 rounded-xl disabled:opacity-50 whitespace-nowrap"
+                        >
+                          {acceptingProposalId === p.id ? "Enviando…" : "Aceptar propuesta"}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         )}

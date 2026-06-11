@@ -84,6 +84,8 @@ function shouldAdvisorSign(category?: string): boolean {
   if (c.includes("visita")) return false;
   // D7: Álvaro NO firma la propuesta — solo el comprador firma en primer lugar.
   if (c.includes("propuesta")) return false;
+  // La aceptación de propuesta la firma solo el vendedor.
+  if (c.includes("aceptacion") || c.includes("aceptación")) return false;
   return true;
 }
 
