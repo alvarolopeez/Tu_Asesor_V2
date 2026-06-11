@@ -18,8 +18,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/utils";
 import AdminAuthGate from "@/components/admin/AdminAuthGate";
-import ActivityTimeline from "./ActivityTimeline";
-import { getSellerTimelineIconConfig } from "./timelineIcons";
+import ActivityTimeline, { type ExtraTimelineLog } from "./ActivityTimeline";
+import { getBuyerTimelineIconConfig, getSellerTimelineIconConfig } from "./timelineIcons";
 import type { Encargo, EncargoDocument, EncargoDocumentKind, EncargoStatus, Lead } from "@/types";
 import {
   ArrowLeft,
@@ -108,6 +108,10 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
   const [propMetrics, setPropMetrics] = useState<{ visits: number; appointments: number } | null>(null);
   const [linking, setLinking] = useState(false);
 
+  // Actividad de COMPRADORES sobre el inmueble del encargo (read-only,
+  // fusionada en el timeline — paridad con el drawer antiguo).
+  const [buyerExtraLogs, setBuyerExtraLogs] = useState<ExtraTimelineLog[]>([]);
+
   const fetchEncargo = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -173,6 +177,47 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
           .eq("encargo_id", encargo.id)
           .order("created_at", { ascending: false });
         if (!cancelled) setVinculatedDocs(docs || []);
+      } else if (tab === "actividad") {
+        // Actividad del comprador vinculada a este inmueble (p.ej. una visita
+        // registrada desde /admin/buyers/[id] con "Vincular a Inmueble").
+        // Se EXCLUYEN los tipos que F3.4 ya espeja en el log del vendedor
+        // (Propuesta/firmas) para no duplicar entradas en la fusión.
+        if (!encargo.property_id) {
+          if (!cancelled) setBuyerExtraLogs([]);
+          return;
+        }
+        const MIRRORED = ["Propuesta", "Propuesta firmada", "Contrato privado firmado"];
+        const { data: buyerLogs } = await supabase
+          .from("buyer_activity_logs")
+          .select("*")
+          .eq("property_id", encargo.property_id)
+          .order("event_date", { ascending: false });
+        const rows = ((buyerLogs as any[]) || []).filter((l) => !MIRRORED.includes(l.event_type));
+
+        // Nombre del comprador para el badge de procedencia.
+        const demandIds = Array.from(new Set(rows.map((l) => l.buyer_id).filter(Boolean)));
+        let namesById = new Map<string, string>();
+        if (demandIds.length > 0) {
+          const { data: demands } = await supabase
+            .from("buyers_demands")
+            .select("id, name")
+            .in("id", demandIds);
+          namesById = new Map(((demands as any[]) || []).map((d) => [d.id, d.name]));
+        }
+
+        if (!cancelled) {
+          setBuyerExtraLogs(
+            rows.map((l) => ({
+              id: `buyer-${l.id}`,
+              event_type: l.event_type,
+              title: l.title,
+              notes: l.notes,
+              event_date: l.event_date,
+              iconConfig: getBuyerTimelineIconConfig(l.event_type),
+              badge: `Comprador · ${namesById.get(l.buyer_id) || "—"}`,
+            })),
+          );
+        }
       } else if (tab === "publicacion") {
         const { data: props } = await supabase
           .from("properties")
@@ -583,6 +628,7 @@ function EncargoProfileBody({ encargoId }: { encargoId: string }) {
                 getIconConfig={getSellerTimelineIconConfig}
                 filterPropertyId={encargo.property_id || undefined}
                 insertExtras={{ property_id: encargo.property_id || null }}
+                extraLogs={buyerExtraLogs}
                 onEventCreated={handleEventCreated}
                 scopeNote={
                   encargo.property_id

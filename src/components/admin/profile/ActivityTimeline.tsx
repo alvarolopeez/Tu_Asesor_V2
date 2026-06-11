@@ -33,6 +33,22 @@ export interface NewTimelineEvent {
   event_date: string; // ISO
 }
 
+/**
+ * Entrada adicional de SOLO LECTURA fusionada cronológicamente con los logs
+ * propios (hotfix post-Sesión B: el timeline del encargo muestra también la
+ * actividad del comprador sobre ese inmueble, como hacía el drawer antiguo).
+ * Trae su propia config de icono y un badge de procedencia.
+ */
+export interface ExtraTimelineLog {
+  id: string;
+  event_type: string;
+  title: string;
+  notes: string | null;
+  event_date: string;
+  iconConfig: TimelineIconConfig;
+  badge?: string;
+}
+
 interface ActivityTimelineProps {
   table: "buyer_activity_logs" | "seller_activity_logs";
   ownerColumn: "buyer_id" | "lead_id";
@@ -49,6 +65,8 @@ interface ActivityTimelineProps {
   onEventCreated?: (event: NewTimelineEvent) => void | Promise<void>;
   /** Nota de alcance visible (p.ej. "Mostrando el timeline completo del vendedor"). */
   scopeNote?: string;
+  /** Entradas read-only de otras fuentes, fusionadas por fecha (sin editar/borrar). */
+  extraLogs?: ExtraTimelineLog[];
 }
 
 export default function ActivityTimeline({
@@ -62,6 +80,7 @@ export default function ActivityTimeline({
   properties,
   onEventCreated,
   scopeNote,
+  extraLogs,
 }: ActivityTimelineProps) {
   const [logs, setLogs] = useState<TimelineLogRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,6 +208,23 @@ export default function ActivityTimeline({
 
   const knownType = (type: string) => eventTypes.some((t) => t.value === type);
 
+  // Fusión cronológica de los logs propios (editables) con los extras
+  // read-only. Cada item lleva resuelta su config de icono y si es editable.
+  const mergedLogs = [
+    ...logs.map((log) => ({
+      log,
+      iconConf: getIconConfig(log.event_type),
+      badge: undefined as string | undefined,
+      editable: true,
+    })),
+    ...(extraLogs || []).map((ex) => ({
+      log: ex as TimelineLogRow,
+      iconConf: ex.iconConfig,
+      badge: ex.badge,
+      editable: false,
+    })),
+  ].sort((a, b) => new Date(b.log.event_date).getTime() - new Date(a.log.event_date).getTime());
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -308,11 +344,10 @@ export default function ActivityTimeline({
       <div className="relative pl-6 border-l-2 border-white/10 space-y-6 pt-2 ml-3">
         {loading ? (
           <div className="py-8 text-center text-xs text-slate-400">Cargando historial...</div>
-        ) : logs.length === 0 ? (
+        ) : mergedLogs.length === 0 ? (
           <div className="py-6 text-center text-xs text-slate-500">Historial vacío. Registra el primer evento de seguimiento.</div>
         ) : (
-          logs.map((log) => {
-            const iconConf = getIconConfig(log.event_type);
+          mergedLogs.map(({ log, iconConf, badge, editable }) => {
             return (
               <div key={log.id} className="relative group/log">
                 <div className={`absolute -left-[31px] top-1.5 w-4 h-4 rounded-full border-2 ${iconConf.color} bg-[#111827] shadow-lg transition-transform group-hover/log:scale-125`} />
@@ -323,6 +358,11 @@ export default function ActivityTimeline({
                       <span className={`text-[9px] font-black uppercase tracking-wider ${iconConf.textColor}`}>
                         {iconConf.label}
                       </span>
+                      {badge && (
+                        <span className="ml-2 text-[9px] font-bold uppercase tracking-wider text-slate-300 bg-white/10 border border-white/10 px-1.5 py-0.5 rounded">
+                          {badge}
+                        </span>
+                      )}
                       <h5 className="font-bold text-white text-sm mt-0.5">{log.title}</h5>
                     </div>
                     <span className="text-[10px] text-slate-500 font-medium">
@@ -351,20 +391,22 @@ export default function ActivityTimeline({
                     </div>
                   )}
 
-                  <div className="flex justify-end gap-2 pt-1 opacity-0 group-hover/log:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => startEdit(log)}
-                      className="text-[10px] text-slate-400 hover:text-[#FBBF24] flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Edit3 size={10} /> Editar
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(log.id)}
-                      className="text-[10px] text-rose-500/80 hover:text-rose-400 flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <Trash2 size={10} /> Eliminar
-                    </button>
-                  </div>
+                  {editable && (
+                    <div className="flex justify-end gap-2 pt-1 opacity-0 group-hover/log:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => startEdit(log)}
+                        className="text-[10px] text-slate-400 hover:text-[#FBBF24] flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Edit3 size={10} /> Editar
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(log.id)}
+                        className="text-[10px] text-rose-500/80 hover:text-rose-400 flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <Trash2 size={10} /> Eliminar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
