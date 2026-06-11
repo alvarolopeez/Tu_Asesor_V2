@@ -5,6 +5,33 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Brief #010: blog automático diario con noticias del sector (cron 08:00)
+
+**Commits**: `chore(gitnexus): reindex` (b8634e8) · T0 `refactor(blog): extrae generateSlug a util compartida` (d69746a) · T1-T3 `feat(blog): generacion automatica diaria de posts de noticias` (264076c) · esta entrada de docs.
+
+**Qué hay nuevo**:
+- **`src/lib/blog/`**: `slug.ts` (generateSlug compartida con BlogManager), `blogPrompt.ts` (prompt redactor + anti-repetición), `generateNewsPost.ts` (Gemini con tool `google_search` — grounding 2.x; modelo `BLOG_LLM_MODEL` default `gemini-2.5-flash`, **separado del `LLM_MODEL` del chatbot**), `validateDraft.ts` (guardarraíl T3).
+- **`POST /api/cron/generate-blog`**: auth `x-cron-secret` en tiempo constante (patrón documenso) · idempotencia diaria (200 `skipped` si ya hay post hoy, día UTC) · títulos de 7 días al prompt · validación dura (title 10-120, content ≥800 con párrafos y sin JSON crudo, excerpt 40-300, SEO con fallback, ≥1 fuente del grounding) → **422 sin insertar si falla (decisión 1: mejor saltar un día que publicar basura)** · slug único con sufijos `-2..` · insert service-role `is_published=true`, `cover_image=null` · log en `n8n_webhook_logs` (`cron_generate_blog`).
+- **27 tests nuevos** (`src/lib/blog/__tests__/`): parseo por niveles, grounding URLs, anti-repetición en prompt, validación, auth 401/503, idempotencia, slug único. Suite total: 112.
+- ⚠️ Gemini grounding NO admite `responseMimeType: application/json` junto con tools → el JSON se exige por prompt y se parsea por niveles (fences → parse → recorte de llaves → null).
+
+**Infra (no commiteado)**:
+- **`CRON_SECRET`**: añadido a `.env.local` y creado en Netlify vía API (site `8eac5c66-...`, contexts all, scopes builds+functions) **sin pasar el valor por el transcript**. Requiere el deploy posterior a este push para estar disponible en runtime.
+- **Workflow n8n NUEVO: `Blog Diario Noticias`** (id `MkaXNPdireWCIGmS`, proyecto personal, **INACTIVO**): Schedule cron `0 0 8 * * *` → HTTP POST a la ruta (timeout 120s, neverError) → IF published/skipped → rama OK o aviso WhatsApp a Álvaro (plantilla `aviso_alvaro`) si un día no se publica. **Los workflows de producción NO se tocaron.**
+
+**Acciones pendientes de Álvaro (el workflow no funciona hasta hacerlas)**:
+1. En n8n, nodo "Generar Post Blog CRM" → crear la credencial Header Auth (`x-cron-secret` + valor de CRON_SECRET de `.env.local`). El secreto NO va en el JSON del workflow a propósito.
+2. Nodo "Aviso WhatsApp Alvaro" → seleccionar la credencial Bearer existente de Meta WA.
+3. Workflow Settings → Timezone `Europe/Madrid`.
+4. **Activar `Blog Diario Noticias` y DESACTIVAR el antiguo `Generador Diario Blog`** (tFk38qR62f1yEnuz): ambos corren a las 08:00 y colisionarían con la dedup diaria. Nota: el antiguo no publica desde el 2026-06-09.
+
+**Gotchas para futuros agentes**:
+- NO encadenar `.select()` tras el insert de `posts` con anon (no aplica aquí: la ruta usa service-role, pero el patrón general de `tool_calculations` del #009 aplica igual).
+- Si se cambia `BLOG_LLM_MODEL` a un 1.5, la tool de grounding cambia de nombre (`google_search` → `google_search_retrieval`) — está aislado en `generateNewsPost.ts`.
+- La idempotencia es por día UTC: un retry de n8n el mismo día devuelve `skipped`, no duplica.
+
+---
+
 ### 2026-06-11 — Brief #009: cleanup final (tablas muertas, código huérfano, coherencia)
 
 **Commits** (en orden):
