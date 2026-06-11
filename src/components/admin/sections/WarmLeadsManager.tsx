@@ -41,7 +41,8 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import EncargoFormModal, { type EncargoInitialValues } from "./encargos/EncargoFormModal";
-import { displaySource, LEAD_SOURCE_OPTIONS } from "@/lib/leadSources";
+import { displaySource, LEAD_SOURCE, LEAD_SOURCE_OPTIONS } from "@/lib/leadSources";
+import { normalizeEsPhone } from "@/lib/phone";
 
 // ─── INTERFACES & HELPER TYPES ──────────────────────────────────────────
 interface WarmLeadsManagerProps {
@@ -118,6 +119,15 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
   // Promoción de lead → Encargo en exclusiva (reutiliza el form de Inmuebles)
   const [showPromoteForm, setShowPromoteForm] = useState(false);
 
+  // Brief #011 F2.2 (R6): alta manual de vendedores
+  const [showNewSellerModal, setShowNewSellerModal] = useState(false);
+  const [newSellerName, setNewSellerName] = useState("");
+  const [newSellerPhone, setNewSellerPhone] = useState("");
+  const [newSellerEmail, setNewSellerEmail] = useState("");
+  const [newSellerSource, setNewSellerSource] = useState<string>(LEAD_SOURCE.MANUAL);
+  const [newSellerAddress, setNewSellerAddress] = useState("");
+  const [creatingSeller, setCreatingSeller] = useState(false);
+
   // ─── INITIALIZATION & SYNC ─────────────────────────────────────────────
   useEffect(() => {
     if (leads) {
@@ -179,6 +189,110 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
       setSellerLeads(data || []);
     } catch (err: any) {
       console.error("Error al recargar vendedores:", err.message);
+    }
+  };
+
+  // ─── Alta manual de vendedores (Brief #011 F2.2 / R6) ────────────────────
+  const resetNewSellerForm = () => {
+    setNewSellerName("");
+    setNewSellerPhone("");
+    setNewSellerEmail("");
+    setNewSellerSource(LEAD_SOURCE.MANUAL);
+    setNewSellerAddress("");
+  };
+
+  /** Dedupe: el phone ya existe → mostrar el lead existente, NO duplicar. */
+  const showExistingLead = (lead: Lead) => {
+    setShowNewSellerModal(false);
+    resetNewSellerForm();
+    if (lead.type === 'seller' && lead.status !== 'closed') {
+      toast(`Ese teléfono ya pertenece a ${lead.name} — abriendo su ficha`, { icon: 'ℹ️' });
+      setSellerLeads(prev => (prev.some(l => l.id === lead.id) ? prev : [lead, ...prev]));
+      openDrawer(lead);
+    } else if (lead.type === 'seller') {
+      toast(`Ese teléfono pertenece a ${lead.name}, ya captado en exclusiva (ver módulo Encargos)`, { icon: 'ℹ️' });
+    } else {
+      toast(`Ese teléfono ya pertenece al comprador ${lead.name} — no se ha creado el vendedor`, { icon: '⚠️' });
+    }
+  };
+
+  const handleCreateSeller = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSellerName.trim()) {
+      toast.error("El nombre del vendedor es obligatorio");
+      return;
+    }
+    const normalizedPhone = normalizeEsPhone(newSellerPhone);
+    if (!normalizedPhone) {
+      toast.error("El teléfono es obligatorio");
+      return;
+    }
+
+    setCreatingSeller(true);
+    try {
+      const findExisting = async (): Promise<Lead | null> => {
+        const { data } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('phone', normalizedPhone)
+          .limit(1);
+        return data && data.length > 0 ? (data[0] as Lead) : null;
+      };
+
+      const existing = await findExisting();
+      if (existing) {
+        showExistingLead(existing);
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      const { data: inserted, error } = await supabase
+        .from('leads')
+        .insert([{
+          name: newSellerName.trim(),
+          phone: normalizedPhone,
+          email: newSellerEmail.trim() || null,
+          source: newSellerSource,
+          type: 'seller',
+          status: 'new',
+          preferences: newSellerAddress.trim() ? { property_address: newSellerAddress.trim() } : {},
+          created_at: nowIso,
+          updated_at: nowIso,
+        }])
+        .select('*')
+        .single();
+
+      if (error) {
+        // Race 23505 (patrón leadService): otro proceso insertó el mismo phone
+        // entre el SELECT y el INSERT → reintenta el SELECT y muestra el existente.
+        if ((error as any).code === '23505') {
+          const raced = await findExisting();
+          if (raced) {
+            showExistingLead(raced);
+            return;
+          }
+        }
+        throw error;
+      }
+
+      // Log inicial del timeline (fire-and-soft: el alta no se rompe si falla).
+      const { error: logError } = await supabase.from('seller_activity_logs').insert({
+        lead_id: inserted.id,
+        event_type: 'Alta en CRM',
+        title: 'Vendedor dado de alta manualmente',
+        notes: `Alta manual desde el CRM (origen: ${newSellerSource}).`,
+      });
+      if (logError) console.warn('[WarmLeads] log Alta en CRM falló:', logError.message);
+
+      toast.success(`Vendedor ${inserted.name} creado`);
+      setShowNewSellerModal(false);
+      resetNewSellerForm();
+      setSellerLeads(prev => [inserted as Lead, ...prev]);
+    } catch (err: any) {
+      console.error("Error creando vendedor:", err.message);
+      toast.error("No se pudo crear el vendedor");
+    } finally {
+      setCreatingSeller(false);
     }
   };
 
@@ -586,6 +700,13 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
             >
               <RefreshCw size={18} />
             </button>
+            <button
+              onClick={() => setShowNewSellerModal(true)}
+              className="flex items-center justify-center gap-2 bg-[#FBBF24] text-[#2C3E50] font-bold px-5 py-2.5 rounded-xl hover:bg-[#F59E0B] active:scale-95 transition-all shadow-md text-sm cursor-pointer"
+            >
+              <PlusCircle size={16} />
+              Nuevo Vendedor
+            </button>
           </div>
         </div>
 
@@ -947,7 +1068,7 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
               {/* ─── TAB 2: INMUEBLE & TASACIÓN CONSOLE ──────────────────────────── */}
               {drawerTab === 'property' && (
                 <div className="space-y-5">
-                  
+
                   {/* Address (hot edit onBlur / Enter) */}
                   <div>
                     <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Dirección del Inmueble</label>
@@ -1277,6 +1398,111 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
           onClose={() => setShowPromoteForm(false)}
           onCreated={handleEncargoCreated}
         />
+      )}
+
+      {/* ─── MODAL: ALTA MANUAL DE VENDEDOR (Brief #011 F2.2 / R6) ────────── */}
+      {showNewSellerModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-start justify-center z-[60] p-4 md:p-6 overflow-y-auto">
+          <form
+            onSubmit={handleCreateSeller}
+            className="bg-[#1E293B] border border-white/10 p-6 md:p-8 rounded-2xl w-full max-w-lg shadow-2xl relative text-left my-auto space-y-4"
+          >
+            <button
+              type="button"
+              onClick={() => { setShowNewSellerModal(false); resetNewSellerForm(); }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 hover:bg-white/10 rounded-full transition-all"
+            >
+              <X size={20} />
+            </button>
+
+            <div>
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <PlusCircle className="text-[#FBBF24]" size={20} />
+                Nuevo Vendedor
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Alta manual de un propietario. Si el teléfono ya existe, se abre la ficha del lead existente (sin duplicar).
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300 font-medium">Nombre *</label>
+              <input
+                type="text"
+                value={newSellerName}
+                onChange={(e) => setNewSellerName(e.target.value)}
+                required
+                className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#FBBF24] transition-all"
+                placeholder="Nombre y apellidos"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300 font-medium">Teléfono *</label>
+                <input
+                  type="tel"
+                  value={newSellerPhone}
+                  onChange={(e) => setNewSellerPhone(e.target.value)}
+                  required
+                  className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#FBBF24] transition-all"
+                  placeholder="697 223 944"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-300 font-medium">Email</label>
+                <input
+                  type="email"
+                  value={newSellerEmail}
+                  onChange={(e) => setNewSellerEmail(e.target.value)}
+                  className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#FBBF24] transition-all"
+                  placeholder="opcional@email.com"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300 font-medium">Origen</label>
+              <select
+                value={newSellerSource}
+                onChange={(e) => setNewSellerSource(e.target.value)}
+                className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#FBBF24] transition-all"
+              >
+                {LEAD_SOURCE_OPTIONS.map(src => (
+                  <option key={src} value={src}>{src}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-slate-300 font-medium">Dirección del inmueble</label>
+              <input
+                type="text"
+                value={newSellerAddress}
+                onChange={(e) => setNewSellerAddress(e.target.value)}
+                className="w-full bg-[#0F172A] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#FBBF24] transition-all"
+                placeholder="C/ Ejemplo 12, Sevilla (opcional)"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowNewSellerModal(false); resetNewSellerForm(); }}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={creatingSeller}
+                className="flex-1 bg-[#FBBF24] hover:bg-[#F59E0B] disabled:opacity-50 text-[#2C3E50] font-extrabold py-2.5 rounded-xl transition-all flex items-center justify-center gap-2"
+              >
+                {creatingSeller ? "Creando..." : "Crear Vendedor"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
     </div>
