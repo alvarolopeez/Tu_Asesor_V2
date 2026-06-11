@@ -10,20 +10,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
-
-// Simple function to clean and generate dynamic slugs
-function generateSlug(text: string): string {
-  return text
-    .toString()
-    .toLowerCase()
-    .normalize('NFD') // remove accents
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-') // replace spaces with -
-    .replace(/[^\w\-]+/g, '') // remove all non-word chars
-    .replace(/\-\-+/g, '-') // replace multiple - with single -
-    .replace(/^-+/, '') // trim - from start
-    .replace(/-+$/, ''); // trim - from end
-}
+// Brief #010 T0: generateSlug extra\u00edda a util compartida (la reusa el
+// generador autom\u00e1tico de posts de noticias).
+import { generateSlug } from '@/lib/blog/slug';
 
 export default function BlogManager() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
