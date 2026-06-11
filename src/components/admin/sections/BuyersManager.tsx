@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { formatCurrency } from "@/lib/utils";
 import ZoneSelectorPremium, { SEVILLA_TAXONOMY } from "./ZoneSelectorPremium";
+// Brief #011 F3.1: config del timeline compartida con /admin/buyers/[id].
+import { getBuyerTimelineIconConfig as getTimelineIconConfig } from "../profile/timelineIcons";
 import { 
   Users, 
   Search, 
@@ -28,7 +31,8 @@ import {
   CheckCircle,
   Clock,
   Compass,
-  MessageSquare
+  MessageSquare,
+  Eye
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -87,6 +91,11 @@ interface BuyersManagerProps {
 }
 
 export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = {}) {
+  // Brief #011 F3.1 (D12): el click en la fila abre la página completa
+  // /admin/buyers/[id]. El drawer se CONSERVA como vista rápida (botón ojo)
+  // porque transporta el flujo DocIntent del #008 (Oferta/Contrato → editor de
+  // Documentos del dashboard), que no puede cruzar de ruta.
+  const router = useRouter();
   const [buyers, setBuyers] = useState<BuyerDemand[]>([]);
   const [selectedBuyer, setSelectedBuyer] = useState<BuyerDemand | null>(null);
   const [activityLogs, setActivityLogs] = useState<BuyerActivityLog[]>([]);
@@ -529,38 +538,9 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
   const archivedCount = buyers.filter(b => b.status === 'Desactivado').length;
   const totalVolume = buyers.filter(b => b.status !== 'Desactivado').reduce((sum, b) => sum + Number(b.max_budget), 0);
 
-  // Timeline item visual mapping (Colors/Design elements)
-  const getTimelineIconConfig = (type: string) => {
-    switch (type) {
-      case 'Llamada telefónica':
-        return { color: 'bg-blue-500 border-blue-600', textColor: 'text-blue-400', label: '📞 Llamada' };
-      case 'Visita física realizada':
-        return { color: 'bg-indigo-500 border-indigo-600', textColor: 'text-indigo-400', label: '🏠 Visita Física' };
-      case 'Oferta presentada':
-        return { color: 'bg-amber-500 border-amber-600', textColor: 'text-amber-400', label: '💰 Oferta' };
-      case 'Contrato firmado':
-        return { color: 'bg-emerald-500 border-emerald-600', textColor: 'text-emerald-400', label: '✍️ Contrato' };
-      // Brief #008 T5: tipos legibles por origen. Los antiguos ('IA WhatsApp',
-      // 'Llamada telefónica' como auto) se conservan por filas legacy.
-      case 'Registro web':
-        return { color: 'bg-sky-500 border-sky-600', textColor: 'text-sky-400', label: '🌐 Registro web' };
-      case 'Actualización web':
-        return { color: 'bg-sky-500 border-sky-600', textColor: 'text-sky-400', label: '🌐 Actualización web' };
-      case 'Reserva web':
-        return { color: 'bg-cyan-500 border-cyan-600', textColor: 'text-cyan-400', label: '📅 Reserva web' };
-      case 'Alta en CRM':
-        return { color: 'bg-teal-500 border-teal-600', textColor: 'text-teal-400', label: '📋 Alta en CRM' };
-      // Brief #011 F1.2 (R19): impacto de difusión registrado por /api/n8n/diffusion.
-      case 'Difusión':
-        return { color: 'bg-fuchsia-500 border-fuchsia-600', textColor: 'text-fuchsia-400', label: '📣 Difusión' };
-      case 'IA WhatsApp':
-        return { color: 'bg-purple-500 border-purple-600', textColor: 'text-purple-400', label: '🤖 IA WhatsApp' };
-      case 'Visita web':
-        return { color: 'bg-sky-500 border-sky-600', textColor: 'text-sky-400', label: '🌐 Web' };
-      default:
-        return { color: 'bg-slate-500 border-slate-600', textColor: 'text-slate-400', label: '📌 Actividad' };
-    }
-  };
+  // Timeline item visual mapping: vive en profile/timelineIcons.ts (F3.1),
+  // compartido con la página completa /admin/buyers/[id]. Importado arriba
+  // con alias getTimelineIconConfig.
 
   return (
     <div className="space-y-6">
@@ -745,12 +725,9 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
                   if (buyer.status === 'Activo') statusBg = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
 
                   return (
-                    <tr 
-                      key={buyer.id} 
-                      onClick={() => {
-                        setSelectedBuyer(buyer);
-                        fetchActivityLogs(buyer.id);
-                      }}
+                    <tr
+                      key={buyer.id}
+                      onClick={() => router.push(`/admin/buyers/${buyer.id}`)}
                       className="hover:bg-white/[0.02] cursor-pointer transition-all group"
                     >
                       {/* Name & Contact */}
@@ -824,7 +801,18 @@ export default function BuyersManager({ onGoToDocuments }: BuyersManagerProps = 
                       {/* Actions */}
                       <td className="py-4 px-6 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
-                          <button 
+                          <button
+                            onClick={() => {
+                              setSelectedBuyer(buyer);
+                              fetchActivityLogs(buyer.id);
+                            }}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-[#FBBF24]/10 text-slate-300 hover:text-[#FBBF24] border border-white/5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            title="Vista rápida (drawer)"
+                          >
+                            <Eye size={14} />
+                          </button>
+
+                          <button
                             onClick={() => openFormModal(buyer)}
                             className="p-2 rounded-lg bg-white/5 hover:bg-[#FBBF24] text-slate-300 hover:text-[#2C3E50] border border-white/5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
                             title="Editar Comprador"
