@@ -57,33 +57,66 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { data: updated, error } = await supabaseAdmin
+    // Dos consultas independientes (no hay FK declarada template_id→document_templates
+    // que PostgREST pueda embedar de forma fiable — igual que en /api/documents/send).
+    const { data: docRow, error: fetchErr } = await supabaseAdmin
       .from("generated_documents")
-      .update({ signature_status: status, updated_at: new Date().toISOString() })
+      .select("id, template_id, seller_lead_id, buyer_id, property_id")
       .eq("documenso_id", String(documensoId))
-      .select("id, template_id, seller_lead_id, buyer_id, property_id, document_templates(name, category)")
       .maybeSingle();
+    if (fetchErr) throw fetchErr;
+    if (!docRow) return NextResponse.json({ ok: true, ignored: true });
+
+    let tplRow: { name: string | null; category: string | null } | null = null;
+    if (docRow.template_id) {
+      const { data: t } = await supabaseAdmin
+        .from("document_templates")
+        .select("name, category")
+        .eq("id", docRow.template_id)
+        .maybeSingle();
+      tplRow = t ?? null;
+    }
+
+    // F4.2: bifurcar status ANTES de escribir.
+    // Propuesta + DOCUMENT_COMPLETED → buyer_signed (D7: solo el comprador firma).
+    // Cualquier otro caso → status sin cambios.
+    let finalStatus = status;
+    if (status === "completed" && tplRow) {
+      const cat = (tplRow.category || "").toLowerCase();
+      if (cat.includes("propuesta")) {
+        finalStatus = "buyer_signed";
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("generated_documents")
+      .update({ signature_status: finalStatus, updated_at: new Date().toISOString() })
+      .eq("documenso_id", String(documensoId));
     if (error) throw error;
 
-    // Aviso a Álvaro cuando un documento queda firmado
-    if (status === "completed" && updated) {
+    // Aviso a Álvaro + auto-eventos F3.4 cuando el evento Documenso es 'completed'.
+    // El aviso a Álvaro se mantiene incluso para buyer_signed (necesita saber que
+    // el comprador firmó la propuesta y puede ir al CRM a aceptarla).
+    if (status === "completed") {
       const advisor = process.env.ADVISOR_WHATSAPP_PHONE;
       if (advisor) {
-        const name = (updated as any).document_templates?.name || "Documento";
-        await sendWhatsAppMessage(
-          advisor,
-          `✅ Documento firmado en Documenso: "${name}". Ya puedes consultarlo en el CRM.`,
-          { normalize: true },
-        ).catch(() => {});
+        const docName = tplRow?.name || "Documento";
+        const msg = finalStatus === "buyer_signed"
+          ? `📝 El comprador firmó la propuesta: "${docName}". Revísala en el CRM y acepta la propuesta para continuar.`
+          : `✅ Documento firmado en Documenso: "${docName}". Ya puedes consultarlo en el CRM.`;
+        await sendWhatsAppMessage(advisor, msg, { normalize: true }).catch(() => {});
       }
 
-      // Brief #011 F3.4 (R17): auto-eventos de firma en los timelines según
-      // la categoría de la plantilla. SOLO inserta eventos — el flujo de
-      // status de arriba queda intacto (la bifurcación buyer_signed es F4.2).
-      // Fire-and-soft: cualquier fallo aquí no rompe la firma. Idempotente
-      // ante reintentos de Documenso: el id del documento viaja en notes y
-      // se comprueba antes de insertar.
-      await insertSignatureEvents(updated as any).catch((err) =>
+      // F3.4: auto-eventos de firma en los timelines.
+      // Fire-and-soft. Idempotente (dedupe por ref doc en notes).
+      const completedDoc: CompletedDocRow = {
+        id: docRow.id,
+        seller_lead_id: docRow.seller_lead_id,
+        buyer_id: docRow.buyer_id,
+        property_id: docRow.property_id,
+        document_templates: tplRow,
+      };
+      await insertSignatureEvents(completedDoc).catch((err) =>
         console.warn("[Documenso webhook] auto-eventos de firma fallaron:", err?.message || err),
       );
     }

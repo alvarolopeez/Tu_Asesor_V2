@@ -82,6 +82,8 @@ function shouldAdvisorSign(category?: string): boolean {
   const c = (category || "").toLowerCase();
   if (c.includes("kyc") || c.includes("pbc") || c.includes("titularidad")) return false;
   if (c.includes("visita")) return false;
+  // D7: Álvaro NO firma la propuesta — solo el comprador firma en primer lugar.
+  if (c.includes("propuesta")) return false;
   return true;
 }
 
