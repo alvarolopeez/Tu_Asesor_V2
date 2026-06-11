@@ -5,6 +5,18 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-11 — Hotfix post-Sesión B (feedback directo de Álvaro) — ⚠️ F4.1 YA HECHA
+
+**Commits**: `feat(documentos): clausulas adicionales en la previa + editar/eliminar/titulo descriptivo` (773959b) · `fix(encargos): actividad del comprador visible en el timeline del encargo` (a8ed133) · `docs(brief): marca F4.1 como adelantada` (2a1160e) · esta entrada.
+
+1. **F4.1 ADELANTADA de la Sesión C** (no repetir): textarea "Cláusulas adicionales" en la página previa de Nota/Propuesta/Contrato → clave `clausulas_adicionales` SIEMPRE informada en el ctx (vacío → "Ninguna.", nunca "________"). Campo `GenForm.clausulasAdicionales` (opcional).
+2. **Documentos generados — gestión**: título descriptivo en la lista (plantilla + `merged_data["inmueble.direccion"]`), botón **Eliminar** (confirm con aviso según signature_status; `encargos.nota_encargo_doc_id` es FK ON DELETE SET NULL — verificado) y botón **Editar SOLO borradores**: `handleGenerate` guarda ahora el snapshot **`__form`** (GenForm completo) en `merged_data`; editar restaura `__form` + `editingDocId` → UPDATE en vez de INSERT (sin re-disparar los auto-eventos F3.4). ⚠️ Documentos generados ANTES de este hotfix no tienen `__form` → no son editables (aviso en UI: borrar y regenerar). `__form` es inerte para Ver/PDF y envío a firmar.
+3. **Timeline del encargo**: la actividad del COMPRADOR sobre el `property_id` del encargo vuelve a verse (paridad con el drawer antiguo): `ActivityTimeline` acepta `extraLogs` (read-only, badge "Comprador · nombre", fusión cronológica, sin editar/borrar). Se excluyen los tipos espejados por F3.4 (Propuesta/firmas) para no duplicar.
+
+**Para la Sesión C**: F4.1 saltársela (anotado también en el brief). F4.2 debe tener en cuenta que `merged_data` ahora lleva `__form` además de `__recipients`. detect_changes volvió a dar CRITICAL por fan-out de DocumentsManager — avisado y aprobado.
+
+---
+
 ### 2026-06-11 — Brief #011 SESIÓN B: gate de auth + perfiles a página completa + auto-eventos (F3)
 
 **Commits** (en orden): `chore(gitnexus): reindex (3157 nodos, 125 flujos)` (db99803) · F3.0 `feat(admin): gate de auth reutilizable (AdminAuthGate)` (e0184e0) · F3.1 `feat(admin): perfil de comprador a pagina completa` (a148efc) · F3.2 `feat(admin): perfil de vendedor a pagina completa` (1c89df1) · F3.3 `feat(admin): encargo a pagina completa` (7ee0b25) · F3.4 `feat(timeline): auto-eventos desde documentos` (d591a1a) · esta entrada de docs.
