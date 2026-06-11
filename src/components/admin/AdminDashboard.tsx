@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   Users, 
@@ -57,6 +57,26 @@ export default function AdminDashboard() {
     setDocIntent(intent);
     setActiveTab('documents');
   };
+
+  // Brief #011 F3.2: puente DocIntent entre rutas. Las páginas completas
+  // (/admin/sellers|buyers|encargos/[id]) no pueden setear docIntent en este
+  // componente → llegan a /admin/dashboard?docKind=nota&docLeadId=... y aquí
+  // se convierte en DocIntent (y se limpia la URL). La página se carga con
+  // ssr:false, así que window está disponible.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kind = params.get('docKind');
+    if (kind === 'nota' || kind === 'propuesta' || kind === 'contrato') {
+      setDocIntent({
+        kind,
+        leadId: params.get('docLeadId') || undefined,
+        buyerId: params.get('docBuyerId') || undefined,
+        encargoId: params.get('docEncargoId') || undefined,
+      });
+      setActiveTab('documents');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, []);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);

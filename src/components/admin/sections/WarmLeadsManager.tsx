@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Lead, LeadStatus, SellerActivityLog } from "@/types";
 import { formatCurrency } from "@/lib/utils";
@@ -93,6 +94,10 @@ const SOURCE_OPTIONS = LEAD_SOURCE_OPTIONS;
 const PROPERTY_TYPES = ["Piso", "Casa", "Ático", "Dúplex", "Chalet", "Local", "Oficina", "Suelo", "Cualquiera"];
 
 export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsManagerProps) {
+  // Brief #011 F3.2 (D12): el click en la fila abre la página completa
+  // /admin/sellers/[id]. El drawer se CONSERVA como vista rápida (botón ojo)
+  // porque transporta promoción a Encargo y DocIntent, flujos del dashboard.
+  const router = useRouter();
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────
   const [sellerLeads, setSellerLeads] = useState<Lead[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -792,9 +797,9 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
                   const conf = STATUS_CONFIG[status] || LEGACY_STATUS_BADGE;
 
                   return (
-                    <tr 
-                      key={lead.id} 
-                      onClick={() => openDrawer(lead)}
+                    <tr
+                      key={lead.id}
+                      onClick={() => router.push(`/admin/sellers/${lead.id}`)}
                       className="hover:bg-white/[0.03] cursor-pointer transition-all group"
                     >
                       {/* Name & Contact */}
