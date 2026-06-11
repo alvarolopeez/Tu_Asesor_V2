@@ -11,8 +11,8 @@ interface SmartMatchmakerModalProps {
   onClose: () => void;
 }
 
-const DEFAULT_PRICE_MARGIN = 10; // ± % de presupuesto
-const DEFAULT_GEO_RADIUS = 5;    // km
+const DEFAULT_PRICE_MARGIN_DOWN = 10; // % a la baja
+const DEFAULT_PRICE_MARGIN_UP   = 10; // % al alza
 // URL real del webhook n8n "Difusion Inteligente - Smart Matchmaker" (workflow
 // 6E0AP0gqLUliPQtN). El placeholder anterior nunca apuntaba a un host real, por
 // eso el workflow tenía 0 ejecuciones. Fix 2026-06-01.
@@ -51,8 +51,8 @@ interface DiffusionRecipient {
  * `dry_run` devuelve los destinatarios sin llamar a n8n ni registrar impactos.
  */
 export default function SmartMatchmakerModal({ property, onClose }: SmartMatchmakerModalProps) {
-  const [priceMargin, setPriceMargin] = useState<number>(DEFAULT_PRICE_MARGIN);
-  const [geoRadius, setGeoRadius] = useState<number>(DEFAULT_GEO_RADIUS);
+  const [priceMarginDown, setPriceMarginDown] = useState<number>(DEFAULT_PRICE_MARGIN_DOWN);
+  const [priceMarginUp,   setPriceMarginUp]   = useState<number>(DEFAULT_PRICE_MARGIN_UP);
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState<string>(DEFAULT_N8N_WEBHOOK);
 
   // Destinatarios reales (dry_run). Exclusión solo para ESTA campaña.
@@ -78,8 +78,8 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
             payload: {
               event: "real_estate_ai_diffusion",
               property_id: property.id,
-              price_margin: priceMargin,
-              geo_radius: geoRadius,
+              price_margin_down: priceMarginDown,
+              price_margin_up: priceMarginUp,
               dry_run: true
             }
           })
@@ -109,7 +109,7 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
     // n8nWebhookUrl no afecta al cruce (dry_run lo ignora) pero se envía como
     // requisito del endpoint; lo dejamos fuera de deps a propósito.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property.id, priceMargin, geoRadius]);
+  }, [property.id, priceMarginDown, priceMarginUp]);
 
   // Desglose de presupuestos (holgado / ajustado / negociable) sobre los
   // destinatarios reales — ahora con max_budget de verdad.
@@ -145,8 +145,8 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
     const payload = {
       event: "real_estate_ai_diffusion",
       property_id: property.id,
-      price_margin: priceMargin,
-      geo_radius: geoRadius,
+      price_margin_down: priceMarginDown,
+      price_margin_up: priceMarginUp,
       excluded_demand_ids: Array.from(excludedIds)
     };
 
@@ -217,12 +217,12 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
         {/* Adjustable Range Sliders UI */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#0F172A] p-6 rounded-xl border border-white/5 mb-6">
 
-          {/* Range Slider 1: Budget Margin Slider */}
+          {/* Slider: Desviación a la baja */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wide">Desviación de Presupuesto</label>
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wide">Desviación a la baja</label>
               <span className="text-xs font-extrabold text-[#FBBF24] bg-[#FBBF24]/10 border border-[#FBBF24]/20 px-2 py-0.5 rounded-full">
-                ± {priceMargin}%
+                -{priceMarginDown}%
               </span>
             </div>
             <input
@@ -230,41 +230,51 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
               min="0"
               max="30"
               step="5"
-              value={priceMargin}
-              onChange={(e) => setPriceMargin(Number(e.target.value))}
+              value={priceMarginDown}
+              onChange={(e) => setPriceMarginDown(Number(e.target.value))}
               className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-[#FBBF24] transition-all hover:bg-slate-700"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
               <span>Estricto (0%)</span>
-              <span className="text-slate-400">
-                Rango: {formatPrice(property.price * (1 - priceMargin/100))} - {formatPrice(property.price * (1 + priceMargin/100))}
-              </span>
-              <span>Ampliante (30%)</span>
+              <span className="text-slate-400">Mín: {formatPrice(property.price * (1 - priceMarginDown / 100))}</span>
+              <span>Amplio (30%)</span>
             </div>
           </div>
 
-          {/* Range Slider 2: Geographic Proximity Radius Slider */}
+          {/* Slider: Desviación al alza */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wide">Radio de Distancia Geográfica</label>
-              <span className="text-xs font-extrabold text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
-                {geoRadius} km
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wide">Desviación al alza</label>
+              <span className="text-xs font-extrabold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                +{priceMarginUp}%
               </span>
             </div>
             <input
               type="range"
-              min="1"
-              max="20"
-              step="1"
-              value={geoRadius}
-              onChange={(e) => setGeoRadius(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500 transition-all hover:bg-slate-700"
+              min="0"
+              max="30"
+              step="5"
+              value={priceMarginUp}
+              onChange={(e) => setPriceMarginUp(Number(e.target.value))}
+              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 transition-all hover:bg-slate-700"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-              <span>Muy cercano (1km)</span>
-              <span className="text-slate-400">Expande la zona de interés dibujada</span>
-              <span>Amplio (20km)</span>
+              <span>Estricto (0%)</span>
+              <span className="text-slate-400">Máx: {formatPrice(property.price * (1 + priceMarginUp / 100))}</span>
+              <span>Amplio (30%)</span>
             </div>
+          </div>
+
+          {/* Rango resultante + nota de zona */}
+          <div className="md:col-span-2 flex items-center justify-between text-[11px] text-slate-400 bg-slate-800/40 rounded-lg px-3 py-2">
+            <span>
+              Rango aceptado: <strong className="text-white">{formatPrice(property.price * (1 - priceMarginDown / 100))}</strong>
+              {" — "}
+              <strong className="text-white">{formatPrice(property.price * (1 + priceMarginUp / 100))}</strong>
+            </span>
+            <span className="text-slate-500 flex items-center gap-1">
+              <MapPin size={10} /> Zona: por zonas de interés del comprador
+            </span>
           </div>
         </div>
 
@@ -373,7 +383,7 @@ export default function SmartMatchmakerModal({ property, onClose }: SmartMatchma
             })
           ) : (
             <div className="p-8 bg-[#0F172A] rounded-xl text-center text-slate-500 text-sm">
-              No hay compradores cualificados con estos parámetros. Amplía los sliders de presupuesto o de distancia geográfica.
+              No hay compradores cualificados con estos parámetros. Amplía los márgenes de presupuesto.
             </div>
           )}
         </div>

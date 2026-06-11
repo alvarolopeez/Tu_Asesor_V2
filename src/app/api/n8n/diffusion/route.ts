@@ -49,7 +49,17 @@ export async function POST(request: NextRequest) {
 
     // R19 (Brief #011 F1.1): dry_run y excluded_demand_ids son contrato
     // CRM↔esta ruta; el payload hacia n8n NO cambia de shape.
-    const { property_id, price_margin = 10, geo_radius = 5, dry_run = false, excluded_demand_ids = [] } = clientPayload;
+    // Brief #012: price_margin_down/up sustituyen a price_margin (simétrico legacy).
+    const {
+      property_id,
+      price_margin = 10,
+      price_margin_down,
+      price_margin_up,
+      dry_run = false,
+      excluded_demand_ids = [],
+    } = clientPayload;
+    const marginDown: number = price_margin_down ?? price_margin;
+    const marginUp: number   = price_margin_up   ?? price_margin;
 
     if (!property_id) {
       return NextResponse.json(
@@ -78,7 +88,7 @@ export async function POST(request: NextRequest) {
     // 2. Obtener TODAS las demands de compradores (fuente canónica del perfil).
     const { data: demands, error: demandsError } = await supabase
       .from('buyers_demands')
-      .select('id, lead_id, name, phone, email, max_budget, property_type, rooms, bathrooms, status');
+      .select('id, lead_id, name, phone, email, max_budget, property_type, rooms, bathrooms, status, preferred_zones');
 
     if (demandsError || !demands) {
       console.error('[N8N Diffusion Backend] Error obteniendo buyers_demands:', demandsError);
@@ -119,6 +129,8 @@ export async function POST(request: NextRequest) {
       propertyType: property.features?.propertyType,
       rooms: Number(property.features?.rooms || 0),
       baths: Number(property.features?.baths || 0),
+      zona: property.features?.zona ?? null,
+      address: property.features?.address ?? null,
       lat: Number.isFinite(propLatNum) ? propLatNum : undefined,
       lng: Number.isFinite(propLngNum) ? propLngNum : undefined,
     };
@@ -129,8 +141,9 @@ export async function POST(request: NextRequest) {
         demand,
         lead,
         property: propertyParams,
-        priceMargin: price_margin,
-        geoRadius: geo_radius,
+        priceMarginDown: marginDown,
+        priceMarginUp: marginUp,
+        demandZones: (demand as any).preferred_zones || [],
       });
       if (!result.match) return false;
       if (result.warnings.includes('no_lead')) {
@@ -196,8 +209,8 @@ export async function POST(request: NextRequest) {
         elevator: property.features?.elevator,
       },
       filters: {
-        priceMargin: price_margin,
-        geoRadius: geo_radius
+        priceMarginDown: marginDown,
+        priceMarginUp: marginUp,
       },
       recipients: finalMatches.map((m: any) => {
         const lead = m.lead_id ? leadsById.get(m.lead_id) || null : null;

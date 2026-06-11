@@ -5,6 +5,27 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-12 — Brief #012: matching por banda asimétrica + geo por zona + tolerancia ±1 hab/baños
+
+**Ficheros**: `src/lib/diffusionMatch.ts` · `src/app/api/n8n/diffusion/route.ts` · `src/components/admin/sections/properties/SmartMatchmakerModal.tsx` · tests.
+
+**3 bugs corregidos en `matchDemand`**:
+1. **Presupuesto sin tope superior** → sustituido por banda asimétrica `[price*(1-down%), price*(1+up%)]`. David (290k > 209k upper con ±10%) queda fuera. Acepta `priceMargin` legacy simétrico como fallback.
+2. **Geo leía `leads.preferences` (vacío en todos los leads)** → ahora lee `buyers_demands.preferred_zones` (etiquetas de taxonomía). Lógica: sin zonas → sin filtro; con zonas → match por `features.zona` (explícita) o fallback por segmentos del nombre de zona contra `features.address` (normalizado sin acentos). Álvaro (Utrera) queda fuera; miriam (Las Avenidas) entra.
+3. **Habitaciones/baños filtro DURO** → tolerancia ±1 (rechaza solo si `demand - property > 1`). miriam (pide 3, hay 2, diff=1) entra.
+
+**Resultado criterio de aceptación**: piso Avenidas 190.000€ con márgenes down=10/up=10 → **solo miriam** (45 tests verdes, build limpio).
+
+**Cambios de contrato**:
+- `route.ts` lee `price_margin_down`/`price_margin_up` del payload (fallback `price_margin`). Añade `preferred_zones` al select de `buyers_demands`. Pasa `zona` y `address` del inmueble al matching.
+- `richPayload.filters` pasa a `{ priceMarginDown, priceMarginUp }` (informativo; n8n no lo usa).
+- **Slider de radio geográfico (km) retirado del modal** — geo es ahora automático por zonas del comprador. Reemplazado por dos sliders: "Desviación a la baja" y "Desviación al alza".
+- El contrato del payload hacia n8n (`recipients[...]`) NO cambia.
+
+**Nuevo export público**: `propertyMatchesZones(prop, zones)` (puro, testeable).
+
+---
+
 ### 2026-06-12 — Difusión a 1 paso + fix lectura visitas web + envs blog
 
 **1. Difusión inteligente reescrita a UN SOLO PASO** (`SmartMatchmakerModal.tsx`).
