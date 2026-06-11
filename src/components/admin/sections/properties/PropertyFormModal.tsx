@@ -154,51 +154,73 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
     }
   }, [editingProperty, reset, setValue]);
 
-  // Upload a Supabase Storage con fallback gracioso a Object URL local si Storage falla
+  // Upload a Supabase Storage. R20 (Brief #011 F1.3): las imágenes admiten
+  // selección múltiple con subida SECUENCIAL y progreso (n de m); vídeo y
+  // plano siguen siendo de archivo único.
   const uploadFile = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video' | 'plan') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploading(true);
+    const toUpload = type === 'image' ? Array.from(files) : Array.from(files).slice(0, 1);
+    const total = toUpload.length;
     const loadingToast = toast.loading(`Subiendo ${type === 'image' ? 'imagen' : type === 'video' ? 'vídeo' : 'plano'}...`);
 
+    let uploadedCount = 0;
+    const failedNames: string[] = [];
+
     try {
-      const file = files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-      const filePath = `${type}s/${fileName}`;
+      for (let i = 0; i < toUpload.length; i++) {
+        const file = toUpload[i];
+        if (total > 1) {
+          toast.loading(`Subiendo imagen ${i + 1} de ${total}...`, { id: loadingToast });
+        }
+        try {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+          const filePath = `${type}s/${fileName}`;
 
-      const { error } = await supabase.storage
-        .from('properties')
-        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+          const { error } = await supabase.storage
+            .from('properties')
+            .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
-      if (error) throw error;
+          if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('properties')
-        .getPublicUrl(filePath);
+          const { data: { publicUrl } } = supabase.storage
+            .from('properties')
+            .getPublicUrl(filePath);
 
-      toast.dismiss(loadingToast);
-      toast.success("Subido con éxito a Supabase Storage");
-
-      if (type === 'image') {
-        setUploadedImages(prev => [...prev, publicUrl]);
-      } else if (type === 'video') {
-        setUploadedVideo(publicUrl);
-      } else {
-        setUploadedPlan(publicUrl);
+          if (type === 'image') {
+            setUploadedImages(prev => [...prev, publicUrl]);
+          } else if (type === 'video') {
+            setUploadedVideo(publicUrl);
+          } else {
+            setUploadedPlan(publicUrl);
+          }
+          uploadedCount++;
+        } catch (err: any) {
+          // NO usamos fallback a URL.createObjectURL: ese `blob:` es temporal y
+          // moría al recargar, dejando fotos/vídeos "fantasma" que desaparecían
+          // de la web y del CRM (bug 2026-06). Si el Storage falla, avisamos y NO
+          // guardamos nada roto — el usuario reintenta.
+          console.error("[PropertyFormModal] Storage upload falló:", err?.message || err);
+          failedNames.push(file.name);
+        }
       }
-    } catch (err: any) {
-      // NO usamos fallback a URL.createObjectURL: ese `blob:` es temporal y
-      // moría al recargar, dejando fotos/vídeos "fantasma" que desaparecían
-      // de la web y del CRM (bug 2026-06). Si el Storage falla, avisamos y NO
-      // guardamos nada roto — el usuario reintenta.
-      console.error("[PropertyFormModal] Storage upload falló:", err?.message || err);
+
       toast.dismiss(loadingToast);
-      toast.error(
-        `No se pudo subir el archivo a Storage: ${err?.message || "error desconocido"}. ` +
-        `Revisa tu conexión e inténtalo de nuevo.`,
-      );
+      if (uploadedCount > 0) {
+        toast.success(
+          total > 1
+            ? `${uploadedCount} de ${total} imágenes subidas a Supabase Storage`
+            : "Subido con éxito a Supabase Storage",
+        );
+      }
+      if (failedNames.length > 0) {
+        toast.error(
+          `No se pudo subir: ${failedNames.join(", ")}. Revisa tu conexión e inténtalo de nuevo.`,
+        );
+      }
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -531,6 +553,7 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
                 id="multimedia-upload-input"
                 onChange={(e) => uploadFile(e, uploadTab === 'images' ? 'image' : uploadTab === 'video' ? 'video' : 'plan')}
                 accept={uploadTab === 'images' ? 'image/png, image/jpeg, image/webp' : uploadTab === 'video' ? 'video/mp4' : 'application/pdf, image/*'}
+                multiple={uploadTab === 'images'}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 disabled={uploading}
               />
@@ -539,7 +562,7 @@ export default function PropertyFormModal({ editingProperty, onClose, onSaved, i
                   <Upload size={24} />
                 </div>
                 <div className="text-sm font-bold text-white">
-                  {uploading ? "Cargando archivo..." : `Arrastra o haz clic para subir tu ${uploadTab === 'images' ? 'Foto (WebP recomendado)' : uploadTab === 'video' ? 'Vídeo (MP4)' : 'Plano Técnico'}`}
+                  {uploading ? "Cargando archivo..." : `Arrastra o haz clic para subir ${uploadTab === 'images' ? 'tus Fotos (varias a la vez, WebP recomendado)' : uploadTab === 'video' ? 'tu Vídeo (MP4)' : 'tu Plano Técnico'}`}
                 </div>
                 <div className="text-xs text-slate-500">Tamaño máximo recomendado: 15MB</div>
               </div>
