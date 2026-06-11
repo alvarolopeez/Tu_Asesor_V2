@@ -17,21 +17,20 @@ export function daysOnMarket(p: PropertyRow): number | null {
 }
 
 // ─── 1. Pipeline de propietarios ─────────────────────────────
+// Brief #011 F2.1 (R8/D1): el funnel del VENDEDOR es de 4 estados
+// (new/contacted/closed/lost); qualified y visit_scheduled ya no existen para
+// vendedores, así que el embudo pasa de 5 etapas a 3 (lost no es etapa).
 export interface PipelineMap {
-  valoracion: number;
-  captacion: number;
-  notas_encargo: number;
-  propuestas: number;
-  pendientes_notaria: number;
+  nuevos: number;
+  contactados: number;
+  adquisiciones: number;
 }
 
 export function computePipeline(sellerLeads: LeadRow[]): PipelineMap {
   return {
-    valoracion: sellerLeads.filter((s) => s.status === "new").length,
-    captacion: sellerLeads.filter((s) => s.status === "contacted").length,
-    notas_encargo: sellerLeads.filter((s) => s.status === "qualified").length,
-    propuestas: sellerLeads.filter((s) => s.status === "visit_scheduled").length,
-    pendientes_notaria: sellerLeads.filter((s) => s.status === "closed").length,
+    nuevos: sellerLeads.filter((s) => s.status === "new").length,
+    contactados: sellerLeads.filter((s) => s.status === "contacted").length,
+    adquisiciones: sellerLeads.filter((s) => s.status === "closed").length,
   };
 }
 

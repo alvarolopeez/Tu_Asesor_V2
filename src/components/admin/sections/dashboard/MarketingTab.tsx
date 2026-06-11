@@ -65,8 +65,13 @@ export default function MarketingTab() {
   // Math.max(leads.length + 5, ...) — un +5 artificial sin base. @cleanup R1.
   const webVisitors = uniqueWebVisitors;
   const formsFilled = leads.length;
+  // Brief #011 F2.1: el COMPRADOR mantiene el funnel de 6 estados; el VENDEDOR
+  // usa 4 — su equivalente a "cualificado" es haber avanzado de new
+  // (contacted/closed). NO tocar la rama de comprador.
   const qualifiedLeads = leads.filter((l) =>
-    ["qualified", "visit_scheduled", "closed"].includes(l.status ?? "")
+    l.type === "seller"
+      ? ["contacted", "closed"].includes(l.status ?? "")
+      : ["qualified", "visit_scheduled", "closed"].includes(l.status ?? "")
   ).length;
   const scheduledVisits = appointments.length;
   const confirmedVisits = appointments.filter(

@@ -8,12 +8,12 @@ interface PipelineCardProps {
 
 /** Embudo de captación de propietarios (barras por etapa de cartera). */
 export default function PipelineCard({ pipelineMap, maxStageCount }: PipelineCardProps) {
+  // Brief #011 F2.1: etapas alineadas con el funnel de vendedor de 4 estados
+  // (lost no es etapa del embudo de cartera).
   const stages = [
-    { label: "Valoración Inicial", val: pipelineMap.valoracion, color: "bg-blue-500" },
-    { label: "Captación Activa", val: pipelineMap.captacion, color: "bg-indigo-500" },
-    { label: "Notas de Encargo firmadas", val: pipelineMap.notas_encargo, color: "bg-amber-500" },
-    { label: "Propuestas Recibidas", val: pipelineMap.propuestas, color: "bg-orange-500" },
-    { label: "Pendientes de Notaría", val: pipelineMap.pendientes_notaria, color: "bg-emerald-500" },
+    { label: "Nuevo Lead", val: pipelineMap.nuevos, color: "bg-blue-500" },
+    { label: "Contacto Establecido", val: pipelineMap.contactados, color: "bg-indigo-500" },
+    { label: "Adquisición Hecha", val: pipelineMap.adquisiciones, color: "bg-emerald-500" },
   ];
 
   return (

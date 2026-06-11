@@ -73,15 +73,18 @@ interface SellerPreferences {
   rgpd_accepted?: boolean;
 }
 
-// Map database LeadStatus values to user-friendly Spanish labels and styling colors
-const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; dot: string; bg: string }> = {
+// Brief #011 F2.1 (R8/D1): el funnel del VENDEDOR usa 4 estados en la UI.
+// El CHECK de BD conserva los 6 por compatibilidad; las filas legacy con
+// qualified/visit_scheduled se renderizan con LEGACY_STATUS_BADGE (en BD hoy
+// no hay ninguna, verificado #007 T1.0, pero no rompemos si aparece).
+const STATUS_CONFIG: Partial<Record<LeadStatus, { label: string; color: string; dot: string; bg: string }>> = {
   'new': { label: 'Nuevo Lead', color: 'text-amber-400 border-amber-500/20', dot: 'bg-amber-400', bg: 'bg-amber-500/10' },
-  'qualified': { label: 'Valoración Enviada', color: 'text-sky-400 border-sky-500/20', dot: 'bg-sky-400', bg: 'bg-sky-500/10' },
   'contacted': { label: 'Contacto Establecido', color: 'text-blue-400 border-blue-500/20', dot: 'bg-blue-400', bg: 'bg-blue-500/10' },
-  'visit_scheduled': { label: 'Visita Realizada', color: 'text-purple-400 border-purple-500/20', dot: 'bg-purple-400', bg: 'bg-purple-500/10' },
-  'closed': { label: 'Captado en Exclusiva', color: 'text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400', bg: 'bg-emerald-500/10' },
+  'closed': { label: 'Adquisición Hecha', color: 'text-emerald-400 border-emerald-500/20', dot: 'bg-emerald-400', bg: 'bg-emerald-500/10' },
   'lost': { label: 'Inactivo / Perdido', color: 'text-slate-400 border-slate-500/20', dot: 'bg-slate-400', bg: 'bg-slate-500/10' }
 };
+
+const LEGACY_STATUS_BADGE = { label: 'Estado legacy', color: 'text-slate-400 border-slate-500/20', dot: 'bg-slate-400', bg: 'bg-slate-500/10' };
 
 // Orígenes canónicos centralizados (fix #7).
 const SOURCE_OPTIONS = LEAD_SOURCE_OPTIONS;
@@ -270,7 +273,7 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
 
       if (error) throw error;
 
-      const oldLabel = STATUS_CONFIG[oldStatus || 'new']?.label || 'Sin Estado';
+      const oldLabel = STATUS_CONFIG[oldStatus || 'new']?.label || 'Estado legacy';
       const newLabel = STATUS_CONFIG[newStatus]?.label || newStatus;
 
       // Autoinject log into public.seller_activity_logs
@@ -665,7 +668,7 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
                 {filteredSellers.map((lead) => {
                   const prefs = getPreferences(lead);
                   const status = lead.status || 'new';
-                  const conf = STATUS_CONFIG[status] || STATUS_CONFIG.new;
+                  const conf = STATUS_CONFIG[status] || LEGACY_STATUS_BADGE;
 
                   return (
                     <tr 
