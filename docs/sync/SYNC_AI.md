@@ -17,7 +17,10 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 **Infra (no commiteado)**:
 - **`CRON_SECRET`**: añadido a `.env.local` y creado en Netlify vía API (site `8eac5c66-...`, contexts all, scopes builds+functions) **sin pasar el valor por el transcript**. Requiere el deploy posterior a este push para estar disponible en runtime.
-- **Workflow n8n NUEVO: `Blog Diario Noticias`** (id `MkaXNPdireWCIGmS`, proyecto personal, **INACTIVO**): Schedule cron `0 0 8 * * *` → HTTP POST a la ruta (timeout 120s, neverError) → IF published/skipped → rama OK o aviso WhatsApp a Álvaro (plantilla `aviso_alvaro`) si un día no se publica. **Los workflows de producción NO se tocaron.**
+- **Workflow n8n NUEVO: `Blog Diario Noticias`** (id `MkaXNPdireWCIGmS`, proyecto personal, **INACTIVO**): Schedule cron `0 0 8 * * *` → HTTP POST a la ruta → **Wait 90s → 2ª llamada de verificación** → IF published/skipped → rama OK o aviso WhatsApp a Álvaro (plantilla `aviso_alvaro`). **Los workflows de producción NO se tocaron.**
+- ⚠️ **Hallazgo del E2E (motivo del patrón de verificación)**: el proxy de Netlify corta la conexión antes de que termine la generación (~30-60s de grounding), PERO **la lambda continúa y publica igualmente**. La 1ª llamada de n8n verá "Inactivity Timeout"; la 2ª (tras el Wait) responde rápido `{skipped:true}` si publicó (y reintenta la generación si de verdad falló). Ambas llamadas con `onError: continueRegularOutput` + `neverError` para que el corte no aborte el flujo.
+
+**E2E ejecutado en producción (2026-06-11 ~12:15 UTC)**: ✅ POST con secreto → post REAL publicado: "Sevilla en Cifras Récord y el Euríbor en Ascenso..." (8.286 chars, tema actual con grounding), visible en `/blog/<slug>` (HTTP 200) · ✅ 2ª llamada → `{skipped:true, reason:'already_generated_today'}` · ✅ sin secreto → 401 · ✅ antes del deploy del env → 503.
 
 **Acciones pendientes de Álvaro (el workflow no funciona hasta hacerlas)**:
 1. En n8n, nodo "Generar Post Blog CRM" → crear la credencial Header Auth (`x-cron-secret` + valor de CRON_SECRET de `.env.local`). El secreto NO va en el JSON del workflow a propósito.
