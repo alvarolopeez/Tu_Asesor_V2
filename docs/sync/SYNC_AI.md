@@ -26,7 +26,7 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 - Webhook: cuando `DOCUMENT_COMPLETED` + categoría contrato (`detectKind === 'contrato'`) + hay `buyer_id` → `closeContractBuyer(buyer_id)`: busca `buyers_demands.lead_id` → UPDATE `leads.status = 'closed'` (idempotente) + UPDATE `buyers_demands.status = 'Desactivado'` (idempotente). UPDATE DIRECTO, sin helper leadFunnel (estados terminales).
 - `shouldAdvisorSign` excluye también "aceptacion" (la firma del vendedor sobre la aceptación es solo suya).
 
-**F5.1 — Retirar nodos log_interaction de n8n**: PENDIENTE confirmación de Álvaro. No tocar workflows de producción sin su OK explícito.
+**F5.1 — Retirar nodos log_interaction de n8n**: ✅ HECHO (2026-06-11, con OK explícito de Álvaro). Workflow afectado: **"Notificacion Nuevo Lead"** (`QikfXMJumWbpI3wL`). Cadena anterior: `Nuevo Lead Webhook → Extraer Datos Lead → WhatsApp Bienvenida → Log Bienvenida CRM`. Operaciones: `removeConnection` (WhatsApp Bienvenida → Log Bienvenida CRM) + `removeNode` (Log Bienvenida CRM). Publicado (`activeVersionId: de83e32f`). El resto de workflows activos (Enviar Documento a Firmar, Blog Diario Noticias) no tenían nodos log_interaction.
 
 **F5.2 — Chatwoot cosmético**: ⚠️ existe `chatbot_conversations_channel_check` CHECK constraint con 'chatwoot' → NO se puede eliminar de la BD ni estrechar el TS type sin migración. Solo se retiró la `<option>` de los dropdowns de filtro en `ChatManager.tsx` y `WebhooksManager.tsx`. El `case 'chatwoot'` del ícono se conserva para compatibilidad con filas existentes.
 
