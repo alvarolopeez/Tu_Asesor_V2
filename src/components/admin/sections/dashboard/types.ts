@@ -139,5 +139,27 @@ export interface BuyerDemandRow {
   email: string | null
   max_budget: number
   status: string
+  preferred_zones?: string[] | null
+  created_at?: string
+  funding_type?: string | null
+  lead_id?: string | null
+}
+
+export interface EncargoRow {
+  id: string
+  seller_lead_id: string | null
+  property_id: string | null
+  fecha_firma: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SellerActivityLogRow {
+  id: string
+  lead_id: string
+  event_type: string
+  event_date: string
+  property_id: string | null
 }
 

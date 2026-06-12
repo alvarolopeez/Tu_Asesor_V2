@@ -1,14 +1,14 @@
 import { MapPin, Search } from "lucide-react";
-import type { SevillaDemandItem } from "./operacionesUtils";
+import type { ZoneDemandItem } from "./operacionesUtils";
 
 interface SevillaDemandChartProps {
-  /** Demanda combinada (baseline + BD) sin filtrar ni ordenar. */
-  demand: SevillaDemandItem[];
+  /** Top 10 zonas de toda la taxonomía, sin filtrar. */
+  demand: ZoneDemandItem[];
   searchQuery: string;
   onSearchChange: (value: string) => void;
 }
 
-/** Top 10 barrios de Sevilla por nº de compradores, con buscador en vivo. */
+/** Top 10 zonas con más compradores activos, con buscador en vivo. */
 export default function SevillaDemandChart({ demand, searchQuery, onSearchChange }: SevillaDemandChartProps) {
   const filtered = demand
     .filter(item => item.zone.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -24,9 +24,9 @@ export default function SevillaDemandChart({ demand, searchQuery, onSearchChange
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <MapPin size={18} className="text-[#FBBF24]" />
-              Demandas por Barrios (Sevilla)
+              Demanda por Zonas
             </h3>
-            <p className="text-slate-400 text-xs mt-0.5">Top 10 barrios con compradores activos y presupuestos medios</p>
+            <p className="text-slate-400 text-xs mt-0.5">Top 10 zonas con más compradores activos y presupuesto medio</p>
           </div>
 
           {/* Modern search input */}
@@ -76,7 +76,7 @@ export default function SevillaDemandChart({ demand, searchQuery, onSearchChange
             })
           ) : (
             <div className="text-center py-10 text-slate-500 text-xs">
-              No se encontraron compradores para "{searchQuery}"
+              {searchQuery ? `Sin zonas para "${searchQuery}"` : "Sin datos de zonas — añade preferred_zones a los compradores"}
             </div>
           )}
         </div>

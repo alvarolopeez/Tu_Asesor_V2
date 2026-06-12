@@ -5,13 +5,12 @@ import type {
   LeadRow,
   AppointmentRow,
   BuyerActivityLogRow,
-  BuyerDemandRow
+  BuyerDemandRow,
+  EncargoRow,
+  SellerActivityLogRow,
 } from "./types";
 import {
-  computePipeline,
-  computeMarketDays,
-  computeSevillaDemand,
-  computeGrowth,
+  computeZoneDemand,
   computeBuyerProfiles,
   computePropertyViews,
   computeSelectedMetrics,
@@ -30,10 +29,9 @@ import AIReportModal from "./operaciones/AIReportModal";
 
 /**
  * Pestaña "Operaciones" del dashboard admin.
- *
- * Orquestador puro: carga propiedades/leads/citas/actividad, ejecuta las
- * derivaciones analíticas (en `operaciones/operacionesUtils`) y reparte los
- * resultados a los subcomponentes de visualización bajo `./operaciones/`.
+ * Orquestador: carga datos y los reparte a subcomponentes en `./operaciones/`.
+ * Los paneles interactivos (PipelineCard, MarketDaysChart, GrowthChart) gestionan
+ * sus propios filtros internamente y reciben datos crudos como props.
  */
 export default function OperacionesTab() {
   const [loading, setLoading] = useState(true);
@@ -42,9 +40,10 @@ export default function OperacionesTab() {
   const [appointments, setAppointments] = useState<AppointmentRow[]>([]);
   const [buyerActivityLogs, setBuyerActivityLogs] = useState<BuyerActivityLogRow[]>([]);
   const [buyersDemands, setBuyersDemands] = useState<BuyerDemandRow[]>([]);
+  const [encargos, setEncargos] = useState<EncargoRow[]>([]);
+  const [sellerActivityLogs, setSellerActivityLogs] = useState<SellerActivityLogRow[]>([]);
   const [webVisits, setWebVisits] = useState<{ page_path: string }[]>([]);
 
-  // Interactive individual property selector state
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
   const [sevillaSearchQuery, setSevillaSearchQuery] = useState("");
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -63,14 +62,25 @@ export default function OperacionesTab() {
         { data: apptsData },
         { data: logsData },
         { data: buyersDemandsData },
-        { data: webVisitsData }
+        { data: encargosData },
+        { data: sellerLogsData },
+        { data: webVisitsData },
       ] = await Promise.all([
         supabase.from("properties").select("*"),
         supabase.from("leads").select("*"),
         supabase.from("appointments").select("*"),
         supabase.from("buyer_activity_logs").select("*").order("event_date", { ascending: false }),
-        supabase.from("buyers_demands").select("id, name, phone, email, max_budget, status"),
-        supabase.from("web_visits").select("page_path")
+        supabase
+          .from("buyers_demands")
+          .select("id, name, phone, email, max_budget, status, preferred_zones, created_at, funding_type, lead_id"),
+        supabase
+          .from("encargos")
+          .select("id, seller_lead_id, property_id, fecha_firma, status, created_at, updated_at"),
+        supabase
+          .from("seller_activity_logs")
+          .select("id, lead_id, event_type, event_date, property_id")
+          .then(res => ({ data: res.data ?? [], error: res.error })), // tabla puede estar vacía
+        supabase.from("web_visits").select("page_path"),
       ]);
 
       const propsList = (propsData || []) as PropertyRow[];
@@ -79,9 +89,10 @@ export default function OperacionesTab() {
       setAppointments((apptsData || []) as AppointmentRow[]);
       setBuyerActivityLogs((logsData || []) as BuyerActivityLogRow[]);
       setBuyersDemands((buyersDemandsData || []) as BuyerDemandRow[]);
+      setEncargos((encargosData || []) as EncargoRow[]);
+      setSellerActivityLogs((sellerLogsData || []) as SellerActivityLogRow[]);
       setWebVisits((webVisitsData || []) as { page_path: string }[]);
 
-      // Default the selector to the first property if available
       if (propsList.length > 0) {
         setSelectedPropertyId(propsList[0].id);
       }
@@ -96,58 +107,58 @@ export default function OperacionesTab() {
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FBBF24]"></div>
-        <p className="text-slate-400 text-sm font-medium">Analizando operaciones, embudos e informes de captación...</p>
+        <p className="text-slate-400 text-sm font-medium">
+          Analizando operaciones, embudos e informes de captación...
+        </p>
       </div>
     );
   }
 
-  const buyerLeads = leads.filter((l) => l.type === "buyer");
-  const sellerLeads = leads.filter((l) => l.type === "seller");
+  const sellerLeads = leads.filter(l => l.type === "seller");
 
-  // Visitas web por propiedad (web_visits cuyo page_path contiene el id)
+  // Visitas web y físicas por propiedad
   const visitsByProperty: Record<string, number> = {};
-  // Visitas físicas (appointments) por propiedad, separadas por status.
-  // Solo `completed` cuenta como cierre real; `pending` se muestra aparte
-  // para no inflar el informe con visitas que aún no han ocurrido.
-  // @added 2026-06-06 brief #002 T3.
   const physicalCompletedByProperty: Record<string, number> = {};
   const physicalPendingByProperty: Record<string, number> = {};
   for (const p of properties) {
     visitsByProperty[p.id] = webVisits.filter(v => v.page_path?.includes(p.id)).length;
     physicalCompletedByProperty[p.id] = appointments.filter(
-      a => a.property_id === p.id && a.status === 'completed'
+      a => a.property_id === p.id && a.status === "completed",
     ).length;
     physicalPendingByProperty[p.id] = appointments.filter(
-      a => a.property_id === p.id && a.status === 'pending'
+      a => a.property_id === p.id && a.status === "pending",
     ).length;
   }
 
-  // Valoración de referencia por propiedad: lead vinculado → fallback feature.
+  // Valoración de referencia por propiedad
   const valuationByProperty: Record<string, number> = {};
   for (const l of sellerLeads) {
     if (!l.property_id) continue;
     const prefs = l.preferences || {};
-    const v = Number((prefs as any).agent_valuation || (prefs as any).estimated_value || 0);
+    const v = Number((prefs as Record<string, unknown>).agent_valuation || (prefs as Record<string, unknown>).estimated_value || 0);
     if (v > 0) valuationByProperty[l.property_id] = v;
   }
 
-  // Derivaciones analíticas (lógica pura en operacionesUtils)
-  const pipelineMap = computePipeline(sellerLeads);
-  const maxStageCount = Math.max(...Object.values(pipelineMap), 1);
-  const marketDaysPerRange = computeMarketDays(properties);
-  const mergedSevillaDemand = computeSevillaDemand(buyerLeads);
-  const growthData = computeGrowth(buyerLeads);
-  const buyerProfiles = computeBuyerProfiles(buyerLeads);
-  const { top3, bottom3, platformAvgViews, platformAvgDays } = computePropertyViews(properties, visitsByProperty);
+  // Derivaciones analíticas
+  const mergedZoneDemand = computeZoneDemand(buyersDemands);
+  const buyerProfiles = computeBuyerProfiles(buyersDemands, leads);
+  const { top3, bottom3, platformAvgViews, platformAvgDays } = computePropertyViews(
+    properties,
+    visitsByProperty,
+  );
   const publishedCount = properties.filter(p => p.published_at).length;
 
-  // Propiedad seleccionada en el generador de informes + sus métricas
+  // Propiedad seleccionada en el generador de informes
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
   const selectedDays = selectedProperty ? daysOnMarket(selectedProperty) : null;
   const selectedVisits = selectedProperty ? (visitsByProperty[selectedProperty.id] ?? 0) : 0;
   const selectedValuation = selectedProperty ? (valuationByProperty[selectedProperty.id] ?? 0) : 0;
-  const selectedPhysicalCompleted = selectedProperty ? (physicalCompletedByProperty[selectedProperty.id] ?? 0) : 0;
-  const selectedPhysicalPending = selectedProperty ? (physicalPendingByProperty[selectedProperty.id] ?? 0) : 0;
+  const selectedPhysicalCompleted = selectedProperty
+    ? (physicalCompletedByProperty[selectedProperty.id] ?? 0)
+    : 0;
+  const selectedPhysicalPending = selectedProperty
+    ? (physicalPendingByProperty[selectedProperty.id] ?? 0)
+    : 0;
   const selectedMetrics = computeSelectedMetrics(selectedProperty, {
     days: selectedDays,
     views: selectedVisits,
@@ -156,7 +167,6 @@ export default function OperacionesTab() {
     valuation: selectedValuation,
   });
 
-  // Estimación de bajada de precio (heurística explicable)
   const priceDrop = selectedProperty
     ? computePriceDropEstimate({
         price: Number(selectedProperty.price || 0),
@@ -174,27 +184,31 @@ export default function OperacionesTab() {
 
       {/* Pipeline & Market Days Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PipelineCard pipelineMap={pipelineMap} maxStageCount={maxStageCount} />
-        <MarketDaysChart marketDaysPerRange={marketDaysPerRange} platformAvgDays={platformAvgDays} />
+        <PipelineCard
+          sellerLeads={sellerLeads}
+          encargos={encargos}
+          sellerActivityLogs={sellerActivityLogs}
+        />
+        <MarketDaysChart properties={properties} platformAvgDays={platformAvgDays} />
       </div>
 
-      {/* Zonas de Demanda e Historial (Sevilla Province & Growth) */}
+      {/* Zonas de Demanda e Historial (Zonas & Growth) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SevillaDemandChart
-          demand={mergedSevillaDemand}
+          demand={mergedZoneDemand}
           searchQuery={sevillaSearchQuery}
           onSearchChange={setSevillaSearchQuery}
         />
-        <GrowthChart growthData={growthData} />
+        <GrowthChart buyersDemands={buyersDemands} />
       </div>
 
-      {/* Active Buyers breakdown Section */}
+      {/* Active Buyers breakdown */}
       <BuyersBreakdown profiles={buyerProfiles} />
 
-      {/* Visitas Top 3 vs Bottom 3 Row */}
+      {/* Visitas Top 3 vs Bottom 3 */}
       <PropertyViewsRanking top3={top3} bottom3={bottom3} visitsByProperty={visitsByProperty} />
 
-      {/* Individual Property Report Selector (Informe de Captador) */}
+      {/* Generador de informes de captación */}
       <PropertyReportSelector
         properties={properties}
         selectedPropertyId={selectedPropertyId}
@@ -208,7 +222,6 @@ export default function OperacionesTab() {
         onGenerateAIReport={() => setShowAIReport(true)}
       />
 
-      {/* Análisis IA del inmueble (T7 brief #002) */}
       {showAIReport && selectedProperty && (
         <AIReportModal
           propertyId={selectedProperty.id}
@@ -217,7 +230,6 @@ export default function OperacionesTab() {
         />
       )}
 
-      {/* PDF Export Overlay modal template */}
       {showPrintModal && selectedProperty && (
         <CaptacionReportModal
           selectedProperty={selectedProperty}
