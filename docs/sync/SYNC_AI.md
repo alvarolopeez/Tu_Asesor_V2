@@ -5,6 +5,45 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #014: dashboard Operaciones — 5 paneles más potentes y flexibles
+
+**Commit**: `b73098a` · `feat(dashboard): brief #014 — Operaciones 5 paneles más potentes`
+
+**Ficheros**: `dashboard/types.ts` · `operaciones/operacionesUtils.ts` · `OperacionesTab.tsx` · `PipelineCard.tsx` · `MarketDaysChart.tsx` · `SevillaDemandChart.tsx` · `GrowthChart.tsx` · `BuyersBreakdown.tsx` · `__tests__/operacionesUtils.test.ts`
+
+**T1 — Pipeline 6 etapas con filtro de fechas**:
+- `computeOwnerPipeline` nuevo: Nuevo Lead / Contacto Establecido / Adquisición Hecha / Encargo Firmado / Contrato Privado Firmado / Cerrado Vendido.
+- Fuentes: `leads` (status) + `encargos` (fecha_firma, status='vendido') + `seller_activity_logs` (event_type='Contrato privado').
+- OperacionesTab carga `encargos` y `seller_activity_logs`. PipelineCard gestiona su propio estado de fecha con atajos 7d/30d/Año/Todo.
+- Decisión: "Adquisición Hecha" (lead closed) ≠ "Encargo Firmado" (documento jurídico) — etapas separadas.
+
+**T2 — MarketDays óptimo 26 días**:
+- `OPTIMO_CIERRE_DIAS = 26` exportado como única fuente de verdad.
+- `computePriceDropEstimate` usa este valor como umbral del `factorTiempo` (más agresivo: >26 días empuja rebaja).
+- `PRICE_RANGES` exportado: 6 franjas (<150k, 150k-250k, …, >700k). `computeMarketDays` acepta `{ ranges?, year?, bucketSize? }`.
+- MarketDaysChart: selector de granularidad (6 franjas / ±50k / ±100k), filtro por año, botón expandir en modal.
+
+**T3 — Demanda por Zonas (fuente reparada)**:
+- `computeZoneDemand(buyersDemands)` reemplaza `computeSevillaDemand(buyerLeads)` — lee `buyers_demands.preferred_zones` (no `leads.preferences.zonas` que estaba vacío).
+- Solo cuenta demands `status='Activo'`. Top 10 global.
+- Panel renombrado a "Demanda por Zonas".
+
+**T4 — GrowthChart interactivo**:
+- `computeGrowth` migrado a `buyers_demands` (campo `created_at` + `max_budget`).
+- Granularidad configurable: `'day' | 'week' | 'month' | 'year'`. Filtro por franja de precio (mismas `PRICE_RANGES`).
+- Eliminado `growthData[5]` hardcodeado — serie funciona con N puntos.
+
+**T5 — BuyersBreakdown conectado a BD real**:
+- `computeBuyerProfiles(buyersDemands, allLeads?)` usa `funding_type` ('Hipoteca'/'Contado') desde `buyers_demands`.
+- Regla propósito: `tipo_compra` confirmado de `leads.preferences` prevalece; fallback Hipoteca→Habitual, Contado→Inversión.
+- Fix NaN%: `safePct()` evita división por 0. Mensajes de vacío en vez de barras a 0.
+
+**BD/contrato**: `buyers_demands` select ampliado a `preferred_zones, created_at, funding_type, lead_id`. Tipos nuevos: `EncargoRow`, `SellerActivityLogRow` en `dashboard/types.ts`.
+
+**Build**: ✅ Next.js 16.2.6 clean · **Tests**: 179/179 (12 suites), 30 nuevos.
+
+---
+
 ### 2026-06-13 — Brief #013: aviso escalado plantilla HSM + doble presentación Paula + copiloto zonas LLM
 
 **Commit**: `76ecd3a` · `fix(whatsapp,chatbot,zones): Brief #013 — 3 fixes CRM`
