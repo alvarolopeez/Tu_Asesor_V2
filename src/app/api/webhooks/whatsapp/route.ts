@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { processMessage } from '@/lib/chatbot/engine';
-import { sendWhatsAppMessage, markWhatsAppRead } from '@/lib/whatsapp';
+import { sendWhatsAppMessage, sendWhatsAppTemplate, markWhatsAppRead } from '@/lib/whatsapp';
 import { normalizeEsPhone } from '@/lib/phone';
 import { advanceLeadStatus } from '@/lib/leadFunnel';
 
@@ -220,6 +220,8 @@ export async function POST(request: NextRequest) {
         leadContext: {
           name: canonicalName,
           phone: normalizedPhone,
+          // existing=true → lead creado por BuyerRegistrationModal (bienvenida HSM ya enviada)
+          was_welcomed: leadInfo?.existing ?? false,
         },
       });
 
@@ -255,18 +257,14 @@ export async function POST(request: NextRequest) {
       if (shouldEscalate) {
         await markEscalated(conversationId);
 
-        // 🔔 Notificación de escalación al asesor vía WhatsApp
+        // 🔔 Notificación de escalación al asesor vía plantilla HSM (fuera de ventana 24h → texto libre rechazado con 131047)
         if (ADVISOR_PHONE) {
-          const escalationMessage =
-            `🚨 *Escalación de Chat*\n\n` +
-            `👤 *Lead:* ${parsed.contactName}\n` +
-            `📱 *Teléfono:* ${parsed.phoneNumber}\n` +
-            `💬 *Último mensaje:* "${parsed.messageText}"\n` +
-            `🤖 *Intención detectada:* ${chatbotIntent || 'ESCALATE'}\n` +
-            `⏰ *Hora:* ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}\n\n` +
-            `El cliente ha solicitado hablar con un asesor. Respóndele directamente al ${parsed.phoneNumber}.`;
-
-          await sendWhatsAppMessage(ADVISOR_PHONE, escalationMessage, { logTag: '[WhatsApp Escalation]' });
+          const snippet = parsed.messageText.length > 120
+            ? parsed.messageText.slice(0, 120) + '…'
+            : parsed.messageText;
+          const p1 = `Escalación: ${parsed.contactName} (${parsed.phoneNumber})`;
+          const p2 = `Pide hablar contigo. Último msg: "${snippet}". Responde en WA.`;
+          await sendWhatsAppTemplate(ADVISOR_PHONE, 'aviso_alvaro', [p1, p2], { logTag: '[WhatsApp Escalation]' });
           console.log(`[WhatsApp] 🔔 Escalación enviada a Álvaro por lead ${parsed.contactName}`);
         }
       }
@@ -634,16 +632,13 @@ async function notifyAdvisorOfEscalatedMessage(
 
   if (Date.now() - lastNotify < NOTIFY_THROTTLE_MIN * 60_000) return; // throttle anti-spam
 
-  const text =
-    `💬 *Mensaje en chat escalado*\n\n` +
-    `👤 *Cliente:* ${parsed.contactName}\n` +
-    `📱 *Teléfono:* ${parsed.phoneNumber}\n` +
-    `💬 *Mensaje:* "${parsed.messageText}"\n` +
-    `⏰ ${new Date().toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}\n\n` +
-    `Estás en *Modo Humano* con este cliente. Respóndele desde el CRM o directamente al ${parsed.phoneNumber}.\n` +
-    `El cliente puede escribir *bot* para volver a hablar con Paula.`;
-
-  await sendWhatsAppMessage(ADVISOR_PHONE, text, { logTag: '[WhatsApp Escalation Msg]' });
+  // Plantilla HSM — texto libre rechazado con 131047 fuera de ventana 24h
+  const snippet = parsed.messageText.length > 120
+    ? parsed.messageText.slice(0, 120) + '…'
+    : parsed.messageText;
+  const p1 = `Mensaje de ${parsed.contactName} (${parsed.phoneNumber})`;
+  const p2 = `"${snippet}". Estás en Modo Humano; el cliente puede escribir 'bot'.`;
+  await sendWhatsAppTemplate(ADVISOR_PHONE, 'aviso_alvaro', [p1, p2], { logTag: '[WhatsApp Escalation Msg]' });
 
   await supabase
     .from('chatbot_conversations')

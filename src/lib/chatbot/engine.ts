@@ -89,10 +89,11 @@ interface EngineInput {
     phone?: string;
     type?: string;
     previousInteractions?: number;
+    was_welcomed?: boolean;
   };
 }
 
-interface NameResolutionState {
+export interface NameResolutionState {
   existing_name: string;
   profile_name: string;
   asked_at: string;
@@ -296,6 +297,9 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
 
   // T5.2: contador de turnos del asistente — para suprimir el doble saludo en turno 2+
   const assistantTurnCount = history.filter((m) => m.role === 'assistant').length;
+  // T2 Brief #013: si el lead ya recibió la bienvenida HSM (was_welcomed), tratar como turno ≥1
+  // aunque chatbot_messages esté vacío (la bienvenida viaja por n8n, no se guarda en BD).
+  const effectiveTurns = Math.max(assistantTurnCount, (input.leadContext?.was_welcomed ? 1 : 0));
 
   // 2. Recuperar propiedades activas para contexto
   const properties = await getActiveProperties();
@@ -308,7 +312,7 @@ export async function processMessage(input: EngineInput): Promise<ChatbotEngineR
     ...(input.leadContext || {}),
     preferred_name: nameState.preferred_name,
     pending_name_resolution: nameState.pending_name_resolution,
-    assistant_turn_count: assistantTurnCount,
+    assistant_turn_count: effectiveTurns,
   } as EngineInput['leadContext'] & {
     preferred_name: string | null;
     pending_name_resolution: NameResolutionState | null;
@@ -611,14 +615,8 @@ function buildTodayContext(): { today: string; tomorrow: string; next7: string }
   };
 }
 
-/**
- * Construye el bloque de contexto de cliente que va al system prompt.
- * Unifica lead.name / preferred_name + estado de colisión pendiente (T3).
- * Sanitiza todo lo que viene del cliente o BD.
- *
- * Devuelve la sección lista para inyectar; vacío si no hay leadContext.
- */
-function buildClientContextBlock(leadContext?: EngineInput['leadContext'] & {
+// exported for unit testing only
+export function buildClientContextBlock(leadContext?: EngineInput['leadContext'] & {
   preferred_name?: string | null;
   pending_name_resolution?: NameResolutionState | null;
   assistant_turn_count?: number;

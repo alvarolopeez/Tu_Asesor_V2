@@ -7,7 +7,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const LLM_MODEL = process.env.LLM_MODEL || 'gemini-1.5-flash';
+const ZONES_LLM_MODEL = process.env.ZONES_LLM_MODEL || 'gemini-2.5-flash';
 
 // Taxonomía oficial disponible (para inyectar en el System Prompt)
 const TAXONOMY_PROMPT = `
@@ -554,6 +554,13 @@ INSTRUCCIONES DE RAZONAMIENTO SEMÁNTICO:
 2. Asocia múltiples barrios si la descripción abarca diferentes puntos.
 3. Si el usuario te pide explícitamente agregar o añadir una nueva zona o barrio al catálogo (ej. "añade la zona Gines - La Florida" o "agrega el barrio Camas - El Chorrillo"), debes retornar la zona propuesta en la propiedad "add_custom_zone" con el distrito y barrio bien separados.
 4. Si no hay suficiente información o la zona queda totalmente fuera de Sevilla y Aljarafe, devuelve un array vacío en "detected_zones".
+5. Cuando el usuario pregunte por zonas **por proximidad a un tipo de servicio o instalación** (hospital, clínica, colegio, escuela, universidad, estación de metro/cercanías/tren, parada de autobús, parque, centro comercial, polígono industrial, zona empresarial, etc.), actúa así:
+   a) Identifica los POIs concretos de ese tipo que existen en Sevilla capital y su área metropolitana, apoyándote en búsqueda si es necesario.
+   b) Para cada POI identificado, determina qué zonas de la TAXONOMÍA OFICIAL están geográficamente próximas.
+   c) Devuelve en "detected_zones" ÚNICAMENTE zonas cuyo nombre coincida EXACTAMENTE con la lista de la taxonomía y que estén efectivamente cerca de esos POIs. Si un POI está cerca de una zona cuyo nombre no aparece literalmente en la TAXONOMÍA OFICIAL, omite esa zona — no aproximes ni reformules nombres.
+   d) En "reasoning" explica qué POIs concretos has cruzado y por qué cada zona es próxima. Ejemplo: "Hospital Virgen Macarena → Macarena - Doctor Barraquer-Grupo Renfe-Policlínico; Hospital Virgen del Rocío → Palmera-Bellavista - Sector Sur-La Palmera-Reina Mercedes, Palmera-Bellavista - Heliópolis".
+   e) Si hay varios POIs del mismo tipo, agrupa los resultados por POI en el reasoning.
+   f) Si no encuentras POIs relevantes del tipo pedido dentro de la cobertura, devuelve "detected_zones": [] con un reasoning explicativo.
 
 DEBES DEVOLVER EXCLUSIVAMENTE UN OBJETO JSON CON LA SIGUIENTE ESTRUCTURA:
 {
@@ -569,6 +576,27 @@ DEBES DEVOLVER EXCLUSIVAMENTE UN OBJETO JSON CON LA SIGUIENTE ESTRUCTURA:
 }
 Note: "add_custom_zone" es opcional y solo debe incluirse si el usuario explícitamente te ordenó crear, añadir o registrar una zona que no existía.
 `;
+
+// Parser defensivo en cascada (mismo patrón que generateNewsPost.ts):
+// 1. strip fences ```json...```; 2. JSON.parse directo; 3. recorte primer{..último}; 4. null.
+// ⚠️ google_search tool (grounding) NO es compatible con responseMimeType:application/json.
+function parseDraftJson(raw: string): Record<string, unknown> | null {
+  let jsonStr = (raw || '').trim();
+  const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fence) jsonStr = fence[1];
+  try {
+    return JSON.parse(jsonStr) as Record<string, unknown>;
+  } catch {
+    const start = jsonStr.indexOf('{');
+    const end = jsonStr.lastIndexOf('}');
+    if (start === -1 || end <= start) return null;
+    try {
+      return JSON.parse(jsonStr.slice(start, end + 1)) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -601,9 +629,9 @@ export async function POST(req: Request) {
       return NextResponse.json(localKeywordDetector(text));
     }
 
-    // 4. Llamada HTTP a la API de Google Gemini (Flash o Pro)
-    const modelName = LLM_MODEL === 'gemini-1.5-flash' ? 'gemini-1.5-flash' : LLM_MODEL;
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`;
+    // 4. Llamada HTTP a la API de Google Gemini con grounding de búsqueda
+    // ⚠️ google_search NO es compatible con responseMimeType:application/json → se usa parseDraftJson
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${ZONES_LLM_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
     const geminiResponse = await fetch(geminiUrl, {
       method: 'POST',
@@ -620,10 +648,10 @@ export async function POST(req: Request) {
         systemInstruction: {
           parts: [{ text: SYSTEM_INSTRUCTION }],
         },
+        tools: [{ google_search: {} }],
         generationConfig: {
-          responseMimeType: 'application/json',
           temperature: 0.2,
-          maxOutputTokens: 600,
+          maxOutputTokens: 800,
         },
       }),
     });
@@ -631,25 +659,26 @@ export async function POST(req: Request) {
     if (!geminiResponse.ok) {
       const errText = await geminiResponse.text();
       console.error('[AI Zones] Gemini API devolvió error:', geminiResponse.status, errText);
-      return NextResponse.json(localKeywordDetector(text)); // Fallback inteligente en caso de error del servicio
+      return NextResponse.json(localKeywordDetector(text));
     }
 
     const data = await geminiResponse.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    // Con grounding, el texto puede venir repartido en varios parts
+    const parts = data.candidates?.[0]?.content?.parts ?? [];
+    const content = parts.map((p: { text?: string }) => p.text ?? '').join('');
 
     if (!content) {
       console.error('[AI Zones] Respuesta vacía de candidatos de Gemini');
       return NextResponse.json(localKeywordDetector(text));
     }
 
-    // Parsear respuesta estructurada
-    try {
-      const parsed = JSON.parse(content.trim());
-      return NextResponse.json(parsed);
-    } catch (parseErr) {
-      console.error('[AI Zones] Error al parsear JSON devuelto por Gemini:', content);
+    // Parser defensivo: strip fences → JSON.parse → rescate → fallback local
+    const parsed = parseDraftJson(content);
+    if (!parsed) {
+      console.error('[AI Zones] JSON no parseable de Gemini, fallback local:', content.slice(0, 300));
       return NextResponse.json(localKeywordDetector(text));
     }
+    return NextResponse.json(parsed);
 
   } catch (error: any) {
     console.error('[AI Zones] Error interno en API de zonas:', error.message || error);
