@@ -5,6 +5,34 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #013: aviso escalado plantilla HSM + doble presentación Paula + copiloto zonas LLM
+
+**Commit**: `76ecd3a` · `fix(whatsapp,chatbot,zones): Brief #013 — 3 fixes CRM`
+
+**Ficheros**: `src/app/api/webhooks/whatsapp/route.ts` · `src/lib/chatbot/engine.ts` · `src/app/api/ai/zones/route.ts` · 2 test files nuevos.
+
+**T1 — Aviso de escalación al asesor usa plantilla HSM** (`aviso_alvaro`):
+- Los dos puntos de notificación a `ADVISOR_PHONE` usaban `sendWhatsAppMessage` (texto libre). Meta rechazaba con error 131047 porque la ventana de 24h está siempre cerrada para el propio número de negocio → Álvaro no recibía nada.
+- Fix: import de `sendWhatsAppTemplate` + 2 llamadas a `sendWhatsAppTemplate(ADVISOR_PHONE, 'aviso_alvaro', [p1, p2])`. Params a una sola línea, con ellipsis si el mensaje del cliente supera 120 chars. Throttle anti-spam (`last_escalation_notify_at`) conservado.
+- ⚠️ Gotcha para futuros agentes: `aviso_alvaro` tiene exactamente 2 variables de body `{{1}}` y `{{2}}`. Nunca usar texto libre hacia `ADVISOR_PHONE`; siempre plantilla fuera de la ventana de 24h.
+
+**T2 — Paula ya no se presenta dos veces** (flag `was_welcomed`):
+- Bug: la bienvenida `bienvenida_nuevo_lead` viaja vía n8n Cloud, no se guarda en `chatbot_messages`. El engine calculaba `assistantTurnCount=0` → `[turno_asistente: 0]` → Paula se presentaba otra vez.
+- Fix (enfoque pragmático): `leadInfo.existing === true` se pasa como `was_welcomed: true` en `processMessage`. El engine calcula `effectiveTurns = Math.max(assistantTurnCount, wasWelcomed ? 1 : 0)` y lo usa como `assistant_turn_count`. Leads nuevos de WhatsApp siguen recibiendo la presentación. Leads registrados vía web, no.
+- Cambios: `EngineInput.leadContext.was_welcomed?: boolean`; `NameResolutionState` y `buildClientContextBlock` ahora exportadas para test. 5 tests nuevos en `wasWelcomed.test.ts`.
+
+**T3 — Copiloto de zonas con grounding real** (`/api/ai/zones`):
+- Modelo separado: `ZONES_LLM_MODEL` (default `gemini-2.5-flash`), distinto del `LLM_MODEL` del chatbot.
+- Añadido `tools: [{ google_search: {} }]` para grounding. ⚠️ Incompatible con `responseMimeType: application/json` → eliminado.
+- Parser defensivo en cascada `parseDraftJson` (strip fences → JSON.parse → rescate primer{..último} → fallback local). 7 tests en `zonesParser.test.ts`.
+- `SYSTEM_INSTRUCTION` ampliado con instrucción 5: proximidad a POIs (hospitales, colegios, metro, centros comerciales…). El modelo busca POIs reales con grounding y devuelve solo zonas exactas de la taxonomía. Fallback al detector local por keywords si Gemini falla.
+
+**Env nueva**: `ZONES_LLM_MODEL=gemini-2.5-flash` — añadir en Netlify (ENV > site vars) y en `.env.local`. La variable tiene default en código, así que es opcional pero recomendada para dejarla explícita.
+
+**Build**: ✅ Next.js 16.2.6 clean · **Tests**: 149/149 (11 suites), 12 nuevos.
+
+---
+
 ### 2026-06-12 — Brief #012: matching por banda asimétrica + geo por zona + tolerancia ±1 hab/baños
 
 **Ficheros**: `src/lib/diffusionMatch.ts` · `src/app/api/n8n/diffusion/route.ts` · `src/components/admin/sections/properties/SmartMatchmakerModal.tsx` · tests.
