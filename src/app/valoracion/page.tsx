@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { normalizeEsPhone } from '@/lib/phone'
 import { computeQuickRange } from '@/lib/zoneValuation'
+import type { ViaSugerencia, InmuebleOpcion } from '@/lib/catastroLookup'
 import Link from 'next/link'
-import { Check, ChevronLeft, ChevronRight, X, Building2, Home, Building, ArrowRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, X, Building2, Home, Building, ArrowRight, MapPin, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function ValoracionPage() {
@@ -15,6 +16,10 @@ export default function ValoracionPage() {
   const [formData, setFormData] = useState({
     propertyType: '',
     street: '',
+    tipoVia: '',              // sigla Catastro de la vía elegida (CL/AV/PZ…)
+    nombreVia: '',            // nombre oficial de la vía elegida en el Catastro
+    referencia_catastral: '', // refcat capturada (20 chars vivienda / 14 parcela)
+    direccion_oficial: '',    // dirección oficial del Catastro (preferida sobre la tecleada)
     number: '',
     zipcode: '',
     city: 'Sevilla',
@@ -66,6 +71,117 @@ export default function ValoracionPage() {
     }
   }, [formData.zipcode]);
 
+  // ── Autocompletado de calle vía Catastro (Brief #017 T1) ──────────────────
+  const [streetSuggestions, setStreetSuggestions] = useState<ViaSugerencia[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [loadingVias, setLoadingVias] = useState(false)
+  const [dwellingOptions, setDwellingOptions] = useState<InmuebleOpcion[]>([])
+  // Tras elegir una sugerencia, evita que el efecto de debounce re-busque.
+  const suppressViasFetch = useRef(false)
+
+  // Debounce ~300ms; mínimo 3 chars. Degradación: ante fallo, sin sugerencias
+  // (el usuario sigue tecleando la calle a mano).
+  useEffect(() => {
+    if (suppressViasFetch.current) { suppressViasFetch.current = false; return }
+    const q = formData.street.trim()
+    if (q.length < 3) { setStreetSuggestions([]); return }
+    const timer = setTimeout(async () => {
+      setLoadingVias(true)
+      try {
+        const res = await fetch(
+          `/api/catastro?action=vias&municipio=${encodeURIComponent(formData.city)}&q=${encodeURIComponent(q)}`,
+        )
+        const data = await res.json()
+        setStreetSuggestions(Array.isArray(data) ? data : [])
+      } catch {
+        setStreetSuggestions([])
+      } finally {
+        setLoadingVias(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [formData.street, formData.city])
+
+  // El usuario teclea la calle a mano → invalida cualquier selección previa del Catastro.
+  const handleStreetInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    suppressViasFetch.current = false
+    setShowSuggestions(true)
+    setDwellingOptions([])
+    setFormData(prev => ({
+      ...prev,
+      street: e.target.value,
+      tipoVia: '',
+      nombreVia: '',
+      referencia_catastral: '',
+      direccion_oficial: '',
+    }))
+  }
+
+  // Elegir una vía del dropdown: fija sigla + nombre oficial del Catastro.
+  const handleSelectVia = (via: ViaSugerencia) => {
+    suppressViasFetch.current = true
+    setShowSuggestions(false)
+    setStreetSuggestions([])
+    setDwellingOptions([])
+    setFormData(prev => ({
+      ...prev,
+      street: via.nombreVia,
+      tipoVia: via.tipoVia,
+      nombreVia: via.nombreVia,
+      referencia_catastral: '',
+      direccion_oficial: '',
+    }))
+  }
+
+  // Resuelve la referencia catastral del número (no bloqueante: el flujo nunca
+  // espera al Catastro). Si hay varias viviendas, ofrece elegir; si no, queda
+  // a nivel de número/parcela.
+  const resolveInmueble = async () => {
+    if (!formData.nombreVia || !formData.number.trim()) return
+    try {
+      const res = await fetch(
+        `/api/catastro?action=inmueble&municipio=${encodeURIComponent(formData.city)}` +
+        `&tipoVia=${encodeURIComponent(formData.tipoVia)}` +
+        `&nombreVia=${encodeURIComponent(formData.nombreVia)}` +
+        `&numero=${encodeURIComponent(formData.number.trim())}`,
+      )
+      const data = await res.json()
+      if (data?.referencia_catastral || data?.direccion_oficial) {
+        setFormData(prev => ({
+          ...prev,
+          referencia_catastral: data.referencia_catastral || '',
+          direccion_oficial: data.direccion_oficial || prev.direccion_oficial,
+        }))
+      }
+      setDwellingOptions(data?.multiple && Array.isArray(data.opciones) ? data.opciones : [])
+    } catch {
+      /* silencio: seguimos con la dirección tecleada */
+    }
+  }
+
+  // El usuario elige su vivienda concreta del edificio → refcat exacta (20 chars).
+  const handleSelectDwelling = (opt: InmuebleOpcion) => {
+    const unidad = [opt.escalera && `Es:${opt.escalera}`, opt.planta && `Pl:${opt.planta}`, opt.puerta && `Pt:${opt.puerta}`]
+      .filter(Boolean).join(' ')
+    setFormData(prev => ({
+      ...prev,
+      referencia_catastral: opt.refcat,
+      direccion_oficial: prev.direccion_oficial && unidad
+        ? `${prev.direccion_oficial} (${unidad})`
+        : prev.direccion_oficial,
+    }))
+    setDwellingOptions([])
+  }
+
+  // Avanzar desde el paso 2: lanza la resolución del inmueble (no bloqueante) y
+  // pasa de paso inmediatamente. La refcat llega a formData antes del submit.
+  const handleStep2Next = () => {
+    if (formData.nombreVia && formData.number.trim() && !formData.referencia_catastral) {
+      void resolveInmueble()
+    }
+    nextStep()
+  }
+
   const totalSteps = 6
 
   const nextStep = () => {
@@ -112,7 +228,16 @@ export default function ValoracionPage() {
       // vendedor; las características del inmueble viven en `leads.preferences`.
       // La conversión a Inmueble/Encargo es una decisión manual de Álvaro
       // (ver pestaña "Vendedores" → promoción a encargo en exclusiva).
-      const addressFull = `${formData.street} ${formData.number}, Piso ${formData.floor}, ${formData.zipcode} ${formData.city}`
+      // Si el Catastro confirmó la dirección, se prefiere la oficial. Si no, se
+      // arma a mano (omitiendo "Piso" si no hay planta — Brief #017 T4).
+      const addressManual = [
+        `${formData.street} ${formData.number}`.trim(),
+        formData.floor ? `Piso ${formData.floor}` : null,
+        `${formData.zipcode} ${formData.city}`.trim(),
+      ].filter(Boolean).join(', ')
+      const addressFull = formData.referencia_catastral && formData.direccion_oficial
+        ? formData.direccion_oficial
+        : addressManual
 
       // Brief #007 T5: dedupe por teléfono normalizado (E.164). Antes cada
       // envío insertaba un lead nuevo; con el UNIQUE INDEX leads_phone_unique
@@ -124,6 +249,9 @@ export default function ValoracionPage() {
         property_type: formData.propertyType,
         street: formData.street,
         number: formData.number,
+        // Catastro (Brief #017 T1): alimenta la valoración IA del CRM (resolveCatastro).
+        referencia_catastral: formData.referencia_catastral || undefined,
+        direccion_oficial: formData.direccion_oficial || undefined,
         floor: formData.floor,
         elevator: formData.hasElevator,
         city: formData.city,
@@ -261,15 +389,82 @@ export default function ValoracionPage() {
               
               <div className="max-w-md mx-auto space-y-4 text-left">
                 <div className="flex gap-4">
-                  <div className="w-3/4">
+                  <div className="w-3/4 relative">
                     <label htmlFor="street" className="block text-sm font-bold mb-2 text-slate-300">Calle / Avenida</label>
-                    <input type="text" id="street" name="street" value={formData.street} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Ej: Calle Aguamarina" />
+                    <input
+                      type="text" id="street" name="street" autoComplete="off"
+                      value={formData.street}
+                      onChange={handleStreetInput}
+                      onFocus={() => { if (streetSuggestions.length > 0) setShowSuggestions(true) }}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                      className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]"
+                      placeholder="Ej: Aguamarina"
+                    />
+                    {loadingVias && (
+                      <Loader2 className="w-4 h-4 text-[#FBBF24] animate-spin absolute right-3 top-[42px]" />
+                    )}
+                    {showSuggestions && streetSuggestions.length > 0 && (
+                      <ul className="absolute z-30 left-0 right-0 mt-1 bg-[#0F172A] border border-[#FBBF24]/30 rounded-lg shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
+                        {streetSuggestions.map((via, i) => (
+                          <li key={`${via.tipoVia}-${via.nombreVia}-${i}`}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectVia(via)}
+                              className="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-white hover:bg-[#FBBF24]/15 transition-colors"
+                            >
+                              <MapPin className="w-4 h-4 text-[#FBBF24] shrink-0" />
+                              <span className="truncate">{via.label}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   <div className="w-1/4">
                     <label htmlFor="number" className="block text-sm font-bold mb-2 text-slate-300">Nº</label>
-                    <input type="text" id="number" name="number" value={formData.number} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white text-center font-bold rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="12" />
+                    <input
+                      type="text" id="number" name="number"
+                      value={formData.number}
+                      onChange={handleChange}
+                      onBlur={resolveInmueble}
+                      className="w-full bg-[#0F172A] border border-white/10 text-white text-center font-bold rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]"
+                      placeholder="12"
+                    />
                   </div>
                 </div>
+
+                {formData.referencia_catastral && (
+                  <p className="flex items-center gap-2 text-xs text-green-300/90">
+                    <Check className="w-4 h-4 text-green-400 shrink-0" />
+                    <span className="truncate">Dirección verificada con el Catastro{formData.direccion_oficial ? `: ${formData.direccion_oficial}` : ''}</span>
+                  </p>
+                )}
+
+                {dwellingOptions.length > 0 && (
+                  <div className="bg-[#0F172A]/60 border border-white/10 rounded-lg p-3">
+                    <p className="text-xs font-bold text-slate-300 mb-2">
+                      Hay varias viviendas en este número. ¿Cuál es la tuya? <span className="font-normal text-slate-500">(opcional)</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+                      {dwellingOptions.map((opt) => {
+                        const etiqueta = [opt.planta && `Pl ${opt.planta}`, opt.puerta && `Pt ${opt.puerta}`, opt.escalera && `Esc ${opt.escalera}`]
+                          .filter(Boolean).join(' · ') || opt.refcat.slice(-4)
+                        const seleccionada = formData.referencia_catastral === opt.refcat
+                        return (
+                          <button
+                            key={opt.refcat}
+                            type="button"
+                            onClick={() => handleSelectDwelling(opt)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${seleccionada ? 'bg-[#FBBF24] text-[#2C3E50] border-[#FBBF24]' : 'bg-[#0F172A] text-slate-200 border-white/10 hover:border-[#FBBF24]/40'}`}
+                          >
+                            {etiqueta}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                   <div className="w-1/3">
@@ -295,7 +490,7 @@ export default function ValoracionPage() {
 
               <div className="mt-10 flex justify-center gap-4">
                 <button onClick={prevStep} className="btn btn-outline text-white border-white hover:bg-white/10 px-6 py-2 rounded-lg font-bold transition-all">Atrás</button>
-                <button onClick={nextStep} disabled={!formData.street || !formData.number} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-extrabold transition-all disabled:opacity-50 active:scale-95 duration-200">Siguiente</button>
+                <button onClick={handleStep2Next} disabled={!formData.street || !formData.number} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-2 rounded-lg font-extrabold transition-all disabled:opacity-50 active:scale-95 duration-200">Siguiente</button>
               </div>
             </div>
           )}
