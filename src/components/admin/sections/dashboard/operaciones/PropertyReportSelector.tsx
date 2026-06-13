@@ -55,9 +55,9 @@ export default function PropertyReportSelector({
         <div>
           <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
             <TrendingDown size={18} className="text-[#FBBF24]" />
-            Generador de Informe de Rebaja
+            Informe de Posicionamiento
           </h3>
-          <p className="text-slate-400 text-xs">Análisis IA en directo con datos de mercado reales · Descarga el dossier PDF</p>
+          <p className="text-slate-400 text-xs">Estudio IA de posición competitiva en el mercado actual · Dossier PDF descargable</p>
         </div>
 
         {/* Properties Dropdown */}
@@ -151,7 +151,7 @@ export default function PropertyReportSelector({
                 onClick={onGeneratePriceDropReport}
                 className="w-full py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
               >
-                <TrendingDown size={14} /> Análisis de rebaja IA
+                <TrendingDown size={14} /> Informe de posicionamiento IA
               </button>
             </div>
           </div>

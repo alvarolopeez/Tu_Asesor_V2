@@ -133,7 +133,7 @@ export default function PriceDropModal({ propertyId, propertyTitle, priceDrop, o
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `dossier_rebaja_${propertyId.slice(0, 8)}.pdf`;
+      a.download = `informe_posicionamiento_${propertyId.slice(0, 8)}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err: any) {
@@ -161,7 +161,7 @@ export default function PriceDropModal({ propertyId, propertyTitle, priceDrop, o
         <div className="px-6 py-4 border-b border-white/10 flex items-start justify-between gap-3 bg-[#0F172A]/95 backdrop-blur">
           <div className="min-w-0">
             <p className="text-[10px] uppercase tracking-widest text-[#FBBF24] font-bold flex items-center gap-1.5">
-              <Sparkles size={12} /> Análisis de Rebaja · IA en directo
+              <Sparkles size={12} /> Informe de Posicionamiento · IA en directo
             </p>
             <h2 className="text-lg font-bold text-white truncate">{propertyTitle}</h2>
           </div>
@@ -262,7 +262,7 @@ export default function PriceDropModal({ propertyId, propertyTitle, priceDrop, o
                       )}
                       {veredicto.veredicto !== 'caro' && (
                         <p className="text-xl font-bold mt-1">
-                          {veredicto.veredicto === 'correcto' ? 'No se recomienda rebaja con las señales actuales.' : 'Precio ligeramente elevado — rebaja discrecional.'}
+                          {veredicto.veredicto === 'correcto' ? 'El precio está bien alineado con el mercado actual.' : 'Precio ligeramente por encima del mercado.'}
                         </p>
                       )}
                     </div>
@@ -303,7 +303,7 @@ export default function PriceDropModal({ propertyId, propertyTitle, priceDrop, o
                 priceDrop && !priceDrop.noAdjustment && (
                   <div className="bg-slate-800/60 border border-[#FBBF24]/20 rounded-xl p-5">
                     <p className="text-[10px] uppercase tracking-wider text-[#FBBF24] font-bold mb-1 flex items-center gap-1.5">
-                      <TrendingDown size={12} /> Estimación de rebaja (heurística)
+                      <TrendingDown size={12} /> Estimación de ajuste (heurística)
                     </p>
                     <p className="text-white font-black text-2xl">−{priceDrop.eurLow.toLocaleString()}€ … −{priceDrop.eurHigh.toLocaleString()}€</p>
                     <p className="text-slate-400 text-xs">(−{priceDrop.pctLow}% … −{priceDrop.pctHigh}%)</p>
