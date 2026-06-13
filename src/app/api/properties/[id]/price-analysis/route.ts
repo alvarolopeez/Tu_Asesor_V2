@@ -29,7 +29,7 @@ import { computePriceDropEstimate } from '@/components/admin/sections/dashboard/
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const REBAJA_LLM_MODEL = process.env.REBAJA_LLM_MODEL || 'gemini-2.5-pro-preview';
+const REBAJA_LLM_MODEL = process.env.REBAJA_LLM_MODEL || 'gemini-2.5-pro';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -102,8 +102,9 @@ export async function POST(
     if (!geminiRes.ok) {
       const body = await geminiRes.text();
       console.error('[price-analysis] Gemini HTTP', geminiRes.status, body.slice(0, 400));
+      const diagMsg = `Gemini ${geminiRes.status} [model=${REBAJA_LLM_MODEL}] ${body.slice(0, 300)}`;
       await db.from('rebaja_reports').upsert(
-        { property_id: propertyId, status: 'failed', finished_at: new Date().toISOString(), error_msg: `Gemini ${geminiRes.status}` },
+        { property_id: propertyId, status: 'failed', finished_at: new Date().toISOString(), error_msg: diagMsg },
         { onConflict: 'property_id' },
       );
       return NextResponse.json({ error: 'Error del modelo IA' }, { status: 502 });
