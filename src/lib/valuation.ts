@@ -173,9 +173,10 @@ export function buildValuationPrompt(inputs: ValuationInputs): string {
 
 ---
 ## INSTRUCCIONES DE ANÁLISIS
-- Usa Google Search para consultar €/m² de venta actuales en **${zonaLabel}** (Idealista, Fotocasa, Habitaclia). Cita la URL de cada fuente.
-- Busca el **rango de €/m²** de la zona (min–max), no solo un valor puntual.
+- Usa Google Search para consultar €/m² de venta actuales en **${zonaLabel}** (Idealista, Fotocasa, Habitaclia). Cita la URL de cada fuente. Busca datos de **2025 y 2026 únicamente** — el mercado en Sevilla ha experimentado subidas relevantes.
+- Busca el **rango de €/m²** de la zona (min–max), no solo un valor puntual. Busca también el precio medio real escriturado (Registradores de la Propiedad, Ministerio de Vivienda).
 ${inputs.referencia_catastral ? `- Consulta el valor de referencia del Catastro para "${inputs.referencia_catastral}" como ancla de sanidad.` : ''}
+- Para inmuebles **"Para reformar"**: busca comparables de pisos SIN REFORMAR en la misma zona. El comprador descuenta el coste de reforma (reforma integral en Sevilla: 700-1.000 EUR/m²). Calcula precio = (€/m² en buen estado - coste_reforma) × m², no solo un porcentaje fijo.
 - Aplica ajuste por estado y por reformas/extras. Documenta los supuestos (m² útiles, coste reforma, etc.).
 - Si hay factores diferenciales (planta alta sin ascensor, orientación, cocina reformada…), inclúyelos en \`factores\`.
 - Si los datos son escasos o la zona es ambigua, anótalo en \`advertencias\` y baja la confianza.
@@ -209,6 +210,18 @@ Definición de los 3 rangos:
 }
 \`\`\`
 
-**DESPUÉS del JSON**: análisis ejecutivo en markdown (máximo 300 palabras). Explica qué fuentes consultaste, cómo calculaste el €/m² de zona, los ajustes aplicados y los factores clave. Cita URLs.
+**DESPUÉS del JSON**: informe estructurado en markdown con estas secciones obligatorias (máximo 800 palabras total):
+
+## ANÁLISIS DE ZONA
+Describe el barrio (nombre, perfil social, calidad de vida). Transporte público en 500 m: líneas de autobús, metro, tranvía y paradas más cercanas. Servicios cercanos: colegios, supermercados, parques, centro de salud, farmacia. Proyectos de mejora urbanística previstos si los hay.
+
+## ANÁLISIS DE MERCADO
+Precio €/m² de venta en 2025-2026 en esta zona concreta (fuente y URL). Evolución del precio en los últimos 12 meses en el barrio. Justificación del rango €/m² que indicaste en el JSON. Si hay datos de pisos sin reformar, cítalos específicamente.
+
+## FACTORES DEL INMUEBLE
+Aspectos concretos de este inmueble que suben su valor vs la media de zona (con cuantificación en EUR/m2 si es posible), y los que lo bajan.
+
+## CONCLUSIÓN
+Resumen de la valoración y recomendación de estrategia de precio de salida con justificación.
 `;
 }

@@ -177,7 +177,12 @@ export default function ValuationManager() {
     try {
       const res = await fetch(`/api/valuation/${activeReport.id}/pdf`, { method: "POST" });
       if (!res.ok) {
-        setError("Error al generar el PDF");
+        let msg = "Error al generar el PDF";
+        try {
+          const errData = await res.json();
+          if (errData?.error) msg = `Error PDF: ${String(errData.error).slice(0, 150)}`;
+        } catch { /* ignore */ }
+        setError(msg);
         return;
       }
       const blob = await res.blob();
