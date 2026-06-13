@@ -5,6 +5,23 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-14 — Brief #017: página pública `/valoracion` (Catastro + rango instantáneo + captación)
+
+Subida de nivel de `src/app/valoracion/page.tsx`. Cuatro commits (`42f3915..4d86e4f`):
+
+- **T2 — Rango de precio instantáneo (`42f3915`)**: nueva lib `src/lib/zoneValuation.ts` (`computeQuickRange`, aritmética local €/m² × m² × estado × extras, SIN IA ni red, sin coste por lead) + 12 tests. El paso 6 del wizard muestra un rango orientativo ancho (±12%) con CTA al informe de Álvaro; cae al mensaje "te contactaré" si no hay m². **El informe IA fino lo sigue generando Álvaro desde el CRM (Brief #016); la web NUNCA llama a `/api/valuation` (Gemini).**
+- **T1 — Autocompletado Catastro (`2f00eef`)**: nuevo proxy server-side `src/app/api/catastro/route.ts` (el Catastro no permite CORS). `?action=vias` → `ObtenerCallejero` (autocompleta calles); `?action=inmueble` → `Consulta_DNPLOC` (captura referencia catastral). Parsers puros en `src/lib/catastroLookup.ts` con 11 tests sobre fixtures de **llamadas reales**. ⚠️ El brief asumía `ConsultaVia`/`NombreVia` pero el servicio real usa `ObtenerCallejero`/`NomVia` (verificado en la help page). `referencia_catastral` + `direccion_oficial` se guardan en `leads.preferences` → alimentan `resolveCatastro` del CRM. Degradación elegante total (Catastro caído → input libre).
+- **T3 — Automatizaciones (`b56209d`)**: nuevo `POST /api/valuation/lead`. Mueve el upsert de lead (dedupe por teléfono, merge de preferences, 23505) del CLIENTE al SERVIDOR (service role) — **se elimina el acceso anon a la BD desde el navegador**. Tras el upsert dispara, fire-and-forget con catch: (1) `aviso_alvaro` a Álvaro con el resumen del lead; (2) `valoracion_recibida` al cliente (HSM, ver dependencia abajo). Anti-abuso: rate-limit en memoria por IP (5/h) + honeypot.
+- **T4 — Copy/limpieza (`4d86e4f`)**: paso 1 "La Macarena y alrededores" → "Sevilla y provincia"; `cpMap` documentado como fallback que complementa (no pisa) al Catastro; dirección sin "Piso ," cuando no hay planta (resuelto al mover `property_address` al endpoint).
+
+**Verificación**: 271 tests verdes (23 nuevos: zoneValuation 12 + catastroLookup 11). Build verde. `gitnexus_impact` (todo LOW) + `detect_changes` por commit. Smoke test E2E en dev del proxy Catastro (vías + inmueble multi reales) y del endpoint de lead (honeypot/400, SIN tocar BD ni WhatsApp para no spamear).
+
+**⚠️ DEPENDENCIAS EXTERNAS PENDIENTES (en manos de Álvaro):**
+1. **Plantilla HSM `valoracion_recibida` en Meta** (categoría Utility, idioma es, 1 param `{{1}}`=nombre). Texto sugerido: *"Hola {{1}}, he recibido tu solicitud de valoración. Estoy preparando un informe detallado y personalizado de tu vivienda y te lo haré llegar muy pronto. Un saludo, Álvaro."* **Mientras no esté aprobada**, la bienvenida al cliente falla en silencio (catch); el lead y el `aviso_alvaro` funcionan igual. Falta hacer UNA valoración real para ver el happy-path de WhatsApp end-to-end.
+2. **Calibrar `ZONE_PRICES_M2`** en `src/lib/zoneValuation.ts`: los €/m² son ORIENTATIVOS 2025-2026 (marcados en el código). Álvaro debe ajustarlos a sus precios reales de zona; el rango ancho (±12%) absorbe imprecisión mientras tanto.
+
+---
+
 ### 2026-06-13 — Fix fiscalidad página PÚBLICA `/plusvalia` (cierra la deuda marcada en FIX v5)
 
 **Problema**: la calculadora pública `/plusvalia` daba cifras erróneas a los visitantes por usar constantes incorrectas: (1) `COEFICIENTES_PLUSVALIA_2024` de `constants.ts` era una tabla MONÓTONA inventada (0,15→0,95, y 0,45 en el año 20) — los coeficientes IIVTNU reales (RDL 8/2023, vigentes 2026) NO son monótonos (valle de 0,09 en años 12-15, repunte al final); (2) el tipo municipal estaba fijado al 30% (máximo legal) en vez del 26,53% de Sevilla; (3) el cálculo IRPF inline tenía el tramo marginal final en 0,28 en vez de 0,30 (escala del ahorro).
