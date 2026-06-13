@@ -14,7 +14,6 @@ import {
   Zap,
   TrendingUp,
   Gem,
-  Save,
   X,
 } from "lucide-react";
 import type { ValuationInputs, ValuationResult, EstadoInmueble } from "@/lib/valuation";
@@ -458,20 +457,6 @@ export default function ValuationManager() {
           />
         </div>
 
-        {/* Vincular inmueble */}
-        <div>
-          <label className="block text-slate-400 text-xs mb-1">
-            ID del inmueble en el CRM (opcional — habilita guardar valoración)
-          </label>
-          <input
-            type="text"
-            value={inputs.property_id || ""}
-            onChange={(e) => field("property_id", e.target.value || undefined)}
-            placeholder="UUID del inmueble del CRM"
-            className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-[#FBBF24]/50 font-mono"
-          />
-        </div>
-
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -502,70 +487,63 @@ export default function ValuationManager() {
       </form>
 
       {/* Resultados */}
-      {activeReport?.status === "done" && result && (
+      {activeReport?.status === "done" && (
         <div className="space-y-4">
-          {/* Confianza */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" />
+          {/* Cabecera: estado + botón PDF (siempre visible) */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
               <span className="text-white font-medium">Valoración completada</span>
-              <span
-                className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                  result.confianza === "alta"
-                    ? "bg-green-500/20 text-green-300"
-                    : result.confianza === "media"
-                      ? "bg-yellow-500/20 text-yellow-300"
-                      : "bg-slate-500/20 text-slate-300"
-                }`}
-              >
-                Confianza {result.confianza}
-              </span>
-              {result.precio_m2_zona > 0 && (
-                <span className="text-slate-400 text-xs">
-                  €/m² zona: {result.precio_m2_zona.toLocaleString()}
-                  {result.precio_m2_zona_rango &&
-                    ` (${result.precio_m2_zona_rango.min.toLocaleString()}–${result.precio_m2_zona_rango.max.toLocaleString()})`}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {activeReport.property_id && (
-                <button
-                  onClick={handleWriteBack}
-                  disabled={writingBack}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 rounded-lg text-white text-xs font-medium transition-colors"
-                >
-                  {writingBack ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Save className="w-3 h-3" />
+              {result && (
+                <>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      result.confianza === "alta"
+                        ? "bg-green-500/20 text-green-300"
+                        : result.confianza === "media"
+                          ? "bg-yellow-500/20 text-yellow-300"
+                          : "bg-slate-500/20 text-slate-300"
+                    }`}
+                  >
+                    Confianza {result.confianza}
+                  </span>
+                  {result.precio_m2_zona > 0 && (
+                    <span className="text-slate-400 text-xs">
+                      €/m² zona: {result.precio_m2_zona.toLocaleString()}
+                      {result.precio_m2_zona_rango &&
+                        ` (${result.precio_m2_zona_rango.min.toLocaleString()}–${result.precio_m2_zona_rango.max.toLocaleString()})`}
+                    </span>
                   )}
-                  Guardar como valoración del inmueble
-                </button>
+                </>
               )}
-              <button
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 rounded-lg text-white text-xs font-medium transition-colors"
-              >
-                {downloadingPdf ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Download className="w-3 h-3" />
-                )}
-                Descargar PDF
-              </button>
             </div>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="flex items-center gap-2 px-4 py-2 bg-[#FBBF24] hover:bg-[#F59E0B] disabled:opacity-60 rounded-xl text-[#0F172A] text-sm font-bold transition-colors shrink-0"
+            >
+              {downloadingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {downloadingPdf ? "Generando…" : "Descargar PDF"}
+            </button>
           </div>
 
-          {writeBackMsg && (
-            <div className="text-sm text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
-              {writeBackMsg}
+          {/* Sin datos estructurados: aviso y descarga */}
+          {!result && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 flex flex-col items-center gap-3 text-center">
+              <Download className="w-8 h-8 text-blue-400" />
+              <p className="text-blue-200 font-medium">Informe listo</p>
+              <p className="text-slate-400 text-sm">
+                El análisis está completo. Pulsa "Descargar PDF" para obtener el informe con todos los detalles generados por la IA.
+              </p>
             </div>
           )}
 
           {/* Advertencias */}
-          {result.advertencias && result.advertencias.length > 0 && (
+          {result?.advertencias && result.advertencias.length > 0 && (
             <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-3">
               <p className="text-amber-300 text-xs font-semibold mb-1">Advertencias</p>
               {result.advertencias.map((a, i) => (
@@ -577,82 +555,84 @@ export default function ValuationManager() {
           )}
 
           {/* 3 Tarjetas hero */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Venta rápida */}
-            <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Zap className="w-4 h-4 text-green-400" />
-                <span className="text-green-300 text-xs font-semibold uppercase tracking-wider">
-                  Venta rápida
-                </span>
-              </div>
-              <p className="text-white text-2xl font-bold">
-                {result.rangos.venta_rapida.precio.toLocaleString()} €
-              </p>
-              <p className="text-green-300 text-sm mt-0.5">
-                {result.rangos.venta_rapida.precio_m2.toLocaleString()} €/m²
-              </p>
-              <p className="text-slate-400 text-xs mt-1">
-                ~{result.rangos.venta_rapida.dias_estimados} días
-              </p>
-              {result.rangos.venta_rapida.justificacion && (
-                <p className="text-slate-300 text-xs mt-2 leading-relaxed">
-                  {result.rangos.venta_rapida.justificacion}
+          {result && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Venta rápida */}
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="w-4 h-4 text-green-400" />
+                  <span className="text-green-300 text-xs font-semibold uppercase tracking-wider">
+                    Venta rápida
+                  </span>
+                </div>
+                <p className="text-white text-2xl font-bold">
+                  {result.rangos.venta_rapida.precio.toLocaleString()} €
                 </p>
-              )}
-            </div>
+                <p className="text-green-300 text-sm mt-0.5">
+                  {result.rangos.venta_rapida.precio_m2.toLocaleString()} €/m²
+                </p>
+                <p className="text-slate-400 text-xs mt-1">
+                  ~{result.rangos.venta_rapida.dias_estimados} días
+                </p>
+                {result.rangos.venta_rapida.justificacion && (
+                  <p className="text-slate-300 text-xs mt-2 leading-relaxed">
+                    {result.rangos.venta_rapida.justificacion}
+                  </p>
+                )}
+              </div>
 
-            {/* Mercado */}
-            <div className="bg-blue-500/10 border border-blue-500/40 rounded-xl p-5 ring-1 ring-blue-500/20">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-4 h-4 text-blue-400" />
-                <span className="text-blue-300 text-xs font-semibold uppercase tracking-wider">
-                  Precio de mercado
-                </span>
-              </div>
-              <p className="text-white text-3xl font-bold">
-                {result.rangos.mercado.precio.toLocaleString()} €
-              </p>
-              <p className="text-blue-300 text-sm mt-0.5">
-                {result.rangos.mercado.precio_m2.toLocaleString()} €/m²
-              </p>
-              <p className="text-slate-400 text-xs mt-1">
-                ~{result.rangos.mercado.dias_estimados} días
-              </p>
-              {result.rangos.mercado.justificacion && (
-                <p className="text-slate-300 text-xs mt-2 leading-relaxed">
-                  {result.rangos.mercado.justificacion}
+              {/* Mercado */}
+              <div className="bg-blue-500/10 border border-blue-500/40 rounded-xl p-5 ring-1 ring-blue-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-blue-400" />
+                  <span className="text-blue-300 text-xs font-semibold uppercase tracking-wider">
+                    Precio de mercado
+                  </span>
+                </div>
+                <p className="text-white text-3xl font-bold">
+                  {result.rangos.mercado.precio.toLocaleString()} €
                 </p>
-              )}
-            </div>
+                <p className="text-blue-300 text-sm mt-0.5">
+                  {result.rangos.mercado.precio_m2.toLocaleString()} €/m²
+                </p>
+                <p className="text-slate-400 text-xs mt-1">
+                  ~{result.rangos.mercado.dias_estimados} días
+                </p>
+                {result.rangos.mercado.justificacion && (
+                  <p className="text-slate-300 text-xs mt-2 leading-relaxed">
+                    {result.rangos.mercado.justificacion}
+                  </p>
+                )}
+              </div>
 
-            {/* Premium */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <Gem className="w-4 h-4 text-amber-400" />
-                <span className="text-amber-300 text-xs font-semibold uppercase tracking-wider">
-                  Premium
-                </span>
-              </div>
-              <p className="text-white text-2xl font-bold">
-                {result.rangos.premium.precio.toLocaleString()} €
-              </p>
-              <p className="text-amber-300 text-sm mt-0.5">
-                {result.rangos.premium.precio_m2.toLocaleString()} €/m²
-              </p>
-              <p className="text-slate-400 text-xs mt-1">
-                ~{result.rangos.premium.dias_estimados} días
-              </p>
-              {result.rangos.premium.justificacion && (
-                <p className="text-slate-300 text-xs mt-2 leading-relaxed">
-                  {result.rangos.premium.justificacion}
+              {/* Premium */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Gem className="w-4 h-4 text-amber-400" />
+                  <span className="text-amber-300 text-xs font-semibold uppercase tracking-wider">
+                    Premium
+                  </span>
+                </div>
+                <p className="text-white text-2xl font-bold">
+                  {result.rangos.premium.precio.toLocaleString()} €
                 </p>
-              )}
+                <p className="text-amber-300 text-sm mt-0.5">
+                  {result.rangos.premium.precio_m2.toLocaleString()} €/m²
+                </p>
+                <p className="text-slate-400 text-xs mt-1">
+                  ~{result.rangos.premium.dias_estimados} días
+                </p>
+                {result.rangos.premium.justificacion && (
+                  <p className="text-slate-300 text-xs mt-2 leading-relaxed">
+                    {result.rangos.premium.justificacion}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Factores */}
-          {result.factores && result.factores.length > 0 && (
+          {result?.factores && result.factores.length > 0 && (
             <div className="bg-slate-800/50 border border-white/5 rounded-xl p-4">
               <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 Factores del inmueble
@@ -671,7 +651,7 @@ export default function ValuationManager() {
           )}
 
           {/* Comparables */}
-          {result.comparables && result.comparables.length > 0 && (
+          {result?.comparables && result.comparables.length > 0 && (
             <div className="bg-slate-800/50 border border-white/5 rounded-xl p-4">
               <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">
                 Comparables de mercado
@@ -715,7 +695,7 @@ export default function ValuationManager() {
           )}
 
           {/* Supuestos */}
-          {result.supuestos && result.supuestos.length > 0 && (
+          {result?.supuestos && result.supuestos.length > 0 && (
             <div className="bg-slate-900/50 border border-white/5 rounded-xl p-4">
               <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-2">
                 Supuestos asumidos por la IA

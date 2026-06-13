@@ -109,7 +109,7 @@ async function runAnalysis(
           tools: [{ google_search: {} }],
           generationConfig: {
             temperature: 0.4,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 16384,
           },
         }),
       },

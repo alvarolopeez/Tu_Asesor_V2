@@ -159,11 +159,7 @@ export function buildValuationPrompt(inputs: ValuationInputs): string {
 
   const ajusteGuia = ESTADO_AJUSTE[inputs.estado] ?? '0%';
 
-  return `Eres un tasador inmobiliario senior especializado en Sevilla y el Aljarafe, España. Tu misión es estimar el **mejor precio de salida al mercado** de un inmueble aún no publicado.
-
-Produce:
-1. Un **informe de valoración en markdown** explicando PASO A PASO la cuenta: €/m² zona → rango zona → ajuste por estado → ajuste por reformas/extras → 3 rangos de precio. Usa fuentes reales; cita las URLs.
-2. Al FINAL, un bloque \`\`\`json con la valoración estructurada.
+  return `Eres un tasador inmobiliario senior especializado en Sevilla y el Aljarafe, España. Estima el mejor precio de salida al mercado del siguiente inmueble.
 
 ---
 ## DATOS DEL INMUEBLE
@@ -176,28 +172,25 @@ Produce:
 - ${reformasBlock}
 
 ---
-## INSTRUCCIONES
-- Usa Google Search para encontrar €/m² reales de venta en **${zonaLabel}** (Idealista, Fotocasa, Habitaclia, portales inmobiliarios). Cita SIEMPRE la URL de cada fuente.
+## INSTRUCCIONES DE ANÁLISIS
+- Usa Google Search para consultar €/m² de venta actuales en **${zonaLabel}** (Idealista, Fotocasa, Habitaclia). Cita la URL de cada fuente.
 - Busca el **rango de €/m²** de la zona (min–max), no solo un valor puntual.
-${inputs.referencia_catastral ? `- Busca el valor de referencia del Catastro para la ref. catastral "${inputs.referencia_catastral}" como ancla objetiva de sanidad (no es el precio de venta).` : ''}
-- Consulta índices de escrituración recientes: Registradores de la Propiedad, Tinsa, Ministerio de Vivienda.
-- Explica la cuenta PASO A PASO: €/m² zona → ajuste por estado → ajuste por reformas → precio total.
-- Registra los **supuestos** que estás asumiendo (coste de reforma, m² útiles vs construidos, etc.) para que el asesor pueda corregirlos.
-- Si hay factores que aumentan o disminuyen el precio (reforma cocina, planta alta sin ascensor, orientación, etc.), listarlos en \`factores\`.
-- Si la zona tiene pocos datos o la dirección es ambigua, anótalo en \`advertencias\` y baja la confianza.
-- NUNCA inventes comparables. Cada €/m² de mercado debe tener fuente real con URL.
-- Tono: ejecutivo, directo, en castellano de España. Máximo 500 palabras de análisis.
+${inputs.referencia_catastral ? `- Consulta el valor de referencia del Catastro para "${inputs.referencia_catastral}" como ancla de sanidad.` : ''}
+- Aplica ajuste por estado y por reformas/extras. Documenta los supuestos (m² útiles, coste reforma, etc.).
+- Si hay factores diferenciales (planta alta sin ascensor, orientación, cocina reformada…), inclúyelos en \`factores\`.
+- Si los datos son escasos o la zona es ambigua, anótalo en \`advertencias\` y baja la confianza.
+- NUNCA inventes comparables. Cada fuente debe tener URL real.
+
+Definición de los 3 rangos:
+- **venta_rapida**: −5/−10% sobre mercado. Cierre ~20-26 días.
+- **mercado**: precio realista ajustado por zona + estado + reformas.
+- **premium**: +5/+10% si hay extras diferenciales claros. Más tiempo de espera.
 
 ---
-## DEFINICIÓN DE LOS 3 RANGOS (precio de salida)
-- **venta_rapida**: −5/−10% sobre el precio de mercado realista. Objetivo: cierre ~20-26 días.
-- **mercado**: precio realista ajustado por zona + estado + reformas. Días estimados según demanda del barrio.
-- **premium**: +5/+10% si el inmueble tiene extras diferenciales claros. Requiere más tiempo de espera.
+## FORMATO DE RESPUESTA — SIGUE ESTE ORDEN SIN EXCEPCIONES
 
-Cada rango: € total, €/m², días estimados y justificación breve.
+**PRIMERO** (antes de cualquier otra cosa): el bloque JSON con los resultados:
 
----
-Al final del informe incluye OBLIGATORIAMENTE este bloque JSON (sin texto después):
 \`\`\`json
 {
   "precio_m2_zona": 0,
@@ -211,9 +204,11 @@ Al final del informe incluye OBLIGATORIAMENTE este bloque JSON (sin texto despu�
   "confianza": "alta|media|baja",
   "comparables": [{"fuente": "nombre del portal", "precio_m2": 0, "url": "https://..."}],
   "factores": ["reforma cocina suma X €/m²", "planta sin ascensor resta Y €/m²"],
-  "supuestos": ["coste reforma estimado en X €/m²", "m² útiles = 90% construidos"],
+  "supuestos": ["m² útiles = 90% construidos"],
   "advertencias": []
 }
 \`\`\`
+
+**DESPUÉS del JSON**: análisis ejecutivo en markdown (máximo 300 palabras). Explica qué fuentes consultaste, cómo calculaste el €/m² de zona, los ajustes aplicados y los factores clave. Cita URLs.
 `;
 }
