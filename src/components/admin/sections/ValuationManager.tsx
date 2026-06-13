@@ -462,6 +462,19 @@ export default function ValuationManager() {
           />
         </div>
 
+        <div>
+          <label className="block text-slate-400 text-xs mb-1">
+            Notas del asesor (opcional) — tu conocimiento de la zona manda sobre los portales
+          </label>
+          <textarea
+            rows={2}
+            value={inputs.notas_asesor || ""}
+            onChange={(e) => field("notas_asesor", e.target.value || undefined)}
+            placeholder="Ej: vendí el de al lado en 190.000€; aquí Idealista infla ~10-15% sobre el cierre real; el parking en superficie suma poco"
+            className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-[#FBBF24]/50 resize-none"
+          />
+        </div>
+
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4 shrink-0" />

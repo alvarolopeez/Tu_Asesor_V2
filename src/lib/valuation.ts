@@ -38,6 +38,8 @@ export interface ValuationInputs {
   ano?: number;
   estado: EstadoInmueble;
   reformas_extras?: string;
+  /** Conocimiento de campo del asesor (ventas reales, si los portales inflan, etc.). Máxima autoridad. */
+  notas_asesor?: string;
   property_id?: string;
 }
 
@@ -170,13 +172,16 @@ export function applyLowballGuard(result: ValuationResult): ValuationResult {
   const mercadoM2 = result.rangos?.mercado?.precio_m2 ?? 0;
   if (med <= 0 || mercadoM2 <= 0) return result;
 
-  if (mercadoM2 < med * 0.92) {
+  // Backstop SOLO para lowball GRAVE. Los comparables son precios de OFERTA
+  // (inflados), así que un cierre realista por debajo de la mediana de oferta es
+  // CORRECTO y no debe marcarse. Solo saltamos si el mercado cae >30% bajo la
+  // mediana, lo que delata un error real (zona equivocada, AVM obsoleto…).
+  if (mercadoM2 < med * 0.70) {
     const aviso =
-      `Posible INFRAVALORACIÓN detectada automáticamente: el precio de mercado ` +
-      `(${Math.round(mercadoM2).toLocaleString('es-ES')} €/m²) queda por debajo de la ` +
-      `mediana de los comparables (${Math.round(med).toLocaleString('es-ES')} €/m²). ` +
-      `Revisa al alza y verifica que la geolocalización del barrio sea correcta antes de ` +
-      `presentar el informe al cliente.`;
+      `Posible INFRAVALORACIÓN GRAVE detectada automáticamente: el precio de mercado ` +
+      `(${Math.round(mercadoM2).toLocaleString('es-ES')} €/m²) queda muy por debajo de la ` +
+      `mediana de las fuentes (${Math.round(med).toLocaleString('es-ES')} €/m²). ` +
+      `Verifica que la geolocalización del barrio sea correcta antes de presentar el informe.`;
     return {
       ...result,
       confianza: 'baja',
@@ -226,6 +231,11 @@ export function buildValuationPrompt(
     ? `\n---\n## UBICACIÓN OFICIAL CONFIRMADA (Catastro + geocodificación) — VERDAD INNEGOCIABLE, NO LA CUESTIONES\n${catastroConfirmedText}\n\nTu PASO 1 (geolocalización) YA ESTÁ RESUELTO con datos oficiales: NO reasignes el barrio/distrito/CP por tu cuenta, ni por tu conocimiento previo, ni por slugs de URL de portales. Si tu prior interno dice otro barrio, está EQUIVOCADO: manda el Catastro. Tu trabajo es VALORAR esta ubicación exacta y buscar comparables de mercado de ESTE barrio/CP, NUNCA de otro. En el PASO 3 busca infraestructura usando este barrio confirmado.\n`
     : '';
 
+  // Conocimiento de campo del asesor: máxima autoridad, por encima de los portales.
+  const notasBlock = inputs.notas_asesor?.trim()
+    ? `\n---\n## CONOCIMIENTO DEL ASESOR (AUTORIDAD LOCAL — PONDÉRALO POR ENCIMA DE LOS PORTALES)\nEl asesor inmobiliario, que conoce esta zona y ha cerrado ventas reales aquí, indica:\n"${inputs.notas_asesor.trim()}"\nEsta información de campo (precios de venta REALES cerrados, cuánto inflan los portales, peso real de los extras) tiene MÁS autoridad que los precios de anuncio. Si contradice a los portales, GANA el asesor. Intégralo en la triangulación del PASO 4 y cítalo en supuestos. Si el asesor da un precio de cierre real de un gemelo, ese es el centro de gravedad.\n`
+    : '';
+
   // Bloque catastral (variable para no anidar template literals en el prompt grande).
   const catastroBlock = inputs.referencia_catastral
     ? ` Busca "${inputs.referencia_catastral}" en Google Search (Sede Electrónica del Catastro / consultas catastrales / callejero) para confirmar municipio, vía, número y código postal exactos. ATENCIÓN: los primeros dígitos de la referencia catastral (p.ej. "5847402…") son la HOJA CARTOGRÁFICA / parcela, NO el código postal ni una pista de barrio: ignóralos como indicio de zona. Cruza la dirección del Catastro con la dirección postal declarada; si no coinciden, márcalo en supuestos/advertencias y baja la confianza.`
@@ -244,7 +254,7 @@ export function buildValuationPrompt(
 - ${reformasBlock}
 
 ATENCIÓN: La "Zona CRM" es una etiqueta interna del asesor, NO una fuente de geolocalización fiable. Verifícala en el PASO 1; si contradice la dirección/catastro/landmarks, gana la realidad sobre la etiqueta.
-${confirmedBlock}
+${confirmedBlock}${notasBlock}
 ---
 ## MÉTODO OBLIGATORIO — EJECUTA LOS PASOS EN ORDEN. NO emitas ni un solo €/m² antes de completar el PASO 1.
 
@@ -271,24 +281,28 @@ Una vez fijado el barrio, BUSCA ACTIVAMENTE proyectos de infraestructura o urban
 Construye el €/m² de mercado de la **micro-zona confirmada** (no del distrito amplio, que mezcla barrios baratos y caros y tira la media abajo) recogiendo **al menos 3 fuentes** de 2025-2026 con URL real:
 
 1. **Comparables directos de venta cerrada / escriturada** en la misma micro-zona (Registradores, Ministerio de Vivienda, o ventas reales conocidas) — máxima autoridad, peso ~40% si existen.
-2. **Portales de oferta viva** (Idealista, Fotocasa, Habitaclia), anuncios de 2025-2026 de la misma calle/CP — reflejan el mercado de HOY, peso ~30%. Captura el rango €/m² (min-max), no un valor puntual.
+2. **Índices/informes de precio de ZONA** de portales (Idealista, Fotocasa: informes y estadísticas AGREGADAS por barrio/CP/distrito, 2025-2026) — reflejan el mercado de HOY, peso ~30%. Captura el rango €/m² AGREGADO de la zona. ⚠️ Usa SIEMPRE el dato agregado de zona, NUNCA un anuncio individual.
 3. **Tasadoras** (Tinsa, Sociedad de Tasación) — metodología sólida, algo conservadoras (valor hipotecario), buen ancla de techo realista, peso ~20%.
 4. **AVM automáticos** (RealAdvisor, Idealista AVM…) — la fuente MÁS débil y MÁS retrasada, SOLO como sanity-check, peso ~10%. ATENCIÓN: un AVM se entrena con escrituras de hace 6-18 meses; en un mercado al alza "recuerda" precios viejos más bajos y SUBVALORA. Un AVM por debajo de la oferta viva NO es "la cifra prudente": es la cifra DESACTUALIZADA (lag). NUNCA fijes el valor con un AVM.
 
 REGLAS DE TRIANGULACIÓN — anti-lowball (de obligado cumplimiento):
+- **PROHIBIDO basarse en o CITAR un ANUNCIO INDIVIDUAL** (un piso concreto en venta con su dirección/precio). Un particular pone el precio que quiere: los anuncios sueltos suelen estar MAL tasados (sobreprecio, m² inflados, planta/estado no comparables) y son RUIDO, no mercado. Usa SIEMPRE datos AGREGADOS de zona (índices, informes, medias por barrio/CP) o ventas cerradas. En el JSON \`comparables\` solo van fuentes AGREGADAS/oficiales con URL (índices de zona, tasadoras, registradores), NUNCA un inmueble concreto a la venta.
 - **El €/m² de mercado = MEDIANA de las fuentes válidas de la micro-zona, ponderada hacia el dato MÁS FRESCO y MÁS específico; NUNCA el mínimo.**
 - **PROHIBIDO elegir el valor más bajo "para no sobrevalorar" / "para ser prudente".** Esa frase es exactamente la señal del error. Descartar una fuente (alta o baja) exige una razón OBJETIVA en supuestos: (a) es de otra micro-zona, (b) está obsoleta (>12 meses), o (c) es metodológicamente débil (AVM puro sin comparables vivos). No vale "es la más alta, mejor no fiarse".
 - **Un comparable de otro barrio NO sirve.** Si una fuente o slug corresponde a un barrio distinto del confirmado en el PASO 1, descártala como comparable directo (anótalo en supuestos).
 - **REGLA DE LA VENTA CERRADA:** si conoces un precio de venta real cerrado de ESTE inmueble o de un gemelo, esa cifra es el centro de gravedad; ninguna estimación puede alejarse >10% de ella sin justificación explícita.
-- **Descuento oferta→venta:** precio_venta ≈ precio_oferta_vivo × 0,90 (descuento medio ~10%) en mercado normal; × 0,95 en micro-zonas tensionadas / mercado de vendedor (alta demanda, driver de infraestructura entrando). NUNCA apliques descuentos >15% salvo evidencia explícita de inmueble sobreofertado/estancado: un descuento exagerado es lowball encubierto.
-- **TEST DE COHERENCIA DE SALIDA (obligatorio):** si tu €/m² final queda por DEBAJO del mínimo de los anuncios vivos de la micro-zona, es lowball casi seguro → RECALCULA AL ALZA, no a la baja. El precio de venta real está típicamente entre el 88% y el 96% de la oferta, NO al 60-70%.
-- **El valor más bajo del rango se mapea a "venta_rapida" (liquidación), JAMÁS a "mercado".** Confundir el suelo con el mercado es el error nº1 a erradicar.
+- **LOS €/m² DE PORTAL SON DE OFERTA, NO DE VENTA.** Idealista/Fotocasa publican el PRECIO PEDIDO, sistemáticamente por ENCIMA del precio de cierre real (en Sevilla, típicamente 8-15% por encima; más donde el stock lleva semanas publicado sin venderse). El "precio de mercado" que devuelves NO es la mediana de los anuncios: es el precio de CIERRE realista al que de verdad se firma. Calcula: precio_venta ≈ mediana_de_oferta_viva × **0,87** (descuento ~13%) por defecto; × 0,90-0,92 solo con CIERRES rápidos demostrados por encima de lo pedido; × 0,82-0,85 si la zona está sobreofertada o el asesor indica que los portales inflan.
+- **PREFERENCIA POR EL REALISMO:** ante la duda, posiciónate en la franja MEDIA-BAJA del rango realista. Un precio de salida ajustado que se vende en 6-10 semanas es MEJOR que uno inflado que se estanca meses y acaba rebajándose. SOBREVALORAR también es un fallo grave (es lo que hace que un piso no se venda): no es más "seguro" tirar alto.
+- **TEST DE COHERENCIA (obligatorio, doble):** (a) tu €/m² de mercado NO puede quedar por debajo del mínimo de VENTAS CERRADAS reales conocidas → eso sí sería lowball; (b) PERO sí puede (y normalmente DEBE) quedar por debajo del mínimo de los ANUNCIOS de oferta, porque los anuncios están inflados. No confundas "precio de anuncio" con "precio de venta".
+- **El valor más bajo del rango se mapea a "venta_rapida" (liquidación), JAMÁS a "mercado".** Confundir el suelo con el mercado es un error; confundir el techo de los anuncios con el mercado es el otro. El mercado es el CIERRE realista.
 
 ### PASO 5 — AJUSTE POR ESTADO Y EXTRAS
 Aplica el ajuste por estado sobre el €/m² de mercado de la micro-zona:
 - **"Para reformar":** busca comparables de pisos SIN REFORMAR en la misma zona. El comprador descuenta la reforma (integral en Sevilla: 700-1.000 EUR/m²). Calcula precio = (€/m² en buen estado - coste_reforma) × m², no un porcentaje fijo a ojo.
 - **"Bien conservado" / "Buen estado" / "Reformado":** NO descuentes como si necesitara reforma. "Buen estado" toma el €/m² de zona como referencia DIRECTA (ajuste 0%); "Reformado" va por ENCIMA de la media. Restar coste de reforma a un piso en buen estado es un error de subvaloración.
-Documenta supuestos (m² útiles vs construidos, coste reforma, etc.) en supuestos. Refleja extras y factores diferenciales en factores con cuantificación en €/m² cuando puedas. NUNCA inventes comparables: cada fuente debe tener URL real.
+Documenta supuestos (m² útiles vs construidos, coste reforma, etc.) en supuestos. Refleja extras y factores diferenciales en factores con cuantificación cuando puedas.
+**EXTRAS NO REGISTRADOS** (parking en superficie sin plaza escriturada, trastero que NO consta en nota simple ni catastro): aportan valor de NEGOCIACIÓN modesto, NO valor sólido de tasación (no son financiables ni garantizables). Cuantifícalos con PRUDENCIA — orientativo TOTAL: parking en superficie 2.000-6.000 €, trastero 1.000-3.000 € — y preséntalos en advertencias como "extra a negociar", no como un salto grande en el precio base. NO sumes ~10.000 € por un parking en superficie sin registrar: es demasiado.
+NUNCA inventes comparables: cada fuente debe tener URL real.
 
 Definición de los 3 rangos:
 - **venta_rapida**: -5/-10% sobre mercado (suelo / liquidación). Cierre ~20-26 días.
@@ -311,7 +325,7 @@ Definición de los 3 rangos:
     "premium":      {"precio": 0, "precio_m2": 0, "dias_estimados": 0, "justificacion": ""}
   },
   "confianza": "alta|media|baja",
-  "comparables": [{"fuente": "nombre del portal/tasadora", "precio_m2": 0, "url": "https://..."}],
+  "comparables": [{"fuente": "índice/informe de zona o tasadora (NUNCA un anuncio individual)", "precio_m2": 0, "url": "https://..."}],
   "factores": ["<driver de infraestructura si existe>: +X €/m²", "<extra del inmueble, p.ej. parking/terraza>: +Y €/m²", "<factor que resta, p.ej. planta baja/sin ascensor>: -Z €/m²"],
   "supuestos": ["Barrio confirmado: <barrio> (distrito <distrito>, CP <cp>), verificado con <fuente1> y <fuente2>", "AVM <fuente> descartado por lag/zona distinta", "m² útiles ~ 90% construidos"],
   "advertencias": []
@@ -324,7 +338,7 @@ Definición de los 3 rangos:
 Indica el **barrio, distrito y código postal confirmados** y con qué fuentes lo confirmaste (PASO 1). Describe el perfil del barrio y calidad de vida. Transporte público en 500 m (autobús, metro, tranvía, cercanías) con paradas concretas. Servicios cercanos (colegios, supermercados, parques, centro de salud, farmacia) y landmarks físicos (hospital, estadio, estación). **Proyectos de infraestructura/urbanismo en curso o previstos** (PASO 3) con su estado y plazo. Si hubo incoherencia geográfica o ambigüedad, explica cómo la resolviste.
 
 ## ANÁLISIS DE MERCADO
-€/m² de venta 2025-2026 en esta **micro-zona concreta** (fuente y URL por cada dato). Evolución de los últimos 12 meses en el barrio. Explica la TRIANGULACIÓN: qué fuentes usaste, cuál fue la mediana, qué descartaste y POR QUÉ (razón objetiva, nunca "para no sobrevalorar"). Si hay datos de pisos sin reformar, cítalos. Deja claro por qué el precio NO es el mínimo de las fuentes.
+€/m² de venta 2025-2026 en esta **micro-zona concreta** usando SOLO datos AGREGADOS (índices/informes de zona por barrio/CP, tasadoras, ventas cerradas) con fuente y URL. Evolución de los últimos 12 meses en el barrio. Explica la TRIANGULACIÓN y el descuento oferta→venta aplicado (los anuncios están por encima del cierre real). **PROHIBIDO mencionar, describir o citar un inmueble concreto que esté a la venta** (ni su dirección, ni sus m², ni su precio): los anuncios sueltos suelen estar sobreprecio y citar uno queda poco profesional y descalibra el informe. Habla siempre de medias/índices de zona, nunca de "un piso en la calle X a Y €".
 
 ## FACTORES DEL INMUEBLE
 Aspectos concretos que suben el valor vs la media de zona (incluidos los drivers de revalorización del PASO 3, cuantificados en €/m²) y los que lo bajan.

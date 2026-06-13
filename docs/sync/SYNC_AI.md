@@ -5,6 +5,23 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #016 FIX v4: calibración a la baja (anti-highball) + notas del asesor + sin anuncios sueltos
+
+**Feedback del asesor (caso Calle Coral 6, vendido a 190.000 €)**: el sistema daba 214.500 € (~13% alto). Causas: (1) trataba el €/m² de Idealista (OFERTA) como precio de mercado; (2) sumaba +10.000 € por parking en superficie + trastero NO registrados; (3) citaba anuncios individuales (uno de 195k que en realidad vale ~145k).
+
+**Cambios en `src/lib/valuation.ts` (prompt v3.1)**:
+- **Oferta ≠ venta**: los €/m² de portal son precio PEDIDO, ~8-15% por encima del cierre real. `mercado = mediana_oferta × 0,87` por defecto (×0,82-0,85 si zona sobreofertada). El "precio de mercado" es el CIERRE realista, no la mediana de anuncios. Preferencia explícita por la franja media-baja (sobrevalorar también es fallo).
+- **Solo datos AGREGADOS**: PROHIBIDO citar/basarse en anuncios individuales (un piso concreto en venta). `comparables[]` solo lleva índices de zona / tasadoras / registradores. La sección ## ANÁLISIS DE MERCADO no menciona inmuebles concretos a la venta.
+- **Extras no registrados** (parking superficie, trastero sin escriturar): valor de NEGOCIACIÓN modesto (parking 2.000-6.000 €, trastero 1.000-3.000 €), no ~10.000 €.
+- **Nuevo input `notas_asesor`** (textarea en el form): conocimiento de campo del asesor inyectado como AUTORIDAD por encima de los portales. Es el lever para "aquí Idealista infla", "vendí el de al lado a X".
+- **`applyLowballGuard` aflojado**: ahora solo marca lowball GRAVE (`mercado < 0,70 × mediana`). Antes (`< mínimo comparable`) daba falsos positivos al quedar el cierre por debajo de la oferta inflada (que es lo correcto).
+
+**Verificado E2E** (Gemini real, Coral): sin notas 206.500 €; con notas 179-182.000 € (vs venta real 190.000 €), confianza ALTA, comparables 100% agregados, sin citar el anuncio sobreprecio. Tests 38 en valuation (suite 234). Build verde.
+
+**Gotcha**: `notas_asesor` viaja en `inputs` (jsonb), no requiere cambios en route/runner. La fila ya lo persiste.
+
+---
+
 ### 2026-06-13 — Brief #016 FIX v3: fiabilidad (Netlify Background Function)
 
 **Problema**: valoraciones se quedaban colgadas en `status='running'` para siempre (sin `finished_at` ni `error_msg`) → la lambda moría a mitad. Causa: el patrón fire-and-forget (`void runAnalysis()` tras devolver la respuesta) NO es fiable en Netlify; Gemini 2.5 Pro tarda **~56 s** (medido) y el límite síncrono en Netlify **Pro es 26 s**. `resolveCatastro` solo añade ~1.2 s (no era la causa).

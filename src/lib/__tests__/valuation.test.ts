@@ -232,6 +232,23 @@ describe('buildValuationPrompt', () => {
     expect(prompt).not.toContain('UBICACIÓN OFICIAL CONFIRMADA');
     expect(prompt).toContain('GEOLOCALIZACIÓN RIGUROSA');
   });
+
+  it('inyecta las notas del asesor como autoridad local cuando se aportan', () => {
+    const inputs = { ...baseInputs, notas_asesor: 'Aquí Idealista infla un 12%; vendí el de al lado a 190.000€' };
+    const prompt = buildValuationPrompt(inputs);
+    expect(prompt).toContain('CONOCIMIENTO DEL ASESOR');
+    expect(prompt).toContain('vendí el de al lado a 190.000€');
+  });
+
+  it('no incluye bloque de notas del asesor si no se aportan', () => {
+    const prompt = buildValuationPrompt(baseInputs);
+    expect(prompt).not.toContain('CONOCIMIENTO DEL ASESOR');
+  });
+
+  it('trata el precio de portal como oferta, no como venta (anti-highball)', () => {
+    const prompt = buildValuationPrompt(baseInputs);
+    expect(prompt).toContain('DE OFERTA, NO DE VENTA');
+  });
 });
 
 // ─── applyLowballGuard ────────────────────────────────────────────────────────
@@ -261,6 +278,20 @@ describe('applyLowballGuard', () => {
     const guarded = applyLowballGuard(makeResult(2200, [2136, 2229, 2348]));
     expect(guarded.confianza).toBe('alta');
     expect(guarded.advertencias ?? []).toHaveLength(0);
+  });
+
+  it('NO marca un cierre por debajo de la mediana de OFERTA si está sobre el mínimo (caso Coral)', () => {
+    // Anuncios inflados [1608,2304,2786,2825], mediana 2545; cierre real 2135 (190k/89m²).
+    // 2135 < mediana pero > mínimo y > 80% mediana → es venta realista, NO lowball.
+    const guarded = applyLowballGuard(makeResult(2135, [1608, 2304, 2786, 2825]));
+    expect(guarded.confianza).toBe('alta');
+    expect(guarded.advertencias ?? []).toHaveLength(0);
+  });
+
+  it('marca cuando el mercado cae muy por debajo del cluster pese a un outlier bajo', () => {
+    // outlier bajo 1600; cluster 2700-2800; mercado 1700 < 80% mediana(2700)=2160 → lowball.
+    const guarded = applyLowballGuard(makeResult(1700, [1600, 2700, 2800]));
+    expect(guarded.confianza).toBe('baja');
   });
 
   it('no juzga con menos de 2 comparables válidos', () => {
