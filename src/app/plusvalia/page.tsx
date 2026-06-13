@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Calculator, Info, CheckCircle2, ArrowRight, Smartphone, User, Lock, ShieldCheck } from "lucide-react";
+import { Calculator, Info, CheckCircle2, ArrowRight, Smartphone, User, Lock } from "lucide-react";
 import { BUSINESS, MUNICIPIOS_SEVILLA } from "@/lib/constants";
 import { coefPlusvalia, irpfAhorro, TIPO_PLUSVALIA_SEVILLA } from "@/lib/sellerEconomics";
 import { submitLeadWithCalculation } from "@/lib/leadService";
@@ -520,7 +520,7 @@ export default function PlusvaliaPage() {
 
               <div className="text-center space-y-4">
                 <p className="text-slate-300 italic">
-                  "Hola {formData.nombre}, ya tengo tu cálculo. Te contactaré en breve al {formData.telefono} para explicarte cómo tramitarlo sin errores."
+                  &ldquo;Hola {formData.nombre}, ya tengo tu cálculo. Te contactaré en breve al {formData.telefono} para explicarte cómo tramitarlo sin errores.&rdquo;
                 </p>
                 <button
                   onClick={() => {
