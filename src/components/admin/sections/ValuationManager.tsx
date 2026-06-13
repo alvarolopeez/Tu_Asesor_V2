@@ -475,6 +475,49 @@ export default function ValuationManager() {
           />
         </div>
 
+        {/* Liquidación del vendedor (opcional) — alimenta el desglose neto del PDF */}
+        <div>
+          <p className="text-slate-300 text-xs font-semibold mb-2 mt-1">
+            Liquidación del vendedor <span className="text-slate-500 font-normal">(opcional — añade el desglose de neto tras impuestos al PDF)</span>
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-slate-400 text-xs mb-1">Precio de compra (€)</label>
+              <input
+                type="number"
+                min={0}
+                value={inputs.precio_compra || ""}
+                onChange={(e) => field("precio_compra", parseFloat(e.target.value) || undefined)}
+                placeholder="150000"
+                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-[#FBBF24]/50"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 text-xs mb-1">Año de compra</label>
+              <input
+                type="number"
+                min={1950}
+                max={2026}
+                value={inputs.anio_compra || ""}
+                onChange={(e) => field("anio_compra", parseInt(e.target.value) || undefined)}
+                placeholder="2008"
+                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-[#FBBF24]/50"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 text-xs mb-1">Valor catastral suelo (€)</label>
+              <input
+                type="number"
+                min={0}
+                value={inputs.valor_catastral_suelo || ""}
+                onChange={(e) => field("valor_catastral_suelo", parseFloat(e.target.value) || undefined)}
+                placeholder="del recibo IBI (afina plusvalía)"
+                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-600 focus:outline-none focus:border-[#FBBF24]/50"
+              />
+            </div>
+          </div>
+        </div>
+
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
             <AlertCircle className="w-4 h-4 shrink-0" />

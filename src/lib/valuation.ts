@@ -41,6 +41,15 @@ export interface ValuationInputs {
   /** Conocimiento de campo del asesor (ventas reales, si los portales inflan, etc.). Máxima autoridad. */
   notas_asesor?: string;
   property_id?: string;
+  // ── Liquidación neta del vendedor (opcional, no entra en el prompt del LLM) ──
+  /** Precio al que se compró el inmueble (para IRPF y plusvalía). */
+  precio_compra?: number;
+  /** Año de compra (años de tenencia para plusvalía; aviso abatimiento si <1995). */
+  anio_compra?: number;
+  /** Valor catastral del suelo (recibo del IBI) — afina la plusvalía municipal. */
+  valor_catastral_suelo?: number;
+  /** Comisión de intermediación en % (default 2). */
+  comision_pct?: number;
 }
 
 export interface ValuationRange {

@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { PDFDocument, rgb, StandardFonts, PDFPage } from 'pdf-lib';
 import { BRAND } from '@/lib/brandedDoc';
 import type { ValuationInputs, ValuationResult } from '@/lib/valuation';
+import { computeSellerNet, SERVICIOS_INTERMEDIACION } from '@/lib/sellerEconomics';
 
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -507,6 +508,99 @@ export async function POST(
           page = r.page; y = r.y;
           page.drawText(sanitize(`· ${a}`).slice(0, 90), { x: M, y, size: 8, font: reg, color: AMBER });
           y -= 13;
+        }
+      }
+    }
+
+    // ─── SERVICIOS DE INTERMEDIACIÓN + LIQUIDACIÓN DEL VENDEDOR ─────────────────
+
+    {
+      page = doc.addPage([W, H]);
+      pages.push(page);
+      y = H - 55;
+      pageHeader(page, 'Servicios y liquidación');
+
+      // Servicios de intermediación
+      y = sectionTitle(page, 'Mis servicios de intermediación', y);
+      for (const ln of wrapText(SERVICIOS_INTERMEDIACION.honorarios, CW, bold, 9.5)) {
+        page.drawText(ln, { x: M, y, size: 9.5, font: bold, color: NAVY });
+        y -= 14;
+      }
+      y -= 4;
+      page.drawText('Incluido en mis honorarios, sin coste adicional para el vendedor:', { x: M, y, size: 9, font: bold, color: SLATE });
+      y -= 15;
+      for (const s of SERVICIOS_INTERMEDIACION.incluidos) {
+        for (const ln of wrapText(`-  ${s}`, CW - 10, reg, 9)) {
+          const rr = ensurePage(doc, pages, y, 14); page = rr.page; y = rr.y;
+          page.drawText(ln, { x: M + 6, y, size: 9, font: reg, color: NAVY });
+          y -= 14;
+        }
+      }
+
+      // Liquidación estimada para el vendedor
+      const precioVenta = result?.rangos?.mercado?.precio ?? 0;
+      if (precioVenta > 0) {
+        const net = computeSellerNet({
+          precioVenta,
+          precioCompra: inputs.precio_compra,
+          anioCompra: inputs.anio_compra,
+          valorCatastralSuelo: inputs.valor_catastral_suelo,
+          comisionPct: inputs.comision_pct,
+        });
+
+        y -= 16;
+        let rr = ensurePage(doc, pages, y, 60); page = rr.page; y = rr.y;
+        y = sectionTitle(page, sanitize(`Estimación de liquidación para el vendedor (precio objetivo ${precioVenta.toLocaleString('es-ES')} EUR)`), y);
+
+        const drawMoney = (label: string, amount: number, kind: 'resta' | 'neto' | 'sub', nota?: string) => {
+          const isNeto = kind === 'neto';
+          const needed = isNeto ? 30 : (nota ? 26 : 16);
+          rr = ensurePage(doc, pages, y, needed); page = rr.page; y = rr.y;
+          const fSize = isNeto ? 11 : (kind === 'sub' ? 10 : 9);
+          const fnt = isNeto || kind === 'sub' ? bold : reg;
+          const col = isNeto ? NAVY : (kind === 'sub' ? NAVY : SLATE);
+          if (isNeto) {
+            page.drawRectangle({ x: M, y: y - 6, width: CW, height: 22, color: LIGHT });
+            page.drawRectangle({ x: M, y: y - 6, width: 3, height: 22, color: BLUE });
+          }
+          page.drawText(sanitize(label), { x: M + (isNeto ? 10 : 0), y, size: fSize, font: fnt, color: col });
+          const amtStr = sanitize(`${amount < 0 ? '- ' : ''}${Math.abs(Math.round(amount)).toLocaleString('es-ES')} EUR`);
+          const w = (isNeto || kind === 'sub' ? bold : reg).widthOfTextAtSize(amtStr, fSize);
+          page.drawText(amtStr, { x: W - M - w - (isNeto ? 10 : 0), y, size: fSize, font: isNeto || kind === 'sub' ? bold : reg, color: isNeto ? NAVY : (amount < 0 ? rgb(0.7, 0.2, 0.2) : NAVY) });
+          y -= isNeto ? 24 : 14;
+          if (nota) {
+            for (const ln of wrapText(nota, CW - 12, reg, 7.5)) {
+              rr = ensurePage(doc, pages, y, 11); page = rr.page; y = rr.y;
+              page.drawText(ln, { x: M + 8, y, size: 7.5, font: reg, color: SLATE });
+              y -= 10;
+            }
+          }
+          page.drawLine({ start: { x: M, y: y + 2 }, end: { x: W - M, y: y + 2 }, thickness: 0.3, color: RULE });
+          y -= 4;
+        };
+
+        for (const l of net.lineas) drawMoney(l.label, l.amount, l.kind, l.nota);
+
+        if (!net.calculable) {
+          y -= 6;
+          rr = ensurePage(doc, pages, y, 28); page = rr.page; y = rr.y;
+          for (const ln of wrapText('Para el desglose completo (IRPF y plusvalía), indica el precio y el año de compra al generar la valoración.', CW, reg, 8)) {
+            page.drawText(ln, { x: M, y, size: 8, font: reg, color: AMBER });
+            y -= 12;
+          }
+        }
+
+        // Disclaimers fiscales
+        y -= 8;
+        rr = ensurePage(doc, pages, y, 40); page = rr.page; y = rr.y;
+        page.drawText('Notas fiscales:', { x: M, y, size: 8, font: bold, color: SLATE });
+        y -= 12;
+        for (const d of net.disclaimers) {
+          for (const ln of wrapText(`· ${d}`, CW - 8, reg, 7)) {
+            rr = ensurePage(doc, pages, y, 11); page = rr.page; y = rr.y;
+            page.drawText(ln, { x: M + 6, y, size: 7, font: reg, color: SLATE });
+            y -= 10;
+          }
         }
       }
     }

@@ -5,6 +5,21 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #016 FIX v5: servicios de intermediación + liquidación neta del vendedor (PDF)
+
+**Petición del asesor**: añadir al informe (1) apartado de SUS SERVICIOS (2% + IVA, sin comisión al comprador, con lista de servicios incluidos) y (2) una ESTIMACIÓN DE LIQUIDACIÓN NETA para el vendedor con desglose (plusvalía municipal, IRPF, costes, honorarios → neto), y poder introducir el precio de compra.
+
+**Implementación** (cálculo fiscal 100% en CÓDIGO, NUNCA el LLM — cero alucinación en cifras):
+- `src/lib/sellerEconomics.ts` (nuevo): `computeSellerNet()` determinista. Fiscalidad España 2026 verificada por investigación (workflow): honorarios 2%+IVA=2,42%; plusvalía municipal IIVTNU = min(objetivo, real), 0 si no hay incremento, tipo Sevilla 26,53%, coeficientes RDL 8/2023 (NO monótonos — los de `constants.ts` son incorrectos, ver abajo); IRPF ganancia = escala del AHORRO 2026 (19/21/23/27/30%) por tramos marginales; notaría/registro/ITP de la compraventa los paga el COMPRADOR (no restan al vendedor). Exenciones >65/vivienda habitual. Disclaimers obligatorios. `SERVICIOS_INTERMEDIACION` (contenido estático).
+- `valuation.ts`: nuevos inputs opcionales `precio_compra`, `anio_compra`, `valor_catastral_suelo`, `comision_pct` (NO entran en el prompt del LLM).
+- `ValuationManager.tsx`: bloque "Liquidación del vendedor" en el form (precio compra, año, valor catastral suelo).
+- `pdf/route.ts`: nueva página "Servicios y liquidación" (servicios + desglose neto con líneas, neto en caja destacada, notas fiscales). Solo desglose completo si hay precio de compra; si no, muestra servicios + aviso.
+- Verificado E2E: render real del handler (Coral, compra 140k/2015, venta 214,5k) → neto 196.819 € con desglose correcto. Tests: 11 nuevos en `sellerEconomics.test.ts` (suite 245). Build verde.
+
+**⚠️ DEUDA DETECTADA (no tocada, otro alcance)**: `src/lib/constants.ts` → `COEFICIENTES_PLUSVALIA_2024` es INCORRECTA (monótona 0,15→0,95) y `IRPF_TRAMOS` usa la escala GENERAL (19-45%) en vez de la del ahorro para ganancias. Alimentan la página PÚBLICA `/plusvalia`, que por tanto da cifras erróneas. Pendiente de corregir en esa página (el módulo nuevo usa constantes propias correctas).
+
+---
+
 ### 2026-06-13 — Brief #016 FIX v4: calibración a la baja (anti-highball) + notas del asesor + sin anuncios sueltos
 
 **Feedback del asesor (caso Calle Coral 6, vendido a 190.000 €)**: el sistema daba 214.500 € (~13% alto). Causas: (1) trataba el €/m² de Idealista (OFERTA) como precio de mercado; (2) sumaba +10.000 € por parking en superficie + trastero NO registrados; (3) citaba anuncios individuales (uno de 195k que en realidad vale ~145k).
