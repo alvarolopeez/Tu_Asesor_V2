@@ -1,4 +1,4 @@
-import { Printer, TrendingDown } from "lucide-react";
+import { Printer, TrendingDown, Sparkles } from "lucide-react";
 import type { PropertyRow } from "../types";
 import type { SelectedMetrics, PriceDropEstimate } from "./operacionesUtils";
 
@@ -149,9 +149,9 @@ export default function PropertyReportSelector({
               </button>
               <button
                 onClick={onGeneratePriceDropReport}
-                className="w-full py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
+                className="w-full py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 hover:text-white border border-blue-400/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
               >
-                <TrendingDown size={14} /> Informe de posicionamiento IA
+                <Sparkles size={14} /> Informe de posicionamiento IA
               </button>
             </div>
           </div>
