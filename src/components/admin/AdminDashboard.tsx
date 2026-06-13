@@ -40,13 +40,14 @@ import BlogManager from "./sections/BlogManager";
 import HeatmapManager from "./sections/HeatmapManager";
 import WebhooksManager from "./sections/WebhooksManager";
 import DocumentsManager from "./sections/DocumentsManager";
+import ValuationManager from "./sections/ValuationManager";
 import type { DocIntent } from "./sections/DocumentsManager.types";
 
 // Brief #009 T3: ids coherentes con lo que renderizan — 'encargos' →
 // EncargosManager y 'sellers' → WarmLeadsManager (antes 'sellers' abría
 // Encargos y 'warm_sellers' abría Vendedores: trampa de mantenimiento).
 // activeTab no se persiste en ningún sitio → sin mapeo de compatibilidad.
-type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'encargos' | 'sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks';
+type TabType = 'dashboard' | 'calendar' | 'properties' | 'buyers' | 'encargos' | 'sellers' | 'documents' | 'chat' | 'reviews' | 'blog' | 'heatmap' | 'webhooks' | 'valuation';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -113,6 +114,7 @@ export default function AdminDashboard() {
     { id: 'chat', label: 'Live Chat (IA)', icon: MessageCircle },
     { id: 'reviews', label: 'Reseñas', icon: Star },
     { id: 'blog', label: 'Blog', icon: PenTool },
+    { id: 'valuation', label: 'Valoración IA', icon: Calculator },
     // 'heatmap' oculto del menú: HeatmapManager es un placeholder de 11 líneas
     // sin datos. Para reactivar cuando se implemente (con web_visits agrupadas
     // por page_path): descomentar la línea de abajo Y re-importar `Activity`
@@ -264,6 +266,9 @@ export default function AdminDashboard() {
 
             {/* 11. WEBHOOKS */}
             {activeTab === 'webhooks' && <WebhooksManager />}
+
+            {/* 12. VALORACIÓN IA */}
+            {activeTab === 'valuation' && <ValuationManager />}
 
             {/* 12. DOCUMENTOS */}
             {activeTab === 'documents' && (

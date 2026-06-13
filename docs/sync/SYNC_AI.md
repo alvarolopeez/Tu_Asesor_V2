@@ -5,6 +5,39 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #016: nueva sección "Valoración IA" (mejor precio de salida)
+
+**Ficheros nuevos**:
+- `src/lib/valuation.ts` — tipos `ValuationInputs`, `ValuationResult`, `EstadoInmueble`; `parseValuationResponse` (gate: `rangos.mercado.precio > 0`); `buildValuationPrompt`; re-export `extractGroundingUrls`
+- `src/app/api/valuation/route.ts` — GET (histórico, últimas 20) + POST (INSERT status:running → fire-and-forget Gemini → UPDATE done/failed)
+- `src/app/api/valuation/[id]/route.ts` — GET polling por id
+- `src/app/api/valuation/[id]/pdf/route.ts` — PDF presentable (portada de marca + 3 rangos hero + comparables + narrativa + supuestos + firma)
+- `src/app/api/valuation/[id]/writeback/route.ts` — escribe `properties.features.precio_valoracion` + `leads.preferences.ia_valuation` (NO toca `agent_valuation`)
+- `src/components/admin/sections/ValuationManager.tsx` — formulario input-driven + polling + 3 tarjetas hero (verde/azul/ámbar) + markdown + comparables + histórico + botón PDF + botón write-back
+
+**Ficheros modificados**:
+- `src/components/admin/AdminDashboard.tsx` — pestaña `'valuation'` (Calculator icon) + import ValuationManager + render
+
+**BD**: migración `brief_016_valuation_reports` aplicada. Tabla `valuation_reports(id, created_at, finished_at, status, inputs jsonb, markdown, result jsonb, grounding_urls text[], error_msg, property_id uuid NULL REFERENCES properties)`. RLS habilitado sin políticas → solo service_role (mismo modelo que `rebaja_reports`).
+
+**Arquitectura** (fire-and-forget + polling):
+- POST /api/valuation → INSERT status:running → `void runAnalysis()` → return `{id}` → cliente hace GET polling /api/valuation/[id]
+- A diferencia del #015: NO hay UNIQUE en property_id → historial completo (N valoraciones por inmueble). Usar INSERT + UPDATE por id, nunca upsert con onConflict.
+- Write-back: `properties.features.precio_valoracion = rangos.mercado.precio` + `leads.preferences.ia_valuation = {precio_mercado, fecha, valuation_id}`. NO toca `agent_valuation` (autoridad humana).
+
+**Env nueva**: `VALUATION_LLM_MODEL=gemini-2.5-pro` — añadida en Netlify y `.env.local`.
+
+**Tests**: 23 nuevos (`src/lib/__tests__/valuation.test.ts`). Suite completa: 219/219 verde.
+
+**Gotchas para futuros agentes**:
+- Parser gate: `rangos.mercado.precio > 0` (no hay enum veredicto como en #015 — parser retorna null si mercado=0).
+- Write-back NO usa `agent_valuation`: ese campo es autoridad humana. Usa `ia_valuation` (campo nuevo en `preferences`).
+- Para que el #015 lea `ia_valuation` como fallback, modificar `price-analysis/route.ts:197` con `|| sellerPrefs.ia_valuation?.precio_mercado`. Diferido por constraint "NO tocar motor #015".
+- PDF fetch de `properties` es CONDICIONAL a que exista `property_id` (la valoración puede ser totalmente input-driven).
+- Schema enriquecido: `precio_m2_zona_rango {min,max}`, `supuestos[]`, `advertencias[]` (mejoras del architect-opus).
+
+---
+
 ### 2026-06-13 — Brief #015: generador de informes de rebaja (IA en directo + PDF real)
 
 **Ficheros nuevos**:
