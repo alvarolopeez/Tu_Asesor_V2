@@ -37,6 +37,10 @@ export default function ValoracionPage() {
     website: '' // honeypot anti-bot (oculto; los humanos lo dejan vacío)
   })
 
+  // Fallback de ciudad a partir del C.P. (Brief #017 T4). Sigue siendo útil porque
+  // el autocompletado del Catastro fija la vía pero NO toca `city`: este efecto y el
+  // Catastro son complementarios, no se pisan (el municipio del autocompletado se lee
+  // de `formData.city`, que solo cambian el usuario o este mapa, nunca el Catastro).
   useEffect(() => {
     if (formData.zipcode.length === 5 && formData.zipcode.startsWith('41')) {
       const cpMap: Record<string, string> = {
@@ -284,7 +288,7 @@ export default function ValoracionPage() {
           {step === 1 && (
             <div className="text-center animate-fade-in">
               <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white font-heading">Tasar Vivienda en Sevilla</h1>
-              <p className="text-lg text-slate-300 mb-10">Seleccione el tipo de inmueble para iniciar la valoración gratuita en La Macarena y alrededores.</p>
+              <p className="text-lg text-slate-300 mb-10">Seleccione el tipo de inmueble para iniciar la valoración gratuita en Sevilla y provincia.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <button onClick={() => handleSelectType('Piso')} className="flex flex-col items-center justify-center bg-[#0F172A]/50 border border-white/10 p-8 rounded-xl cursor-pointer hover:bg-white/10 hover:border-[#FBBF24]/30 transition-all group">
                   <Building2 className="w-16 h-16 text-[#FBBF24] mb-4 group-hover:scale-110 transition-transform" />
