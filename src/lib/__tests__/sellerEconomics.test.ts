@@ -2,7 +2,24 @@
  * Tests del cálculo determinista de liquidación neta al vendedor (Brief #016).
  */
 
-import { computeSellerNet, irpfAhorro } from '../sellerEconomics';
+import { computeSellerNet, irpfAhorro, coefPlusvalia } from '../sellerEconomics';
+
+describe('coefPlusvalia (RDL 8/2023, vigente 2026, NO monótono)', () => {
+  it('menos de 1 año y 1 año → 0,15', () => {
+    expect(coefPlusvalia(0)).toBeCloseTo(0.15, 5);
+    expect(coefPlusvalia(1)).toBeCloseTo(0.15, 5);
+  });
+  it('valle no monótono: cae a su mínimo (0,09) entre los años 12 y 15', () => {
+    expect(coefPlusvalia(11)).toBeCloseTo(0.10, 5);
+    expect(coefPlusvalia(12)).toBeCloseTo(0.09, 5);
+    expect(coefPlusvalia(15)).toBeCloseTo(0.09, 5);
+  });
+  it('repunta al final y satura en 20+ a 0,40', () => {
+    expect(coefPlusvalia(19)).toBeCloseTo(0.23, 5);
+    expect(coefPlusvalia(20)).toBeCloseTo(0.40, 5);
+    expect(coefPlusvalia(35)).toBeCloseTo(0.40, 5);
+  });
+});
 
 describe('irpfAhorro (escala del ahorro 2026 por tramos)', () => {
   it('0 o pérdida → 0', () => {

@@ -23,31 +23,11 @@ export const COLORS = {
 } as const;
 
 /**
- * Coeficientes de plusvalía municipal (2024).
- * Actualizar anualmente según BOE.
+ * Coeficientes de plusvalía municipal (IIVTNU): ver COEF_PLUSVALIA_2026 y el tipo
+ * de Sevilla (TIPO_PLUSVALIA_SEVILLA) en @/lib/sellerEconomics — fuente única de
+ * verdad. La antigua tabla COEFICIENTES_PLUSVALIA_2024 (monótona, inventada) se
+ * eliminó porque daba cifras erróneas en /plusvalia.
  */
-export const COEFICIENTES_PLUSVALIA_2024 = [
-  { years: 1, coef: 0.15 },
-  { years: 2, coef: 0.15 },
-  { years: 3, coef: 0.16 },
-  { years: 4, coef: 0.19 },
-  { years: 5, coef: 0.23 },
-  { years: 6, coef: 0.28 },
-  { years: 7, coef: 0.35 },
-  { years: 8, coef: 0.40 },
-  { years: 9, coef: 0.45 },
-  { years: 10, coef: 0.50 },
-  { years: 11, coef: 0.55 },
-  { years: 12, coef: 0.60 },
-  { years: 13, coef: 0.65 },
-  { years: 14, coef: 0.70 },
-  { years: 15, coef: 0.75 },
-  { years: 16, coef: 0.80 },
-  { years: 17, coef: 0.85 },
-  { years: 18, coef: 0.90 },
-  { years: 19, coef: 0.95 },
-  { years: 20, coef: 0.45 },
-] as const;
 
 export const MUNICIPIOS_SEVILLA = [
   'Sevilla', 'Dos Hermanas', 'Alcalá de Guadaíra', 'Utrera', 'Mairena del Aljarafe',

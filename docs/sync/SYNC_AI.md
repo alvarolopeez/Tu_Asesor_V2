@@ -5,6 +5,21 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Fix fiscalidad página PÚBLICA `/plusvalia` (cierra la deuda marcada en FIX v5)
+
+**Problema**: la calculadora pública `/plusvalia` daba cifras erróneas a los visitantes por usar constantes incorrectas: (1) `COEFICIENTES_PLUSVALIA_2024` de `constants.ts` era una tabla MONÓTONA inventada (0,15→0,95, y 0,45 en el año 20) — los coeficientes IIVTNU reales (RDL 8/2023, vigentes 2026) NO son monótonos (valle de 0,09 en años 12-15, repunte al final); (2) el tipo municipal estaba fijado al 30% (máximo legal) en vez del 26,53% de Sevilla; (3) el cálculo IRPF inline tenía el tramo marginal final en 0,28 en vez de 0,30 (escala del ahorro).
+
+**Solución (reutilizar la fuente única de verdad, no duplicar)**:
+- `src/lib/sellerEconomics.ts`: `coefPlusvalia()` ahora se **exporta** (antes privada).
+- `src/app/plusvalia/page.tsx`: importa `coefPlusvalia`, `irpfAhorro` y `TIPO_PLUSVALIA_SEVILLA` de `sellerEconomics`. El método objetivo/real usa el coeficiente correcto y el tipo 26,53%; el IRPF usa `irpfAhorro` (escala del ahorro 2026). UI: "30%" → "26,53%", nota informativa actualizada a RDL 8/2023.
+- `src/lib/constants.ts`: **eliminada** `COEFICIENTES_PLUSVALIA_2024` (muerta tras el refactor; solo la usaba `/plusvalia`). Reemplazada por un comentario que apunta a `sellerEconomics`.
+
+**Aclaración importante**: `IRPF_TRAMOS` (escala GENERAL 19-45%) NO se tocó — `/plusvalia` nunca la importaba; la usa `/rentabilidad` (rentas de alquiler), donde la escala general SÍ es la correcta. La premisa del brief sobre esa constante era un malentendido.
+
+**Verificación**: gitnexus impact (todo LOW, 0 callers externos) + `detect_changes` (risk low, 0 procesos afectados). Suite 248 tests verdes (3 nuevos para `coefPlusvalia`). Build verde. Hand-check: suelo 30k€/11 años → cuota objetiva 4.950 € (antes) → **795,90 €** (ahora); IRPF 350k€ → 85.880 € → **86.880 €**.
+
+---
+
 ### 2026-06-13 — Brief #016 FIX v5: servicios de intermediación + liquidación neta del vendedor (PDF)
 
 **Petición del asesor**: añadir al informe (1) apartado de SUS SERVICIOS (2% + IVA, sin comisión al comprador, con lista de servicios incluidos) y (2) una ESTIMACIÓN DE LIQUIDACIÓN NETA para el vendedor con desglose (plusvalía municipal, IRPF, costes, honorarios → neto), y poder introducir el precio de compra.

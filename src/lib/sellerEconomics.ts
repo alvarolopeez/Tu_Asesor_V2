@@ -90,7 +90,7 @@ export interface SellerNetResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────────
 
-function coefPlusvalia(anios: number): number {
+export function coefPlusvalia(anios: number): number {
   const a = Math.max(0, Math.floor(anios));
   if (a >= 20) return COEF_PLUSVALIA_2026[20];
   return COEF_PLUSVALIA_2026[a] ?? COEF_PLUSVALIA_2026[0];

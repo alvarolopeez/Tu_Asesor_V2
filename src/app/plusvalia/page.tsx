@@ -2,19 +2,25 @@
 
 import { useState } from "react";
 import { Calculator, Info, CheckCircle2, ArrowRight, Smartphone, User, Lock, ShieldCheck } from "lucide-react";
-import { BUSINESS, COEFICIENTES_PLUSVALIA_2024, MUNICIPIOS_SEVILLA } from "@/lib/constants";
+import { BUSINESS, MUNICIPIOS_SEVILLA } from "@/lib/constants";
+import { coefPlusvalia, irpfAhorro, TIPO_PLUSVALIA_SEVILLA } from "@/lib/sellerEconomics";
 import { submitLeadWithCalculation } from "@/lib/leadService";
 import type { PlusvaliaResult } from "@/types";
 
 /**
  * FIX APLICADO (Code Review):
- * - Constantes (coeficientes, municipios) importadas de @/lib/constants
+ * - Constantes (municipios) importadas de @/lib/constants
  * - Número WhatsApp centralizado (era 623956461, corregido a 697223944)
  * - BUG-006: Eliminada variable porcentajeSuelo sin uso
  * - Tipado: PlusvaliaResult reemplaza 'any'
+ * - FIX 2026: fiscalidad reutilizada de @/lib/sellerEconomics (fuente única):
+ *   · Coeficientes IIVTNU del RDL 8/2023 (vigentes 2026, NO monótonos) vía coefPlusvalia().
+ *   · Tipo de plusvalía municipal de Sevilla 26,53% (antes 30% fijo).
+ *   · IRPF por la escala del AHORRO 2026 vía irpfAhorro() (antes: tramo final 0,28 erróneo).
+ *   La tabla COEFICIENTES_PLUSVALIA_2024 (monótona, inventada) queda eliminada.
  */
 
-// COEFICIENTES y MUNICIPIOS ahora importados de @/lib/constants
+// MUNICIPIOS importados de @/lib/constants; fiscalidad (coeficientes/IRPF/tipo) de @/lib/sellerEconomics
 
 export default function PlusvaliaPage() {
   const [step, setStep] = useState(1);
@@ -51,12 +57,13 @@ export default function PlusvaliaPage() {
 
       const diffTime = Math.abs(fVenta.getTime() - fAdq.getTime());
       const diffYears = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 365.25));
-      const yearsIndex = Math.min(Math.max(diffYears, 1), 20);
-      const coef = COEFICIENTES_PLUSVALIA_2024.find(c => c.years === yearsIndex)?.coef || 0.45;
+      // Coeficiente IIVTNU del RDL 8/2023 (vigente 2026, no monótono) reutilizado
+      // de @/lib/sellerEconomics; clamp [0, 20+] gestionado por el helper.
+      const coef = coefPlusvalia(diffYears);
 
-      // Método Objetivo
+      // Método Objetivo (tipo de Sevilla 26,53%, Ordenanza Fiscal 1.5)
       const baseObjetiva = valCatSuelo * coef;
-      const cuotaObjetiva = baseObjetiva * 0.30; // 30% tipo maximo legal
+      const cuotaObjetiva = baseObjetiva * TIPO_PLUSVALIA_SEVILLA;
 
       // Método Real
       const incrementoReal = valVenta - valAdq;
@@ -67,7 +74,7 @@ export default function PlusvaliaPage() {
         const ratioSuelo = valCatSuelo / (valCatSuelo * 1.5);
         baseReal = incrementoReal * ratioSuelo;
       }
-      const cuotaReal = baseReal * 0.30;
+      const cuotaReal = baseReal * TIPO_PLUSVALIA_SEVILLA;
 
       const mejorOpcion = cuotaReal < cuotaObjetiva ? "Método Real" : "Método Objetivo";
       const cuotaFinal = Math.min(cuotaObjetiva, cuotaReal);
@@ -120,33 +127,9 @@ export default function PlusvaliaPage() {
 
       if (gananciaSujeta < 0) gananciaSujeta = 0;
 
-      // Apply IRPF tiers 2024
-      let cuotaIRPF = 0;
-      let remaining = gananciaSujeta;
-
-      if (remaining > 0) {
-        const b1 = Math.min(remaining, 6000);
-        cuotaIRPF += b1 * 0.19;
-        remaining -= b1;
-      }
-      if (remaining > 0) {
-        const b2 = Math.min(remaining, 44000); // up to 50k
-        cuotaIRPF += b2 * 0.21;
-        remaining -= b2;
-      }
-      if (remaining > 0) {
-        const b3 = Math.min(remaining, 150000); // up to 200k
-        cuotaIRPF += b3 * 0.23;
-        remaining -= b3;
-      }
-      if (remaining > 0) {
-        const b4 = Math.min(remaining, 100000); // up to 300k
-        cuotaIRPF += b4 * 0.27;
-        remaining -= b4;
-      }
-      if (remaining > 0) {
-        cuotaIRPF += remaining * 0.28;
-      }
+      // Cuota IRPF por la escala del AHORRO 2026 (19/21/23/27/30%, tramos
+      // marginales) reutilizando irpfAhorro de @/lib/sellerEconomics.
+      const cuotaIRPF = irpfAhorro(gananciaSujeta);
 
       setResults({
         tipo: 'fiscal',
@@ -328,7 +311,7 @@ export default function PlusvaliaPage() {
                 <Info className="text-[#FBBF24] shrink-0" size={20} />
                 <p className="text-sm text-blue-100">
                   {taxType === 'municipal'
-                    ? "Calculamos automáticamente el método más favorable (Real vs Objetivo) según la normativa de 2024."
+                    ? "Calculamos automáticamente el método más favorable (Real vs Objetivo) con los coeficientes vigentes (RDL 8/2023) y el tipo de Sevilla del 26,53%."
                     : "Aplicamos los coeficientes de abatimiento si tu inmueble fue adquirido antes del 31 de diciembre de 1994."}
                 </p>
               </div>
@@ -473,7 +456,7 @@ export default function PlusvaliaPage() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-300">Tipo Impositivo:</span>
-                        <span className="text-white font-medium">30%</span>
+                        <span className="text-white font-medium">26,53%</span>
                       </div>
                       <div className="pt-3 border-t border-white/10 flex justify-between font-bold text-lg">
                         <span className="text-[#FBBF24]">Cuota:</span>
@@ -496,7 +479,7 @@ export default function PlusvaliaPage() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-300">Tipo Impositivo:</span>
-                        <span className="text-white font-medium">30%</span>
+                        <span className="text-white font-medium">26,53%</span>
                       </div>
                       <div className="pt-3 border-t border-white/10 flex justify-between font-bold text-lg">
                         <span className="text-[#FBBF24]">Cuota:</span>
