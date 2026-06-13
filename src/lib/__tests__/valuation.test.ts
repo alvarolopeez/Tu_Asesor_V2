@@ -2,8 +2,8 @@
  * Tests para parseValuationResponse y buildValuationPrompt (Brief #016).
  */
 
-import { parseValuationResponse, buildValuationPrompt } from '../valuation';
-import type { ValuationInputs } from '../valuation';
+import { parseValuationResponse, buildValuationPrompt, applyLowballGuard } from '../valuation';
+import type { ValuationInputs, ValuationResult } from '../valuation';
 
 // ─── parseValuationResponse ───────────────────────────────────────────────────
 
@@ -160,16 +160,37 @@ describe('buildValuationPrompt', () => {
     expect(prompt).toContain('+5%');
   });
 
-  it('incluye búsqueda de valor de referencia del Catastro cuando hay ref catastral', () => {
+  it('incluye búsqueda de la referencia catastral concreta cuando se aporta', () => {
     const inputs = { ...baseInputs, referencia_catastral: '9872023VH5797S0001WX' };
     const prompt = buildValuationPrompt(inputs);
     expect(prompt).toContain('9872023VH5797S0001WX');
-    expect(prompt).toContain('Catastro');
+    expect(prompt).toContain('Sede Electrónica del Catastro');
   });
 
-  it('no menciona Catastro si no hay ref catastral', () => {
+  it('usa el fallback de geolocalización cuando NO hay ref catastral', () => {
     const prompt = buildValuationPrompt(baseInputs);
-    expect(prompt).not.toContain('Catastro');
+    // No debe aparecer ninguna ref catastral concreta, pero el método sí cita
+    // el Catastro como fuente oficial de geolocalización (es correcto).
+    expect(prompt).toContain('No se aportó referencia catastral');
+    expect(prompt).not.toContain('Sede Electrónica del Catastro');
+  });
+
+  it('exige geolocalización antes de cualquier precio (PASO 1)', () => {
+    const prompt = buildValuationPrompt(baseInputs);
+    expect(prompt).toContain('GEOLOCALIZACIÓN RIGUROSA');
+    expect(prompt).toContain('NO emitas ni un solo €/m² antes de completar el PASO 1');
+  });
+
+  it('incluye reglas anti-lowball y triangulación', () => {
+    const prompt = buildValuationPrompt(baseInputs);
+    expect(prompt).toContain('anti-lowball');
+    expect(prompt).toContain('NUNCA el mínimo');
+  });
+
+  it('obliga a buscar infraestructura/drivers de revalorización', () => {
+    const prompt = buildValuationPrompt(baseInputs);
+    expect(prompt).toContain('INFRAESTRUCTURA');
+    expect(prompt).toContain('metro');
   });
 
   it('incluye los 3 rangos en el template JSON del prompt', () => {
@@ -188,5 +209,76 @@ describe('buildValuationPrompt', () => {
   it('incluye instrucción de Google Search', () => {
     const prompt = buildValuationPrompt(baseInputs);
     expect(prompt).toContain('Google Search');
+  });
+
+  it('inyecta la ubicación confirmada por Catastro como verdad innegociable', () => {
+    const prompt = buildValuationPrompt(baseInputs, {
+      cp: '41009',
+      barrio: 'Las Avenidas',
+      distrito: 'Distrito Macarena',
+      lat: 37.4098,
+      lon: -5.9859,
+      direccion: 'CL GRANATE 8 41009 SEVILLA',
+    });
+    expect(prompt).toContain('UBICACIÓN OFICIAL CONFIRMADA');
+    expect(prompt).toContain('41009');
+    expect(prompt).toContain('Las Avenidas');
+    expect(prompt).toContain('Distrito Macarena');
+    expect(prompt).toContain('NO LA CUESTIONES');
+  });
+
+  it('sin ubicación confirmada usa el método de geolocalización por IA', () => {
+    const prompt = buildValuationPrompt(baseInputs);
+    expect(prompt).not.toContain('UBICACIÓN OFICIAL CONFIRMADA');
+    expect(prompt).toContain('GEOLOCALIZACIÓN RIGUROSA');
+  });
+});
+
+// ─── applyLowballGuard ────────────────────────────────────────────────────────
+
+describe('applyLowballGuard', () => {
+  const makeResult = (mercadoM2: number, compsM2: number[]): ValuationResult => ({
+    precio_m2_zona: 2200,
+    estado_ajuste_pct: 0,
+    rangos: {
+      venta_rapida: { precio: 1, precio_m2: mercadoM2 - 100, dias_estimados: 20, justificacion: '' },
+      mercado:      { precio: mercadoM2 * 63, precio_m2: mercadoM2, dias_estimados: 35, justificacion: '' },
+      premium:      { precio: 1, precio_m2: mercadoM2 + 100, dias_estimados: 60, justificacion: '' },
+    },
+    confianza: 'alta',
+    comparables: compsM2.map((m, i) => ({ fuente: `F${i}`, precio_m2: m, url: 'https://x' })),
+    factores: [],
+  });
+
+  it('marca infravaloración cuando mercado < 92% de la mediana de comparables (caso Granate)', () => {
+    // Réplica del fallo real: mercado 1511, comparables 1513/2229/2518 (mediana 2229).
+    const guarded = applyLowballGuard(makeResult(1511, [1513, 2229, 2518]));
+    expect(guarded.confianza).toBe('baja');
+    expect(guarded.advertencias && guarded.advertencias[0]).toMatch(/INFRAVALORACIÓN/i);
+  });
+
+  it('NO marca nada cuando el mercado es coherente con la mediana', () => {
+    const guarded = applyLowballGuard(makeResult(2200, [2136, 2229, 2348]));
+    expect(guarded.confianza).toBe('alta');
+    expect(guarded.advertencias ?? []).toHaveLength(0);
+  });
+
+  it('no juzga con menos de 2 comparables válidos', () => {
+    const guarded = applyLowballGuard(makeResult(900, [2500]));
+    expect(guarded.confianza).toBe('alta'); // muestra insuficiente, no toca
+  });
+
+  it('ignora comparables con precio_m2 = 0 al calcular la mediana', () => {
+    const guarded = applyLowballGuard(makeResult(1500, [0, 2200, 2400]));
+    // mediana de [2200,2400] = 2300; 1500 < 0.92*2300 → marca
+    expect(guarded.confianza).toBe('baja');
+  });
+
+  it('preserva las advertencias existentes y antepone la nueva', () => {
+    const base = makeResult(1500, [2200, 2400]);
+    base.advertencias = ['Aviso previo'];
+    const guarded = applyLowballGuard(base);
+    expect(guarded.advertencias).toContain('Aviso previo');
+    expect(guarded.advertencias![0]).toMatch(/INFRAVALORACIÓN/i);
   });
 });

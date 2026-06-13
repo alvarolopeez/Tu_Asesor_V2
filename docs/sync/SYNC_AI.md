@@ -5,6 +5,36 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #016 FIX v2: geolocalización por Catastro + anti-lowball + PDF profesional
+
+**Problema reportado** (caso real "calle Granate 8", ref. catastral `5847402TG3454N0004UI`): la IA (1) geolocalizaba mal (decía "Polígono San Pablo / CP 41007" cuando es **Las Avenidas, Distrito Macarena, CP 41009**, a 285 m del Hospital Virgen Macarena), (2) infravaloraba ~30% (daba 95.200 € cuando el piso se vendió por 136.000 €), (3) el PDF crasheaba y (4) el "Análisis completo" mostraba JSON crudo.
+
+**Causa raíz geolocalización**: el prior de Gemini "Granate→San Pablo" es tan fuerte que racionaliza incluso con prompt reforzado (llegó a inventar el CP 41007 "confirmado por catastro"). El prompt SOLO no basta.
+
+**Solución — geolocalización en CÓDIGO** (nuevo `src/lib/catastro.ts`):
+- `resolveCatastro(refCat)`: ref catastral → **Catastro DNPRC** (dirección + CP oficial) → **Catastro CPMRC** (coords lat/lon) → **Nominatim/OSM** (barrio + distrito). APIs públicas sin auth, best-effort con degradación elegante.
+- `route.ts` resuelve la ubicación ANTES del prompt y la inyecta como "UBICACIÓN OFICIAL CONFIRMADA — VERDAD INNEGOCIABLE". Gemini ya no re-geolocaliza.
+- Verificado E2E: ahora devuelve Las Avenidas/Macarena/41009, 135.000 € (vs venta real 136.000 €, error 0,7%), menciona Hospital Virgen Macarena + Metro L3.
+
+**Solución — anti-lowball** (`src/lib/valuation.ts`):
+- `buildValuationPrompt` v3: método de 5 pasos (geolocalización-primero → coherencia landmark↔distrito → infraestructura obligatoria → triangulación SIN sesgo a la baja → ajuste estado). Prohíbe coger el comparable más bajo "para no sobrevalorar"; el mercado = mediana de la micro-zona, nunca el mínimo.
+- `applyLowballGuard(result)`: red de seguridad en código. Si `mercado.precio_m2 < 0,92 × mediana(comparables)` → baja confianza a "baja" + advertencia visible (no reescribe el número; el asesor es la autoridad). Aplicado en `route.ts`.
+- `temperature` 0.4 → 0.2 (reglas determinísticas).
+
+**Solución — PDF + stripper** (`src/app/api/valuation/[id]/pdf/route.ts`, `route.ts`):
+- Crash del PDF: `€` (U+20AC) no está en WinAnsiEncoding de Helvetica (pdf-lib) → `sanitize()` lo convierte a "EUR" + comillas/guiones tipográficos. try-catch devuelve el error real.
+- PDF rediseñado multipágina (portada hero + ficha + zona + mercado + estrategia + conclusión + firmas + aviso legal), extrae secciones `## ANÁLISIS DE ...` del markdown.
+- Stripper del JSON: Gemini abre ```` ```json ```` sin cerrar la valla → el regex no hacía match. Ahora `stripLeadingJson` corta desde el primer encabezado `##` (robusto). Arregla el "Análisis completo" que mostraba JSON crudo.
+
+**Tests**: 33 en `valuation.test.ts` (parser, prompt v3, `applyLowballGuard`, rama Catastro). Suite completa 229/229.
+
+**Gotchas**:
+- `resolveCatastro` añade ~2-3 s (3 HTTP) antes del Gemini; dentro del presupuesto del lambda background. Timeouts de 6 s por llamada.
+- Nominatim requiere `User-Agent` válido (puesto). Si falla, se usa solo el CP del Catastro (sigue siendo ancla fuerte).
+- NUNCA usar `€` en `drawText` de pdf-lib con fuentes Standard: siempre pasar por `sanitize()`.
+
+---
+
 ### 2026-06-13 — Brief #016: nueva sección "Valoración IA" (mejor precio de salida)
 
 **Ficheros nuevos**:

@@ -16,9 +16,11 @@ import { createClient } from '@supabase/supabase-js';
 import {
   buildValuationPrompt,
   parseValuationResponse,
+  applyLowballGuard,
   extractGroundingUrls,
 } from '@/lib/valuation';
 import type { ValuationInputs, ValuationResult } from '@/lib/valuation';
+import { resolveCatastro } from '@/lib/catastro';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -91,13 +93,39 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id: valuationId, status: 'running' });
 }
 
+/**
+ * Quita el bloque JSON inicial dejando solo la narrativa markdown.
+ * Robusto frente a vallas ```json sin cerrar: si hay result y existe un
+ * encabezado markdown (## …), corta desde ahí. Si no, hace fallback a strip
+ * de vallas y limpieza de vallas huérfanas.
+ */
+function stripLeadingJson(raw: string, hasResult: boolean): string {
+  const text = (raw || '').trim();
+  if (!hasResult) return text;
+  const heading = text.match(/(^|\n)#{1,3}\s+\S/);
+  if (heading && heading.index !== undefined) {
+    const start = heading.index + (heading[1] ? heading[1].length : 0);
+    return text.slice(start).replace(/```/g, '').trim();
+  }
+  return text.replace(/```(?:json)?[\s\S]*?```/g, '').replace(/```/g, '').trim();
+}
+
 async function runAnalysis(
   db: ReturnType<typeof supabaseAdmin>,
   valuationId: string,
   inputs: ValuationInputs,
 ) {
   try {
-    const prompt = buildValuationPrompt(inputs);
+    // Geolocalización en código: resuelve la ref catastral contra el Catastro
+    // oficial (+ geocodificación) y la inyecta como verdad innegociable. Erradica
+    // la alucinación de distrito de Gemini (caso "Granate" → San Pablo). Best-effort.
+    const confirmed = inputs.referencia_catastral
+      ? await resolveCatastro(inputs.referencia_catastral)
+      : null;
+    if (confirmed) {
+      console.log('[valuation] Catastro confirmó:', confirmed.cp, confirmed.barrio, confirmed.distrito);
+    }
+    const prompt = buildValuationPrompt(inputs, confirmed);
 
     const geminiRes = await fetch(
       `${GEMINI_BASE}/${VALUATION_LLM_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
@@ -108,7 +136,9 @@ async function runAnalysis(
           contents: [{ parts: [{ text: prompt }] }],
           tools: [{ google_search: {} }],
           generationConfig: {
-            temperature: 0.4,
+            // Baja varianza: las reglas de geolocalización y anti-lowball son
+            // determinísticas, no creativas.
+            temperature: 0.2,
             maxOutputTokens: 16384,
           },
         }),
@@ -134,11 +164,16 @@ async function runAnalysis(
       .join('\n');
 
     const groundingUrls = extractGroundingUrls(geminiData);
-    const result: ValuationResult | null = parseValuationResponse(rawText);
+    const parsed = parseValuationResponse(rawText);
+    // Red de seguridad anti-infravaloración (caso "Granate"): si el mercado
+    // queda por debajo de la mediana de comparables, marca y baja confianza.
+    const result: ValuationResult | null = parsed ? applyLowballGuard(parsed) : null;
 
-    const markdownText = result
-      ? rawText.replace(/```json[\s\S]*?```/g, '').trim()
-      : rawText;
+    // Aísla la narrativa markdown del bloque JSON inicial.
+    // ⚠️ Gemini a veces abre ```json pero NO cierra la valla → un strip por
+    //    regex de valla deja el JSON dentro. Como el prompt exige JSON PRIMERO
+    //    y luego secciones ##, cortamos desde el primer encabezado markdown.
+    const markdownText = stripLeadingJson(rawText, !!result);
 
     await db
       .from('valuation_reports')
