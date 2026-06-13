@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { normalizeEsPhone } from '@/lib/phone'
+import { computeQuickRange } from '@/lib/zoneValuation'
 import Link from 'next/link'
 import { Check, ChevronLeft, ChevronRight, X, Building2, Home, Building, ArrowRight } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -205,6 +206,18 @@ export default function ValoracionPage() {
 
   const progressPercentage = ((step - 1) / (totalSteps - 1)) * 100
 
+  // Rango orientativo instantáneo (aritmética local, sin red ni IA). Brief #017 T2.
+  // Devuelve null si aún no hay m² → el paso 6 cae al mensaje "te contactaré".
+  const quickRange = computeQuickRange({
+    zipcode: formData.zipcode,
+    sqm: Number(formData.sqm),
+    condition: formData.condition,
+    hasElevator: formData.hasElevator,
+    hasTerrace: formData.hasTerrace,
+    hasGarage: formData.hasGarage,
+  })
+  const formatEur = (n: number) => `${n.toLocaleString('es-ES')} €`
+
   return (
     <main className="min-h-screen flex flex-col items-center pt-48 pb-24 px-4 bg-[#0F172A] text-white relative overflow-x-hidden">
       {/* Elementos decorativos */}
@@ -362,7 +375,7 @@ export default function ValoracionPage() {
           {step === 5 && (
             <div className="text-center animate-fade-in">
               <h2 className="text-3xl font-bold mb-2 text-white font-heading">Último paso</h2>
-              <p className="text-slate-300 mb-6 text-sm">Déjenos sus datos de contacto para recibir el informe de valoración al instante.</p>
+              <p className="text-slate-300 mb-6 text-sm">Déjenos sus datos de contacto para ver una estimación al instante y recibir un informe detallado de Álvaro.</p>
 
               <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-4 text-left">
                 <div className="grid grid-cols-2 gap-4">
@@ -411,19 +424,45 @@ export default function ValoracionPage() {
 
           {step === 6 && (
             <div className="text-center animate-fade-in">
-              <h3 className="text-3xl font-bold text-white mb-4 font-heading">Estudio Personalizado Requerido</h3>
-              <p className="text-lg text-slate-300 mb-8 max-w-lg mx-auto">
-                Su propiedad tiene características únicas. Para garantizar el precio máximo, realizaré el cálculo manualmente con datos de mercado exclusivos.
-              </p>
-              <div className="p-4 bg-green-500/20 border border-green-500/50 text-green-100 rounded-lg mb-8 flex items-center justify-center gap-3 max-w-sm mx-auto shadow-lg shadow-green-500/10">
-                <Check className="w-6 h-6 text-green-400" />
-                <span className="font-medium">Solicitud recibida correctamente</span>
-              </div>
-              <p className="text-slate-400 mb-10">Le contactaré en breve con la valoración detallada a su correo o teléfono.</p>
-              
-              <Link href="/" className="inline-flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-3 rounded-full font-extrabold transition-all shadow-lg active:scale-95 duration-200">
-                Volver al inicio <ArrowRight className="w-4 h-4" />
-              </Link>
+              {quickRange ? (
+                <>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#FBBF24] font-bold mb-3">Estimación orientativa</p>
+                  <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 font-heading">
+                    Tu vivienda en {formData.city} se sitúa aproximadamente entre
+                  </h3>
+                  <p className="text-4xl md:text-6xl font-extrabold my-6 bg-gradient-to-r from-yellow-400 to-[#FBBF24] bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(251,191,36,0.25)] leading-tight">
+                    {formatEur(quickRange.low)} <span className="text-slate-500 font-bold">y</span> {formatEur(quickRange.high)}
+                  </p>
+                  <p className="text-sm text-slate-500 mb-6">Referencia de zona: ~{formatEur(quickRange.pricePerM2)}/m²</p>
+                  <p className="text-sm text-slate-400 max-w-lg mx-auto mb-8 leading-relaxed">
+                    Estimación orientativa basada en datos de mercado de la zona. El precio óptimo de salida
+                    depende de factores que analizo uno a uno.
+                  </p>
+                  <div className="p-4 bg-green-500/20 border border-green-500/50 text-green-100 rounded-lg mb-10 flex items-center justify-center gap-3 max-w-md mx-auto shadow-lg shadow-green-500/10">
+                    <Check className="w-6 h-6 text-green-400 shrink-0" />
+                    <span className="font-medium text-sm">Álvaro ya está preparando tu informe detallado y personalizado, y te lo enviará en breve.</span>
+                  </div>
+                  <Link href="/" className="inline-flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-3 rounded-full font-extrabold transition-all shadow-lg active:scale-95 duration-200">
+                    Volver al inicio <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-3xl font-bold text-white mb-4 font-heading">Estudio Personalizado Requerido</h3>
+                  <p className="text-lg text-slate-300 mb-8 max-w-lg mx-auto">
+                    Su propiedad tiene características únicas. Para garantizar el precio máximo, realizaré el cálculo manualmente con datos de mercado exclusivos.
+                  </p>
+                  <div className="p-4 bg-green-500/20 border border-green-500/50 text-green-100 rounded-lg mb-8 flex items-center justify-center gap-3 max-w-sm mx-auto shadow-lg shadow-green-500/10">
+                    <Check className="w-6 h-6 text-green-400" />
+                    <span className="font-medium">Solicitud recibida correctamente</span>
+                  </div>
+                  <p className="text-slate-400 mb-10">Le contactaré en breve con la valoración detallada a su correo o teléfono.</p>
+
+                  <Link href="/" className="inline-flex items-center gap-2 bg-[#FBBF24] hover:bg-yellow-500 text-[#2C3E50] px-8 py-3 rounded-full font-extrabold transition-all shadow-lg active:scale-95 duration-200">
+                    Volver al inicio <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </>
+              )}
             </div>
           )}
 
