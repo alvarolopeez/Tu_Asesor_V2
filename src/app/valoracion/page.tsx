@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
-import { normalizeEsPhone } from '@/lib/phone'
 import { computeQuickRange } from '@/lib/zoneValuation'
 import type { ViaSugerencia, InmuebleOpcion } from '@/lib/catastroLookup'
 import Link from 'next/link'
@@ -35,7 +33,8 @@ export default function ValoracionPage() {
     surname: '',
     email: '',
     phone: '',
-    privacyCheck: false
+    privacyCheck: false,
+    website: '' // honeypot anti-bot (oculto; los humanos lo dejan vacío)
   })
 
   useEffect(() => {
@@ -224,104 +223,21 @@ export default function ValoracionPage() {
     setIsSubmitting(true)
 
     try {
-      // Un lead de valoración NUNCA crea una propiedad. Sólo se crea el lead
-      // vendedor; las características del inmueble viven en `leads.preferences`.
-      // La conversión a Inmueble/Encargo es una decisión manual de Álvaro
-      // (ver pestaña "Vendedores" → promoción a encargo en exclusiva).
-      // Si el Catastro confirmó la dirección, se prefiere la oficial. Si no, se
-      // arma a mano (omitiendo "Piso" si no hay planta — Brief #017 T4).
-      const addressManual = [
-        `${formData.street} ${formData.number}`.trim(),
-        formData.floor ? `Piso ${formData.floor}` : null,
-        `${formData.zipcode} ${formData.city}`.trim(),
-      ].filter(Boolean).join(', ')
-      const addressFull = formData.referencia_catastral && formData.direccion_oficial
-        ? formData.direccion_oficial
-        : addressManual
-
-      // Brief #007 T5: dedupe por teléfono normalizado (E.164). Antes cada
-      // envío insertaba un lead nuevo; con el UNIQUE INDEX leads_phone_unique
-      // el segundo envío fallaba con 23505 y el usuario veía un error.
-      const normalizedPhone = normalizeEsPhone(formData.phone)
-      const fullName = `${formData.name} ${formData.surname}`.trim()
-      const newPreferences = {
-        property_address: addressFull,
-        property_type: formData.propertyType,
-        street: formData.street,
-        number: formData.number,
-        // Catastro (Brief #017 T1): alimenta la valoración IA del CRM (resolveCatastro).
-        referencia_catastral: formData.referencia_catastral || undefined,
-        direccion_oficial: formData.direccion_oficial || undefined,
-        floor: formData.floor,
-        elevator: formData.hasElevator,
-        city: formData.city,
-        zipcode: formData.zipcode,
-        sqm: formData.sqm ? Number(formData.sqm) : undefined,
-        rooms: formData.rooms,
-        baths: formData.baths,
-        condition: formData.condition,
-        hasTerrace: formData.hasTerrace,
-        hasGarage: formData.hasGarage,
-        rgpd_accepted: formData.privacyCheck
-      }
-
-      // Merge sobre lead existente: las claves nuevas del formulario pisan
-      // las antiguas del mismo nombre; el resto (agent_valuation, notas...)
-      // se conserva.
-      const updateExistingLead = async (
-        leadId: string,
-        existingPrefs: Record<string, unknown> | null,
-      ) => {
-        const { error } = await supabase
-          .from('leads')
-          .update({
-            preferences: { ...(existingPrefs || {}), ...newPreferences },
-            ...(fullName ? { name: fullName } : {}),
-            ...(formData.email ? { email: formData.email } : {}),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', leadId)
-        if (error) throw error
-      }
-
-      const findExistingLead = async () => {
-        const { data, error } = await supabase
-          .from('leads')
-          .select('id, preferences')
-          .eq('phone', normalizedPhone)
-          .limit(1)
-        if (error) throw error
-        return data && data.length > 0 ? data[0] : null
-      }
-
-      const existing = await findExistingLead()
-      if (existing) {
-        await updateExistingLead(existing.id, existing.preferences as Record<string, unknown> | null)
-      } else {
-        const { error: leadError } = await supabase
-          .from('leads')
-          .insert([{
-            name: fullName,
-            phone: normalizedPhone,
-            email: formData.email,
-            type: 'seller',
-            source: 'Calculadora Valoración',
-            preferences: newPreferences
-          }])
-
-        if (leadError) {
-          // Race con el UNIQUE INDEX (dos envíos simultáneos del mismo
-          // teléfono): reintentar el SELECT y hacer el merge. Mismo patrón
-          // que findOrCreateLead en el webhook de WhatsApp.
-          if ((leadError as { code?: string }).code === '23505') {
-            const retry = await findExistingLead()
-            if (!retry) throw leadError
-            await updateExistingLead(retry.id, retry.preferences as Record<string, unknown> | null)
-          } else {
-            throw leadError
-          }
-        }
-      }
+      // El upsert del lead (dedupe por teléfono, merge de preferences, manejo de
+      // 23505) y las notificaciones WhatsApp viven ahora en el servidor para poder
+      // usar el service role y el secreto de WhatsApp (Brief #017 T3). La página
+      // solo envía el formulario + el rango calculado.
+      const res = await fetch('/api/valuation/lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          rangeLow: quickRange?.low ?? null,
+          rangeHigh: quickRange?.high ?? null,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`)
 
       nextStep()
     } catch (error) {
@@ -573,6 +489,12 @@ export default function ValoracionPage() {
               <p className="text-slate-300 mb-6 text-sm">Déjenos sus datos de contacto para ver una estimación al instante y recibir un informe detallado de Álvaro.</p>
 
               <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-4 text-left">
+                {/* Honeypot anti-bot: oculto a humanos; si llega relleno, el servidor descarta el lead */}
+                <input
+                  type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
+                  value={formData.website} onChange={handleChange}
+                  className="hidden" style={{ position: 'absolute', left: '-9999px' }}
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} className="w-full bg-[#0F172A] border border-white/10 text-white placeholder-slate-400 rounded-lg px-4 py-3 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#FBBF24]" placeholder="Nombre" required />
