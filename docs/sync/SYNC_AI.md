@@ -5,6 +5,46 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #015: generador de informes de rebaja (IA en directo + PDF real)
+
+**Ficheros nuevos**:
+- `src/lib/priceAnalysis.ts` — tipos `PriceVerdicto`/`PriceAnalysisContext`, `parsePriceAnalysisResponse`, `extractGroundingUrls`, `buildPriceAnalysisPrompt`
+- `src/app/api/properties/[id]/price-analysis/route.ts` — POST (inicia análisis, upsert `rebaja_reports`) + GET (polling)
+- `src/app/api/properties/[id]/dossier-pdf/route.ts` — genera PDF con `pdf-lib` desde `rebaja_reports`
+- `src/components/admin/sections/dashboard/operaciones/PriceDropModal.tsx` — modal con polling + hero number + react-markdown + descarga PDF
+
+**Ficheros modificados**:
+- `OperacionesTab.tsx` — usa `PriceDropModal` (sustituye `AIReportModal` para el flujo de rebaja)
+- `PropertyReportSelector.tsx` — botón renombrado "Análisis de rebaja IA", prop `onGeneratePriceDropReport`
+
+**BD**: migración `brief_015_rebaja_reports` aplicada. Tabla `rebaja_reports(id, property_id UNIQUE, status, started_at, finished_at, markdown, veredicto, context, grounding_urls, error_msg)`. RLS authenticated.
+
+**5 bugs corregidos**:
+1. Zona: lee `features.zona` (plano), no `features.location.zone` (anidado bug anterior).
+2. Comparables: internos por `features.zona` + externos via Google Search grounding.
+3. Valoración asesor: lee `leads.preferences.agent_valuation` del lead vendedor con `property_id`.
+4. Feedback compradores: incluye `buyer_activity_logs` (event_type, title, notes) además de notas de citas.
+5. Veredicto numérico: `{veredicto, sobreprecio_pct, precio_recomendado, rebaja_eur, rebaja_pct_low/high, confianza, comparables, motivos}`.
+
+**Arquitectura** (background job + polling, patrón del blog):
+- POST escribe `status='running'` antes del LLM → cliente puede empezar a hacer GET polling si Netlify corta la conexión a ~26-30s.
+- Lambda continúa, escribe resultado en `rebaja_reports`, cliente lo recoge vía GET.
+- No-streaming (grounding + razonamiento + streaming no confirmado compatible).
+
+**PDF**: usa `pdf-lib` (ya instalado, probado serverless) en lugar de `@react-pdf/renderer` (no instalado). ⚠️ Desviación deliberada del brief: pdf-lib ya está probado serverless-safe; añadir @react-pdf/renderer solo por duplicar motores no tiene ROI. **Álvaro puede reconfirmar si quiere @react-pdf/renderer**.
+
+**Env nueva**: `REBAJA_LLM_MODEL=gemini-2.5-pro-preview` — añadida en Netlify (scopes builds/functions/runtime). Añadir a `.env.local`. Valor actualizable sin redespliegue de código.
+
+**Tests**: 17 nuevos (`src/lib/__tests__/priceAnalysis.test.ts`). Suite completa: 196/196 verde.
+
+**Gotchas para futuros agentes**:
+- `rebaja_reports` tiene UNIQUE constraint en `property_id` → se hace upsert `onConflict:'property_id'`. Un segundo análisis del mismo inmueble sobreescribe el anterior.
+- Polling máximo 60 intentos × 3s = 3 min antes de mostrar timeout. Si el modelo tarda más, Álvaro verá el fallback heurístico.
+- `REBAJA_LLM_MODEL` por defecto `gemini-2.5-pro-preview`. Si cambia a un modelo 1.5, la tool `google_search` en Gemini 1.5 se llama `google_search_retrieval` (patrón ya documentado en generateNewsPost.ts).
+- El dossier PDF lee siempre de `rebaja_reports` (no del body) → la cifra del panel y la del PDF siempre coinciden.
+
+---
+
 ### 2026-06-13 — Brief #014: dashboard Operaciones — 5 paneles más potentes y flexibles
 
 **Commit**: `b73098a` · `feat(dashboard): brief #014 — Operaciones 5 paneles más potentes`

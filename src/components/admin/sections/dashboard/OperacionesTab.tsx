@@ -25,7 +25,7 @@ import BuyersBreakdown from "./operaciones/BuyersBreakdown";
 import PropertyViewsRanking from "./operaciones/PropertyViewsRanking";
 import PropertyReportSelector from "./operaciones/PropertyReportSelector";
 import CaptacionReportModal from "./operaciones/CaptacionReportModal";
-import AIReportModal from "./operaciones/AIReportModal";
+import PriceDropModal from "./operaciones/PriceDropModal";
 
 /**
  * Pestaña "Operaciones" del dashboard admin.
@@ -47,7 +47,7 @@ export default function OperacionesTab() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
   const [sevillaSearchQuery, setSevillaSearchQuery] = useState("");
   const [showPrintModal, setShowPrintModal] = useState(false);
-  const [showAIReport, setShowAIReport] = useState(false);
+  const [showPriceDropModal, setShowPriceDropModal] = useState(false);
 
   useEffect(() => {
     fetchOperacionesData();
@@ -219,14 +219,15 @@ export default function OperacionesTab() {
         platformAvgDays={platformAvgDays}
         priceDrop={priceDrop}
         onPrint={() => setShowPrintModal(true)}
-        onGenerateAIReport={() => setShowAIReport(true)}
+        onGeneratePriceDropReport={() => setShowPriceDropModal(true)}
       />
 
-      {showAIReport && selectedProperty && (
-        <AIReportModal
+      {showPriceDropModal && selectedProperty && (
+        <PriceDropModal
           propertyId={selectedProperty.id}
           propertyTitle={selectedProperty.title}
-          onClose={() => setShowAIReport(false)}
+          priceDrop={priceDrop}
+          onClose={() => setShowPriceDropModal(false)}
         />
       )}
 

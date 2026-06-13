@@ -1,4 +1,4 @@
-import { Printer, TrendingDown, Sparkles } from "lucide-react";
+import { Printer, TrendingDown } from "lucide-react";
 import type { PropertyRow } from "../types";
 import type { SelectedMetrics, PriceDropEstimate } from "./operacionesUtils";
 
@@ -13,8 +13,8 @@ interface PropertyReportSelectorProps {
   priceDrop?: PriceDropEstimate;
   /** Abre la vista previa del dossier PDF. */
   onPrint: () => void;
-  /** Abre el modal con el análisis IA del inmueble (T7 brief #002). */
-  onGenerateAIReport: () => void;
+  /** Abre el modal de análisis de rebaja IA (brief #015). */
+  onGeneratePriceDropReport: () => void;
 }
 
 const CONFIDENCE_STYLE: Record<string, string> = {
@@ -34,7 +34,7 @@ export default function PropertyReportSelector({
   platformAvgDays,
   priceDrop,
   onPrint,
-  onGenerateAIReport,
+  onGeneratePriceDropReport,
 }: PropertyReportSelectorProps) {
   const {
     selectedViews,
@@ -54,10 +54,10 @@ export default function PropertyReportSelector({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-            <Printer size={18} className="text-[#FBBF24]" />
-            Generador de Informes de Captación
+            <TrendingDown size={18} className="text-[#FBBF24]" />
+            Generador de Informe de Rebaja
           </h3>
-          <p className="text-slate-400 text-xs">Compara propiedades individuales e imprime el dossier de valoración</p>
+          <p className="text-slate-400 text-xs">Análisis IA en directo con datos de mercado reales · Descarga el dossier PDF</p>
         </div>
 
         {/* Properties Dropdown */}
@@ -148,10 +148,10 @@ export default function PropertyReportSelector({
                 <Printer size={14} /> Generar Informe PDF
               </button>
               <button
-                onClick={onGenerateAIReport}
-                className="w-full py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-200 hover:text-white border border-violet-400/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
+                onClick={onGeneratePriceDropReport}
+                className="w-full py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/30 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all duration-300"
               >
-                <Sparkles size={14} /> Generar análisis IA
+                <TrendingDown size={14} /> Análisis de rebaja IA
               </button>
             </div>
           </div>
