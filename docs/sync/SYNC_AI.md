@@ -33,15 +33,25 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 **PDF**: usa `pdf-lib` (ya instalado, probado serverless) en lugar de `@react-pdf/renderer` (no instalado). ⚠️ Desviación deliberada del brief: pdf-lib ya está probado serverless-safe; añadir @react-pdf/renderer solo por duplicar motores no tiene ROI. **Álvaro puede reconfirmar si quiere @react-pdf/renderer**.
 
-**Env nueva**: `REBAJA_LLM_MODEL=gemini-2.5-pro-preview` — añadida en Netlify (scopes builds/functions/runtime). Añadir a `.env.local`. Valor actualizable sin redespliegue de código.
+**Env nueva**: `REBAJA_LLM_MODEL=gemini-2.5-pro` — añadida en Netlify (scopes builds/functions/runtime). Añadir a `.env.local`. ⚠️ El nombre correcto es `gemini-2.5-pro` (sin `-preview`): el alias genérico `gemini-2.5-pro-preview` no existe en la API de Gemini.
 
 **Tests**: 17 nuevos (`src/lib/__tests__/priceAnalysis.test.ts`). Suite completa: 196/196 verde.
+
+**Matriz de aceptación (2026-06-13, commit `6565d61`)** — 4 ZZTEST eliminados tras validar:
+| Escenario | Veredicto | Sobreprecio | Precio rec. | Rebaja | Confianza |
+|-----------|-----------|-------------|-------------|--------|-----------|
+| A Nervión 320k (95 días, feedback negativo) | caro | 15% | 275.000€ | 45.000€ | alta |
+| B Triana 180k (18 días, visitas positivas) | correcto | 0% | 180.000€ | 0€ | alta |
+| C Los Remedios 240k (50 días, tibio) | caro | 8,75% | 219.000€ | 21.000€ | alta |
+| D Sin datos 150k | ajustado | 4,9% | 143.000€ | 7.000€ | **baja** |
 
 **Gotchas para futuros agentes**:
 - `rebaja_reports` tiene UNIQUE constraint en `property_id` → se hace upsert `onConflict:'property_id'`. Un segundo análisis del mismo inmueble sobreescribe el anterior.
 - Polling máximo 60 intentos × 3s = 3 min antes de mostrar timeout. Si el modelo tarda más, Álvaro verá el fallback heurístico.
-- `REBAJA_LLM_MODEL` por defecto `gemini-2.5-pro-preview`. Si cambia a un modelo 1.5, la tool `google_search` en Gemini 1.5 se llama `google_search_retrieval` (patrón ya documentado en generateNewsPost.ts).
+- `REBAJA_LLM_MODEL` por defecto `gemini-2.5-pro`. Si cambia a un modelo 1.5, la tool `google_search` en Gemini 1.5 se llama `google_search_retrieval` (patrón ya documentado en generateNewsPost.ts).
+- **Warm-start caching**: las constantes module-level (`const X = process.env.X`) se evalúan una vez al cargar el módulo. Cambiar un env var en Netlify NO se refleja en lambdas warm-started — requiere redespliegue para contenedores frescos.
 - El dossier PDF lee siempre de `rebaja_reports` (no del body) → la cifra del panel y la del PDF siempre coinciden.
+- El `error_msg` en caso de fallo incluye el modelo usado: `Gemini 404 [model=gemini-2.5-pro] {...}` — útil para diagnóstico rápido.
 
 ---
 

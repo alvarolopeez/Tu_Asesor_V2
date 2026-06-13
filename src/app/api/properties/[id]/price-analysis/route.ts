@@ -9,7 +9,7 @@
  *   Lee el último resultado de rebaja_reports por property_id.
  *   El cliente hace polling hasta status='done'|'failed'.
  *
- * Modelo: REBAJA_LLM_MODEL (default gemini-2.5-pro-preview) con google_search.
+ * Modelo: REBAJA_LLM_MODEL (default gemini-2.5-pro) con google_search.
  * ⚠️ grounding es incompatible con responseMimeType:application/json →
  *    el JSON del veredicto se exige por prompt y se parsea con parsePriceAnalysisResponse().
  *
