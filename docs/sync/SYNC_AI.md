@@ -5,6 +5,25 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-13 — Brief #016 FIX v3: fiabilidad (Netlify Background Function)
+
+**Problema**: valoraciones se quedaban colgadas en `status='running'` para siempre (sin `finished_at` ni `error_msg`) → la lambda moría a mitad. Causa: el patrón fire-and-forget (`void runAnalysis()` tras devolver la respuesta) NO es fiable en Netlify; Gemini 2.5 Pro tarda **~56 s** (medido) y el límite síncrono en Netlify **Pro es 26 s**. `resolveCatastro` solo añade ~1.2 s (no era la causa).
+
+**Solución — arquitectura**: el análisis se mueve a una **Netlify Background Function** (límite 15 min, responde 202 al instante).
+- `src/lib/valuationRunner.ts` (nuevo): `runValuation(id, inputs)` con TODA la lógica (catastro + Gemini + parse + guard + UPDATE). Sin imports `@/` (esbuild lo empaqueta). `stripLeadingJson` movido aquí.
+- `netlify/functions/valuation-run-background.mts` (nuevo): wrapper que verifica secreto (`x-internal-secret` == service role key) y llama `runValuation`. El sufijo `-background` activa la ejecución asíncrona de Netlify.
+- `route.ts`: `POST` hace INSERT running → `triggerBackground()` (fetch a `/.netlify/functions/valuation-run-background`, 202) → devuelve `{id}`. Si el trigger falla (dev local sin runtime Netlify) → fallback `void runValuation()` inline.
+- `runAnalysis` eliminado de `route.ts` (ahora en el runner).
+
+**Verificado**: `runValuation` end-to-end escribe `done` (probado en local contra DB real). esbuild bundle de la función OK (erradica el `import type` con `@/` de priceAnalysis). Build + 229 tests verdes.
+
+**Gotchas**:
+- La Background Function vive hasta 15 min; el patrón fire-and-forget síncrono está DEPRECADO para tareas >25 s en este repo. Reutilizar este patrón (INSERT running → trigger bg fn → poll) para futuras tareas LLM largas.
+- Carpeta `netlify/functions/` ahora en uso (default, sin netlify.toml). NO añadir netlify.toml que cambie `functions` dir sin migrar esta función.
+- El endpoint bg está protegido por `x-internal-secret`. Si rota la service role key, ambos lados la leen de env, OK.
+
+---
+
 ### 2026-06-13 — Brief #016 FIX v2: geolocalización por Catastro + anti-lowball + PDF profesional
 
 **Problema reportado** (caso real "calle Granate 8", ref. catastral `5847402TG3454N0004UI`): la IA (1) geolocalizaba mal (decía "Polígono San Pablo / CP 41007" cuando es **Las Avenidas, Distrito Macarena, CP 41009**, a 285 m del Hospital Virgen Macarena), (2) infravaloraba ~30% (daba 95.200 € cuando el piso se vendió por 136.000 €), (3) el PDF crasheaba y (4) el "Análisis completo" mostraba JSON crudo.
