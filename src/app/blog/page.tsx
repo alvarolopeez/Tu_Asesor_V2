@@ -1,16 +1,25 @@
 import Link from "next/link";
-import { getPublishedPosts } from "@/lib/blogService";
+import { getPublishedPostsPage } from "@/lib/blogService";
 import { Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 9;
 
 export const metadata = {
   title: "Blog de Noticias Inmobiliarias | Tu Asesor Álvaro",
   description: "Últimas noticias, consejos y tendencias del mercado inmobiliario en Sevilla y Andalucía.",
 };
 
-export default async function BlogIndexPage() {
-  const posts = await getPublishedPosts();
+export default async function BlogIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+  const { posts, total } = await getPublishedPostsPage(page, PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="min-h-screen bg-[#0f172a] pt-32 pb-24 text-white relative overflow-hidden">
@@ -37,15 +46,17 @@ export default async function BlogIndexPage() {
             <p className="text-slate-400">Estamos preparando los mejores artículos para ti.</p>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {posts.map((post) => (
               <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
                 <article className="h-full glass-effect bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(251,191,36,0.15)] flex flex-col">
                   {post.cover_image && (
                     <div className="relative h-48 w-full overflow-hidden">
-                      <img 
-                        src={post.cover_image} 
-                        alt={post.title} 
+                      <img
+                        src={post.cover_image}
+                        alt={post.title}
+                        loading="lazy"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0f172a] to-transparent"></div>
@@ -80,6 +91,42 @@ export default async function BlogIndexPage() {
               </Link>
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <nav className="flex flex-wrap justify-center items-center gap-2 mt-16" aria-label="Paginación del blog">
+              {page > 1 && (
+                <Link
+                  href={`/blog?page=${page - 1}`}
+                  className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all"
+                >
+                  ← Anterior
+                </Link>
+              )}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                <Link
+                  key={n}
+                  href={`/blog?page=${n}`}
+                  aria-current={n === page ? "page" : undefined}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
+                    n === page
+                      ? "bg-[#FBBF24] border-[#FBBF24] text-[#2C3E50]"
+                      : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {n}
+                </Link>
+              ))}
+              {page < totalPages && (
+                <Link
+                  href={`/blog?page=${page + 1}`}
+                  className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all"
+                >
+                  Siguiente →
+                </Link>
+              )}
+            </nav>
+          )}
+          </>
         )}
       </div>
     </div>

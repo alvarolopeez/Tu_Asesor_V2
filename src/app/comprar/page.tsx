@@ -174,6 +174,7 @@ export default function ComprarPage() {
   const [maxPrice, setMaxPrice] = useState("");
   const [minRooms, setMinRooms] = useState("");
   const [minBaths, setMinBaths] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Modal de Detalle
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -370,6 +371,28 @@ export default function ComprarPage() {
     return true;
   });
 
+  // Paginación client-side: 9 inmuebles por página. Renderizar solo la página
+  // actual aligera el DOM y, con loading="lazy" en las fotos, solo se descargan
+  // las imágenes de los inmuebles visibles (página más rápida).
+  const PROPERTIES_PER_PAGE = 9;
+  const totalPropertyPages = Math.max(1, Math.ceil(filteredProperties.length / PROPERTIES_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPropertyPages);
+  const pagedProperties = filteredProperties.slice(
+    (safePage - 1) * PROPERTIES_PER_PAGE,
+    safePage * PROPERTIES_PER_PAGE,
+  );
+
+  // Al cambiar cualquier filtro, volver a la página 1 (evita quedar en una
+  // página que ya no existe tras filtrar).
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, propertyType, minPrice, maxPrice, minRooms, minBaths]);
+
+  const goToPage = (n: number) => {
+    setCurrentPage(n);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProperty || !selectedDay || !selectedSlot) return;
@@ -558,8 +581,9 @@ export default function ComprarPage() {
             </button>
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {filteredProperties.map((p) => {
+            {pagedProperties.map((p) => {
               const details = getPropertyDetails(p);
               const f = (p.features || {}) as PropertyFeatures;
               const hasVisitable = f.is_visitable_online === true || f.visitable_slots?.active === true;
@@ -573,9 +597,10 @@ export default function ComprarPage() {
                 >
                   {/* Foto con Hover */}
                   <div className="relative h-60 w-full overflow-hidden bg-slate-800">
-                    <img 
-                      src={mainImg} 
-                      alt={p.title} 
+                    <img
+                      src={mainImg}
+                      alt={p.title}
+                      loading="lazy"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-[#2C3E50] via-transparent to-transparent"></div>
@@ -634,6 +659,42 @@ export default function ComprarPage() {
               );
             })}
           </div>
+
+          {totalPropertyPages > 1 && (
+            <nav className="flex flex-wrap justify-center items-center gap-2 mt-12" aria-label="Paginación de inmuebles">
+              {safePage > 1 && (
+                <button
+                  onClick={() => goToPage(safePage - 1)}
+                  className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                >
+                  ← Anterior
+                </button>
+              )}
+              {Array.from({ length: totalPropertyPages }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => goToPage(n)}
+                  aria-current={n === safePage ? "page" : undefined}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all cursor-pointer ${
+                    n === safePage
+                      ? "bg-[#FBBF24] border-[#FBBF24] text-[#2C3E50]"
+                      : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+              {safePage < totalPropertyPages && (
+                <button
+                  onClick={() => goToPage(safePage + 1)}
+                  className="px-4 py-2 rounded-lg text-sm font-bold bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+                >
+                  Siguiente →
+                </button>
+              )}
+            </nav>
+          )}
+          </>
         )}
 
       </div>
