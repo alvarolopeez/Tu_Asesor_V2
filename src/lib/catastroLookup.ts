@@ -77,6 +77,41 @@ function buildDireccion(lourb: any, dt: any, includeUnit: boolean): string {
   return parts.join(' ').trim();
 }
 
+// Prefijos de tipo de vía (con sus abreviaturas habituales). El Catastro indexa
+// el NOMBRE de la vía SIN el tipo (nv="AGUAMARINA", tv="CL" aparte), así que si el
+// usuario escribe "calle aguamarina" hay que quitar el "calle" antes de buscar.
+const VIA_PREFIXES = [
+  'calle', 'avenida', 'avda', 'avenida.', 'avda.', 'av', 'av.',
+  'plaza', 'plza', 'pza', 'pza.', 'plz', 'pl.',
+  'paseo', 'ps', 'pso', 'glorieta', 'gta', 'ronda', 'rda',
+  'camino', 'cmno', 'carretera', 'ctra', 'ctra.', 'travesia', 'travesía', 'trav',
+  'callejon', 'callejón', 'pasaje', 'psje', 'cuesta', 'costanilla',
+  'urbanizacion', 'urbanización', 'urb', 'urb.', 'barriada', 'bda',
+  'poligono', 'polígono', 'pol', 'via', 'vía',
+];
+
+/**
+ * Normaliza el texto que teclea el usuario a un NOMBRE de vía buscable por el
+ * Catastro: quita el prefijo de tipo de vía si lo escribió ("calle aguamarina"
+ * → "aguamarina", "c/ aguamarina" → "aguamarina"). No mapea el tipo a sigla a
+ * propósito: dejamos TipoVia vacío en la consulta para no ocultar vías cuyo tipo
+ * real difiera de lo que el usuario asumió (una "calle" que en realidad es avenida).
+ */
+export function normalizeViaQuery(raw: string): string {
+  let q = (raw || '').trim();
+  if (!q) return '';
+  // "c/aguamarina" o "c/ aguamarina"
+  const cSlash = q.replace(/^c\/\s*/i, '');
+  if (cSlash !== q) return cSlash.trim();
+  const lower = q.toLowerCase();
+  for (const p of VIA_PREFIXES) {
+    if (lower.startsWith(p + ' ')) {
+      return q.slice(p.length).trim();
+    }
+  }
+  return q;
+}
+
 /**
  * Parsea la respuesta de ObtenerCallejero a una lista de sugerencias de vía.
  * Degradación: ante error/null/vacío devuelve [] (el front cae a input libre).

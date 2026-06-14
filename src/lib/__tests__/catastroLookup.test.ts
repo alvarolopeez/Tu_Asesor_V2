@@ -10,7 +10,7 @@
  * (lrcdnp.rcdnp[]); estos tests fijan ese comportamiento contra datos reales.
  */
 
-import { parseViasResponse, parseInmuebleResponse } from '../catastroLookup';
+import { parseViasResponse, parseInmuebleResponse, normalizeViaQuery } from '../catastroLookup';
 
 // ─── Fixtures reales ────────────────────────────────────────────────────────
 
@@ -107,6 +107,47 @@ describe('parseViasResponse', () => {
       consulta_callejeroResult: { callejero: { calle: Array.from({ length: 20 }, (_, i) => ({ dir: { tv: 'CL', nv: `VIA ${i}` } })) } },
     };
     expect(parseViasResponse(many)).toHaveLength(8);
+  });
+});
+
+// ─── normalizeViaQuery ──────────────────────────────────────────────────────
+
+describe('normalizeViaQuery — quita el prefijo de tipo de vía', () => {
+  it('"calle aguamarina" → "aguamarina" (el bug reportado)', () => {
+    expect(normalizeViaQuery('calle aguamarina')).toBe('aguamarina');
+  });
+
+  it('conserva la capitalización del nombre', () => {
+    expect(normalizeViaQuery('Calle Aguamarina')).toBe('Aguamarina');
+  });
+
+  it('soporta "c/" con y sin espacio', () => {
+    expect(normalizeViaQuery('c/ aguamarina')).toBe('aguamarina');
+    expect(normalizeViaQuery('c/aguamarina')).toBe('aguamarina');
+  });
+
+  it('soporta abreviaturas y otros tipos (av, avenida, plaza, pza)', () => {
+    expect(normalizeViaQuery('avenida de la borbolla')).toBe('de la borbolla');
+    expect(normalizeViaQuery('av borbolla')).toBe('borbolla');
+    expect(normalizeViaQuery('plaza nueva')).toBe('nueva');
+    expect(normalizeViaQuery('pza nueva')).toBe('nueva');
+  });
+
+  it('no toca un nombre sin prefijo de tipo', () => {
+    expect(normalizeViaQuery('aguamarina')).toBe('aguamarina');
+  });
+
+  it('NO confunde un prefijo pegado al nombre (no es tipo de vía)', () => {
+    // "calleja" empieza por "calle" pero NO es "calle " → no se toca.
+    expect(normalizeViaQuery('calleja')).toBe('calleja');
+  });
+
+  it('trim y espacios múltiples', () => {
+    expect(normalizeViaQuery('  CALLE   AGUAMARINA ')).toBe('AGUAMARINA');
+  });
+
+  it('cadena vacía → vacía', () => {
+    expect(normalizeViaQuery('')).toBe('');
   });
 });
 

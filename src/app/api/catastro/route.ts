@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseViasResponse, parseInmuebleResponse } from '@/lib/catastroLookup';
+import { parseViasResponse, parseInmuebleResponse, normalizeViaQuery } from '@/lib/catastroLookup';
 
 /**
  * Proxy server-side del Catastro para el autocompletado de dirección de la web
@@ -46,11 +46,16 @@ export async function GET(req: NextRequest) {
     const q = (params.get('q') || '').trim();
     if (q.length < 3) return NextResponse.json([]); // mismo umbral que el front
 
+    // El usuario puede teclear el tipo de vía ("calle aguamarina"); el Catastro
+    // indexa el nombre sin tipo, así que lo quitamos antes de buscar.
+    const nomVia = normalizeViaQuery(q);
+    if (nomVia.length < 2) return NextResponse.json([]);
+
     const url =
       `${CALLEJERO_BASE}/ObtenerCallejero` +
       `?Provincia=${encodeURIComponent(provincia)}` +
       `&Municipio=${encodeURIComponent(municipio)}` +
-      `&TipoVia=&NomVia=${encodeURIComponent(q)}`;
+      `&TipoVia=&NomVia=${encodeURIComponent(nomVia)}`;
 
     const json = await fetchJsonWithTimeout(url, 6000);
     return NextResponse.json(parseViasResponse(json)); // [] si null/error
