@@ -5,6 +5,23 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-14 — Brief #018: portada IA en los posts del blog (ilustración editorial + marca de agua + SEO)
+
+Los posts del cron automático (`/api/cron/generate-blog`, Brief #010) salían con `cover_image=null`. Ahora cada post recibe una imagen de portada generada con Gemini, con la marca de la web, que además mejora el SEO (og:image). Tres commits (`87387cd`, `eff0b53`, `8e22483`).
+
+- **T0 — Bucket Storage nuevo (`blog-images`, público)**: migración aplicada en Supabase (`create_blog_images_bucket`). Política de **lectura pública** (`blog-images public read`); la escritura la hace el service role (bypassa RLS). Verificado: URL pública responde 200 image/png.
+- **T1 — `src/lib/blog/generateCoverImage.ts`**: ilustración editorial 16:9 con `gemini-2.5-flash-image` (env `BLOG_IMAGE_MODEL`). ⚠️ **Confirmado con llamada REAL**: el aspect ratio va en `generationConfig.imageConfig.aspectRatio`; ponerlo suelto (`generationConfig.aspectRatio`, como sugería el brief) devuelve **HTTP 400**. Imagen en `candidates[0].content.parts[].inlineData` (PNG ~1344×768). Graceful: devuelve null si falla.
+- **T2 — `src/lib/blog/watermark.ts` (jimp)**: recorta a 1200×630 (og:image) + banda inferior navy translúcida con filete dorado + logo de marca (recoloreado a blanco) + dominio `tuasesoralvaro.com`. **Netlify-proof**: solo jimp core (JS puro, NO sharp), NO lee `public/` ni carga fuentes en runtime (el logo reutiliza el base64 de `brandLogo.ts`; el dominio va pre-renderizado en `watermarkAssets.ts`).
+- **T3 — Integración + Background Function**: el cron publica el post (texto) y **delega la portada a una Netlify Background Function** `netlify/functions/blog-cover-background.mts` (patrón Brief #016). **Motivo (medido end-to-end): texto ~21s + imagen ~6s + watermark + upload ≈ 28s > límite 26s de Netlify Pro** → inline daría timeout. La función (15 min) genera/marca/sube y hace `UPDATE posts.cover_image`. Lógica compartida en `storeCoverImage.ts`. La imagen **NUNCA bloquea la publicación** (el post ya está insertado antes). Fallback inline en dev local.
+
+**Para el agente N8N**: n8n **no cambia** — sigue disparando el cron a las 08:00 Madrid igual que antes. La generación de imagen es 100% server-side; la nueva Background Function la dispara el propio endpoint (no n8n). Solo hay infra nueva: el bucket `blog-images` y la env `BLOG_IMAGE_MODEL=gemini-2.5-flash-image` (default en código = mismo valor; añadida a `.env.local` y Netlify).
+
+**SEO**: `og:image`/`twitter:image` ya leían `cover_image` y el `alt` ya es `post.title` → con la URL real funcionan solos (sin columna nueva).
+
+**Verificación**: build verde + 289 tests verdes; pipeline real end-to-end OK (genera → sube → UPDATE → URL pública 200 image/png 1200×630). **Caveat**: la imagen IA es estocástica — la mayoría salen limpias, pero alguna puede traer marcas de texto tenues pese al "sin texto" del prompt (no es bug; ~$0.04/img). La primera portada aparecerá en la próxima generación diaria o al disparar el cron a mano.
+
+---
+
 ### 2026-06-14 — Fix: notificaciones WhatsApp fiables (valoración) + aviso de nuevo post de blog
 
 **Problemas reportados por Álvaro**: (1) no llega aviso de nuevo blog; (2) el aviso de valoración del lead REAL (Lucía Rubio, +34644751691) no llegó aunque sí los de sus pruebas; (3) la bienvenida al cliente tampoco.
