@@ -5,6 +5,22 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-14 — Fix: notificaciones WhatsApp fiables (valoración) + aviso de nuevo post de blog
+
+**Problemas reportados por Álvaro**: (1) no llega aviso de nuevo blog; (2) el aviso de valoración del lead REAL (Lucía Rubio, +34644751691) no llegó aunque sí los de sus pruebas; (3) la bienvenida al cliente tampoco.
+
+**Causa raíz (2 y 3)**: `/api/valuation/lead` enviaba los WhatsApp con `void sendWhatsAppTemplate(...)` (fire-and-forget). En serverless (Netlify Functions) el contenedor se congela tras el `return` y el POST a Meta se pierde de forma INTERMITENTE (sí en pruebas con contenedor caliente, no en leads reales). **Fix**: `await Promise.allSettled([...])` antes de responder.
+
+**Problema 1**: el cron `generate-blog` publicaba el post pero NUNCA avisaba (el aviso no existía). **Fix**: tras el insert, `await sendWhatsAppTemplate(ADVISOR_PHONE, 'aviso_alvaro', ['Nuevo post publicado en el blog', "titulo" + url])`. El primer aviso llegará en la próxima generación diaria (08:00 Madrid) o si se dispara el cron a mano.
+
+**⚠️ Riesgo latente (NO tocado — pendiente decisión de Álvaro)**: el MISMO patrón `void sendWhatsApp*` existe en `appointmentService.ts` (reserva web, 5 envíos: líneas 305/318/329/337/358) y `scheduling.ts` (chatbot Paula, líneas 953/1050). El chatbot se salva por trabajo síncrono posterior; la reserva web puede perder avisos igual que valoración. Candidato a fix de consistencia.
+
+**⚠️ Dependencia Meta**: la bienvenida al cliente (`valoracion_recibida`) sigue requiriendo que la plantilla esté APROBADA en Meta. Si no lo está, el envío devuelve false (no rompe) pero el cliente no recibe el WhatsApp.
+
+Build verde.
+
+---
+
 ### 2026-06-14 — Fix CRM: el perfil de vendedor no reflejaba todos los datos de la web de valoración
 
 **Problema (reportado por Álvaro)**: tras el Brief #017 la web guarda TODO el inmueble en `leads.preferences`, pero el perfil de vendedor (`SellerProfileClient.tsx`, `/admin/sellers/[id]` → Ficha Inmueble) y el drawer antiguo (`WarmLeadsManager`) no leían varios campos: se perdían **planta, ascensor, estado, terraza, garaje** y la **valoración del formulario** (el CRM leía `prefs.estimated_value` pero la web guarda `rango_estimado_web` → mostraba "Sin calcular"). La etiqueta decía "M² Útiles" cuando el dato es **superficie construida**.

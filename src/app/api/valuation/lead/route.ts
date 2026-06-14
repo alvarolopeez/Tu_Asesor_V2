@@ -213,31 +213,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'db_error' }, { status: 500 });
   }
 
-  // ── Notificaciones (fire-and-forget: no rompen la respuesta al cliente) ──
+  // ── Notificaciones ──
+  // ⚠️ Hay que AWAIT los envíos antes de responder. En serverless (Netlify
+  // Functions) un fire-and-forget (`void promise`) se pierde si el contenedor se
+  // congela tras el `return`: por eso el aviso a Álvaro llegaba de forma
+  // intermitente (sí en pruebas calientes, no en leads reales como Lucía).
+  // Esperamos ambos en paralelo con allSettled — el fallo de uno (p.ej. la
+  // plantilla del cliente pendiente en Meta) no tumba al otro.
   const rangoTxt =
     body.rangeLow && body.rangeHigh
       ? `estimado ${body.rangeLow.toLocaleString('es-ES')}-${body.rangeHigh.toLocaleString('es-ES')} € · `
       : '';
   const m2Txt = sqmNum ? `${sqmNum} m² · ` : '';
 
-  // 1. Aviso a Álvaro.
+  const notifications: Promise<unknown>[] = [];
+
+  // 1. Aviso a Álvaro (plantilla aviso_alvaro, ya aprobada).
   if (ADVISOR_PHONE) {
     const detalle = `${fullName} · ${addressFull} · ${m2Txt}${rangoTxt}tel ${normalizedPhone}`;
-    void sendWhatsAppTemplate(ADVISOR_PHONE, TPL_AVISO_ALVARO, ['Nueva valoración solicitada', detalle], {
-      normalize: true,
-      logTag: '[valuation/lead][HSM asesor]',
-    }).catch((e) => console.warn('[valuation/lead] aviso Álvaro falló:', e));
+    notifications.push(
+      sendWhatsAppTemplate(ADVISOR_PHONE, TPL_AVISO_ALVARO, ['Nueva valoración solicitada', detalle], {
+        normalize: true,
+        logTag: '[valuation/lead][HSM asesor]',
+      }).catch((e) => console.warn('[valuation/lead] aviso Álvaro falló:', e)),
+    );
   }
 
-  // 2. Bienvenida al cliente (HSM pendiente de aprobación → try/catch).
-  try {
-    void sendWhatsAppTemplate(normalizedPhone, TPL_VALORACION_RECIBIDA, [body.name || fullName], {
+  // 2. Bienvenida al cliente (plantilla valoracion_recibida; si no está aprobada
+  //    en Meta, sendWhatsAppTemplate devuelve false sin lanzar).
+  notifications.push(
+    sendWhatsAppTemplate(normalizedPhone, TPL_VALORACION_RECIBIDA, [body.name || fullName], {
       normalize: true,
       logTag: '[valuation/lead][HSM cliente]',
-    }).catch((e) => console.warn('[valuation/lead] bienvenida cliente falló (plantilla pendiente?):', e));
-  } catch (e) {
-    console.warn('[valuation/lead] bienvenida cliente no enviada:', e);
-  }
+    }).catch((e) => console.warn('[valuation/lead] bienvenida cliente falló (plantilla pendiente?):', e)),
+  );
+
+  await Promise.allSettled(notifications);
 
   return NextResponse.json({ ok: true, leadId });
 }

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { timingSafeEqual } from 'crypto';
 import { generateNewsPost } from '@/lib/blog/generateNewsPost';
 import { validateDraft } from '@/lib/blog/validateDraft';
+import { sendWhatsAppTemplate } from '@/lib/whatsapp';
 
 /**
  * POST /api/cron/generate-blog — Brief #010 T2.
@@ -37,6 +38,8 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
 );
+
+const ADVISOR_PHONE = process.env.ADVISOR_WHATSAPP_PHONE || '';
 
 /** Log de trazabilidad en n8n_webhook_logs (fire-and-soft). */
 async function logResult(payload: Record<string, unknown>, status: number): Promise<void> {
@@ -142,6 +145,19 @@ export async function POST(request: NextRequest) {
       { published: true, slug, title: draft.title, source_urls: draft.source_urls },
       200,
     );
+
+    // ── Paso 6: avisar a Álvaro del nuevo post (await — en serverless un
+    //    fire-and-forget se pierde al congelarse el contenedor tras el return).
+    //    Plantilla aviso_alvaro (HSM) para que llegue aunque la ventana de 24h
+    //    esté cerrada.
+    if (ADVISOR_PHONE) {
+      const detalle = `"${draft.title}" → tuasesoralvaro.com/blog/${slug}`;
+      await sendWhatsAppTemplate(ADVISOR_PHONE, 'aviso_alvaro', ['Nuevo post publicado en el blog', detalle], {
+        normalize: true,
+        logTag: '[cron blog][HSM asesor]',
+      }).catch((e) => console.warn('[cron blog] aviso a Álvaro falló:', e));
+    }
+
     return NextResponse.json({ published: true, slug, title: draft.title });
   } catch (err) {
     console.error('[cron blog] error inesperado:', err);
