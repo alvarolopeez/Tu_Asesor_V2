@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tu Asesor Álvaro — Mockup v1 (fondo claro)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#0F172A',
+            'navy-light': '#1E293B',
+            gold: '#FBBF24',
+            bone: '#FAFAF8',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #FAFAF8;
+      color: #1A1A1A;
+      margin: 0;
+    }
+
+    h1, h2, h3, h4 { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
+
+    a { text-decoration: none; }
+
+    /* ---- Buttons ---- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 13px 26px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+    .btn-gold {
+      background: #FBBF24;
+      color: #0F172A;
+    }
+    .btn-gold:hover {
+      background: #F59E0B;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(251,191,36,0.35);
+    }
+    .btn-outline {
+      background: transparent;
+      color: #0F172A;
+      border: 1.5px solid #CBD5E1;
+    }
+    .btn-outline:hover {
+      border-color: #0F172A;
+      background: #0F172A;
+      color: white;
+    }
+
+    /* ---- Nav ---- */
+    .nav-link {
+      color: #475569;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .nav-link:hover { color: #0F172A; }
+
+    /* ---- Hero ---- */
+    .hero-image {
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+    .hero-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* ---- Gold accent line on headline ---- */
+    .accent-line {
+      display: inline;
+      background-image: linear-gradient(transparent 60%, #FDE68A 60%);
+    }
+
+    /* ---- Property card ---- */
+    .prop-card {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #E2E8F0;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .prop-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 40px rgba(15,23,42,0.1);
+    }
+    .prop-card img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.4s ease;
+    }
+    .prop-card:hover img { transform: scale(1.04); }
+
+    /* ---- Badge ---- */
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-gold { background: #FEF3C7; color: #92400E; }
+    .badge-navy { background: #0F172A; color: white; }
+
+    /* ---- Blog card ---- */
+    .blog-card {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #E2E8F0;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .blog-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 28px rgba(15,23,42,0.08);
+    }
+    .blog-card img {
+      width: 100%;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.4s ease;
+    }
+    .blog-card:hover img { transform: scale(1.04); }
+
+    /* ---- Testimonial ---- */
+    .testimonial {
+      background: white;
+      border-radius: 14px;
+      padding: 28px;
+      border: 1px solid #E2E8F0;
+    }
+    .stars { color: #FBBF24; font-size: 15px; letter-spacing: 1px; }
+
+    /* ---- Section title label ---- */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #FBBF24;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    /* ---- Separators ---- */
+    .dot-sep {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #CBD5E1;
+      display: inline-block;
+    }
+
+    /* ---- Section spacing ---- */
+    .section { padding: 88px 0; }
+
+    /* ---- Value prop strip ---- */
+    .vp-strip {
+      background: #0F172A;
+      padding: 60px 0;
+    }
+    .vp-item {
+      border-right: 1px solid #1E293B;
+      padding: 0 32px;
+    }
+    .vp-item:last-child { border-right: none; }
+
+    /* ---- CTA band ---- */
+    .cta-band {
+      background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+    .cta-band::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      right: -60px;
+      width: 280px;
+      height: 280px;
+      border-radius: 50%;
+      background: rgba(251,191,36,0.08);
+    }
+
+    /* ---- WhatsApp button ---- */
+    .btn-wa {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #25D366;
+      color: white;
+      padding: 12px 22px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: opacity 0.2s;
+    }
+    .btn-wa:hover { opacity: 0.9; }
+
+    /* ---- Footer ---- */
+    footer {
+      background: #0F172A;
+      padding: 72px 0 36px;
+    }
+    .footer-link {
+      color: #64748B;
+      font-size: 13px;
+      transition: color 0.15s;
+    }
+    .footer-link:hover { color: white; }
+
+    /* ---- Responsive helpers ---- */
+    @media (max-width: 767px) {
+      .section { padding: 60px 0; }
+      .vp-item { border-right: none; border-bottom: 1px solid #1E293B; padding: 24px 0; }
+      .vp-item:last-child { border-bottom: none; }
+      .hero-img-wrap { aspect-ratio: 4/3; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════ HEADER -->
+<header style="background:white;border-bottom:1px solid #F1F5F9;position:sticky;top:0;z-index:100;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;height:64px;display:flex;align-items:center;justify-content:space-between;">
+
+    <!-- Logo -->
+    <a href="#" style="display:flex;align-items:center;gap:6px;">
+      <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:18px;color:#0F172A;letter-spacing:-0.5px;">Tu Asesor</span>
+      <span style="color:#FBBF24;font-size:22px;font-weight:700;line-height:1;">·</span>
+      <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:18px;color:#0F172A;letter-spacing:-0.5px;">Álvaro</span>
+    </a>
+
+    <!-- Nav (desktop) -->
+    <nav style="display:flex;align-items:center;gap:32px;" class="hidden md:flex">
+      <a href="#" class="nav-link">Comprar</a>
+      <a href="#" class="nav-link">Vender</a>
+      <a href="#" class="nav-link">Valoración</a>
+      <a href="#" class="nav-link">Blog</a>
+      <a href="#" class="nav-link">Contacto</a>
+    </nav>
+
+    <!-- CTA -->
+    <a href="#" class="btn btn-gold" style="font-size:13px;padding:10px 20px;">Valora tu casa gratis</a>
+  </div>
+</header>
+
+
+<!-- ══════════════════════════════════════════════ HERO -->
+<section style="background:#FAFAF8;padding:0;">
+  <div style="max-width:1100px;margin:0 auto;padding:64px 24px 80px;display:flex;flex-wrap:wrap;align-items:center;gap:48px;">
+
+    <!-- Left: texto -->
+    <div style="flex:1;min-width:280px;">
+      <span class="badge badge-gold" style="margin-bottom:20px;">🏠 Asesor independiente · Sevilla</span>
+      <h1 style="font-size:clamp(38px,5vw,60px);font-weight:800;color:#0F172A;line-height:1.08;letter-spacing:-1.5px;margin:16px 0 24px;">
+        Vende tu casa<br>en Sevilla por<br>
+        <span class="accent-line">solo un 2%</span>
+      </h1>
+      <p style="font-size:18px;color:#475569;line-height:1.65;margin-bottom:36px;max-width:440px;">
+        Ahorra miles de euros en comisiones con asesoramiento personal, honesto y de principio a fin. Sin agencias. Sin letra pequeña.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <a href="#" class="btn btn-gold">Valoración gratuita →</a>
+        <a href="#" class="btn btn-outline">Ver inmuebles</a>
+      </div>
+
+      <!-- Micro social proof -->
+      <div style="display:flex;align-items:center;gap:12px;margin-top:40px;">
+        <div style="display:flex;">
+          <img src="https://i.pravatar.cc/36?img=1"  style="width:34px;height:34px;border-radius:50%;border:2px solid white;margin-right:-8px;" alt="">
+          <img src="https://i.pravatar.cc/36?img=5"  style="width:34px;height:34px;border-radius:50%;border:2px solid white;margin-right:-8px;" alt="">
+          <img src="https://i.pravatar.cc/36?img=9"  style="width:34px;height:34px;border-radius:50%;border:2px solid white;margin-right:-8px;" alt="">
+          <img src="https://i.pravatar.cc/36?img=25" style="width:34px;height:34px;border-radius:50%;border:2px solid white;" alt="">
+        </div>
+        <div>
+          <p style="font-weight:600;font-size:14px;color:#0F172A;margin:0;">+40 familias asesoradas en Sevilla</p>
+          <span class="stars">★★★★★</span>
+          <span style="font-size:12px;color:#94A3B8;margin-left:4px;">5.0 / Google</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: imagen -->
+    <div style="flex:1;min-width:280px;position:relative;" class="hero-img-wrap">
+      <div class="hero-image" style="aspect-ratio:4/3;">
+        <img src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&q=85" alt="Vivienda en Sevilla"/>
+        <!-- Floating card -->
+        <div style="position:absolute;bottom:20px;left:20px;background:white;border-radius:12px;padding:14px 18px;box-shadow:0 8px 24px rgba(0,0,0,0.12);">
+          <p style="font-size:11px;color:#94A3B8;margin:0 0 2px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">En venta · Triana</p>
+          <p style="font-size:22px;font-weight:800;color:#0F172A;margin:0 0 2px;font-family:'Plus Jakarta Sans',sans-serif;">287.000 €</p>
+          <p style="font-size:12px;color:#475569;margin:0;">90 m² · 3 hab. · 1 baño</p>
+        </div>
+      </div>
+      <!-- Decorative dot -->
+      <div style="position:absolute;bottom:-16px;right:-16px;width:80px;height:80px;border-radius:50%;background:#FEF3C7;z-index:-1;"></div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════ VALUE PROP STRIP -->
+<div class="vp-strip">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+
+    <div class="vp-item">
+      <div style="font-size:28px;margin-bottom:10px;">💰</div>
+      <h3 style="color:white;font-size:18px;font-weight:700;margin-bottom:8px;">Solo un 2%</h3>
+      <p style="color:#94A3B8;font-size:14px;line-height:1.55;margin:0;">La mitad que las agencias tradicionales. Ahorras miles de euros.</p>
+    </div>
+
+    <div class="vp-item">
+      <div style="font-size:28px;margin-bottom:10px;">🤝</div>
+      <h3 style="color:white;font-size:18px;font-weight:700;margin-bottom:8px;">0% al comprador</h3>
+      <p style="color:#94A3B8;font-size:14px;line-height:1.55;margin:0;">Si compras, no pagas comisión. Así debería funcionar.</p>
+    </div>
+
+    <div class="vp-item">
+      <div style="font-size:28px;margin-bottom:10px;">🤖</div>
+      <h3 style="color:white;font-size:18px;font-weight:700;margin-bottom:8px;">Valoración con IA</h3>
+      <p style="color:#94A3B8;font-size:14px;line-height:1.55;margin:0;">Precio real de tu casa en minutos, con datos del mercado sevillano.</p>
+    </div>
+
+    <div class="vp-item">
+      <div style="font-size:28px;margin-bottom:10px;">👤</div>
+      <h3 style="color:white;font-size:18px;font-weight:700;margin-bottom:8px;">Asesor personal</h3>
+      <p style="color:#94A3B8;font-size:14px;line-height:1.55;margin:0;">Siempre hablas con Álvaro, de principio a fin. Sin cambios de gestor.</p>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════ INMUEBLES DESTACADOS -->
+<section class="section" style="background:#FAFAF8;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <span class="section-label">Inmuebles</span>
+        <h2 style="font-size:clamp(28px,4vw,40px);font-weight:800;color:#0F172A;letter-spacing:-0.5px;">Destacados del mes</h2>
+      </div>
+      <a href="#" style="font-size:14px;font-weight:600;color:#475569;border-bottom:1px solid #CBD5E1;">Ver todos los inmuebles →</a>
+    </div>
+
+    <!-- Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;">
+
+      <!-- Card 1 -->
+      <div class="prop-card">
+        <div style="position:relative;overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=640&q=80" alt="Piso en Triana"/>
+          <span class="badge badge-gold" style="position:absolute;top:12px;left:12px;">En venta</span>
+        </div>
+        <div style="padding:20px 22px 24px;">
+          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin:0 0 6px;">Triana · Sevilla</p>
+          <h3 style="font-size:18px;font-weight:700;color:#0F172A;margin:0 0 12px;line-height:1.3;">Piso luminoso con terraza</h3>
+          <p style="font-size:26px;font-weight:800;color:#0F172A;margin:0 0 16px;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:-0.5px;">287.000 €</p>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569;">
+            <span>90 m²</span>
+            <span class="dot-sep"></span>
+            <span>3 hab.</span>
+            <span class="dot-sep"></span>
+            <span>1 baño</span>
+            <span class="dot-sep"></span>
+            <span>Ascensor</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="prop-card">
+        <div style="position:relative;overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=640&q=80" alt="Ático en Los Remedios"/>
+          <span class="badge badge-navy" style="position:absolute;top:12px;left:12px;">Precio reducido</span>
+        </div>
+        <div style="padding:20px 22px 24px;">
+          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin:0 0 6px;">Los Remedios · Sevilla</p>
+          <h3 style="font-size:18px;font-weight:700;color:#0F172A;margin:0 0 12px;line-height:1.3;">Ático con vistas al río</h3>
+          <p style="font-size:26px;font-weight:800;color:#0F172A;margin:0 0 16px;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:-0.5px;">415.000 €</p>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569;">
+            <span>110 m²</span>
+            <span class="dot-sep"></span>
+            <span>4 hab.</span>
+            <span class="dot-sep"></span>
+            <span>2 baños</span>
+            <span class="dot-sep"></span>
+            <span>Terraza</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="prop-card">
+        <div style="position:relative;overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?w=640&q=80" alt="Piso reformado en Nervión"/>
+          <span class="badge badge-gold" style="position:absolute;top:12px;left:12px;">En venta</span>
+        </div>
+        <div style="padding:20px 22px 24px;">
+          <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#94A3B8;margin:0 0 6px;">Nervión · Sevilla</p>
+          <h3 style="font-size:18px;font-weight:700;color:#0F172A;margin:0 0 12px;line-height:1.3;">Piso reformado, llave en mano</h3>
+          <p style="font-size:26px;font-weight:800;color:#0F172A;margin:0 0 16px;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:-0.5px;">198.000 €</p>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#475569;">
+            <span>75 m²</span>
+            <span class="dot-sep"></span>
+            <span>2 hab.</span>
+            <span class="dot-sep"></span>
+            <span>1 baño</span>
+            <span class="dot-sep"></span>
+            <span>Reformado</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════ VALORACIÓN IA -->
+<section class="section" style="background:white;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+    <div style="display:flex;flex-wrap:wrap;border-radius:20px;overflow:hidden;border:1px solid #E2E8F0;min-height:380px;">
+
+      <!-- Foto -->
+      <div style="flex:1;min-width:280px;position:relative;min-height:280px;">
+        <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=85"
+             alt="Valoración de vivienda"
+             style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;"/>
+      </div>
+
+      <!-- Texto -->
+      <div style="flex:1;min-width:280px;padding:52px 48px;background:#FAFAF8;display:flex;flex-direction:column;justify-content:center;">
+        <span class="section-label">Herramienta gratuita</span>
+        <h2 style="font-size:clamp(26px,3.5vw,38px);font-weight:800;color:#0F172A;letter-spacing:-0.5px;margin-bottom:16px;line-height:1.2;">¿Cuánto vale<br>tu casa?</h2>
+        <p style="color:#475569;line-height:1.7;font-size:16px;margin-bottom:32px;">
+          Usa nuestra valoración con inteligencia artificial y obtén en minutos una estimación precisa basada en datos reales del mercado en Sevilla. Gratis, sin compromisos.
+        </p>
+        <a href="#" class="btn btn-gold" style="width:fit-content;">Valorar mi casa →</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════ TESTIMONIOS -->
+<section class="section" style="background:#FAFAF8;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+
+    <div style="text-align:center;margin-bottom:48px;">
+      <span class="section-label" style="display:block;text-align:center;">Lo que dicen</span>
+      <h2 style="font-size:clamp(28px,4vw,40px);font-weight:800;color:#0F172A;letter-spacing:-0.5px;">Familias que ya confían</h2>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;">
+
+      <div class="testimonial">
+        <div class="stars" style="margin-bottom:14px;">★★★★★</div>
+        <p style="color:#475569;line-height:1.7;font-size:15px;margin:0 0 20px;">
+          "Vendimos el piso en 3 semanas y ahorramos casi 8.000€ en comisiones. Álvaro estuvo disponible en todo momento y nos explicó cada paso con total claridad."
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="https://i.pravatar.cc/44?img=12" style="width:42px;height:42px;border-radius:50%;" alt="">
+          <div>
+            <p style="font-weight:600;font-size:14px;color:#0F172A;margin:0 0 2px;">Carmen y Javier R.</p>
+            <p style="font-size:12px;color:#94A3B8;margin:0;">Vendedores · Triana</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial">
+        <div class="stars" style="margin-bottom:14px;">★★★★★</div>
+        <p style="color:#475569;line-height:1.7;font-size:15px;margin:0 0 20px;">
+          "Como comprador, no pagué nada de comisión. Encontramos el piso que buscábamos y Álvaro negoció por nosotros. Un trato que no esperaba de un asesor inmobiliario."
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="https://i.pravatar.cc/44?img=33" style="width:42px;height:42px;border-radius:50%;" alt="">
+          <div>
+            <p style="font-weight:600;font-size:14px;color:#0F172A;margin:0 0 2px;">Lucía Martínez</p>
+            <p style="font-size:12px;color:#94A3B8;margin:0;">Compradora · Los Remedios</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="testimonial">
+        <div class="stars" style="margin-bottom:14px;">★★★★★</div>
+        <p style="color:#475569;line-height:1.7;font-size:15px;margin:0 0 20px;">
+          "La valoración online fue exactísima. Pusimos el precio que sugirió y vendimos en dos semanas. Trato directo, sin rodeos y sin sorpresas al final."
+        </p>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="https://i.pravatar.cc/44?img=47" style="width:42px;height:42px;border-radius:50%;" alt="">
+          <div>
+            <p style="font-weight:600;font-size:14px;color:#0F172A;margin:0 0 2px;">Miguel Ángel Torres</p>
+            <p style="font-size:12px;color:#94A3B8;margin:0;">Vendedor · Nervión</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════ BLOG -->
+<section class="section" style="background:white;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <span class="section-label">Blog</span>
+        <h2 style="font-size:clamp(28px,4vw,40px);font-weight:800;color:#0F172A;letter-spacing:-0.5px;">Todo sobre el mercado sevillano</h2>
+      </div>
+      <a href="#" style="font-size:14px;font-weight:600;color:#475569;border-bottom:1px solid #CBD5E1;">Ver todos los artículos →</a>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;">
+
+      <div class="blog-card">
+        <div style="overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=640&q=80" alt="Mercado inmobiliario Sevilla"/>
+        </div>
+        <div style="padding:20px 22px 26px;">
+          <span class="section-label" style="margin-bottom:8px;font-size:10px;">Mercado</span>
+          <h3 style="font-size:17px;font-weight:700;color:#0F172A;line-height:1.35;margin:0 0 10px;">¿Cuándo es buen momento para vender en Sevilla?</h3>
+          <p style="font-size:14px;color:#64748B;line-height:1.6;margin:0;">Analizamos los datos de 2025 y qué esperar para el segundo semestre de 2026.</p>
+        </div>
+      </div>
+
+      <div class="blog-card">
+        <div style="overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=640&q=80" alt="Gastos de venta de un piso"/>
+        </div>
+        <div style="padding:20px 22px 26px;">
+          <span class="section-label" style="margin-bottom:8px;font-size:10px;">Guías</span>
+          <h3 style="font-size:17px;font-weight:700;color:#0F172A;line-height:1.35;margin:0 0 10px;">Los gastos reales de vender un piso (sin sorpresas)</h3>
+          <p style="font-size:14px;color:#64748B;line-height:1.6;margin:0;">Notaría, plusvalía, IRPF… te explicamos qué paga el vendedor y qué puedes ahorrarte.</p>
+        </div>
+      </div>
+
+      <div class="blog-card">
+        <div style="overflow:hidden;">
+          <img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=640&q=80" alt="Barrios de Sevilla"/>
+        </div>
+        <div style="padding:20px 22px 26px;">
+          <span class="section-label" style="margin-bottom:8px;font-size:10px;">Barrios</span>
+          <h3 style="font-size:17px;font-weight:700;color:#0F172A;line-height:1.35;margin:0 0 10px;">Triana vs. Los Remedios: dónde comprar en 2026</h3>
+          <p style="font-size:14px;color:#64748B;line-height:1.6;margin:0;">Precio por m², oferta disponible y qué barrio sube más en los últimos 12 meses.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════ CTA FINAL -->
+<section class="section" style="background:#FAFAF8;">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+    <div class="cta-band" style="padding:56px 52px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:32px;">
+      <div style="max-width:520px;position:relative;z-index:1;">
+        <h2 style="font-size:clamp(26px,3.5vw,38px);font-weight:800;color:white;line-height:1.2;letter-spacing:-0.5px;margin-bottom:14px;">
+          ¿Tienes una casa que vender?<br>Hablemos sin compromiso.
+        </h2>
+        <p style="color:#94A3B8;font-size:16px;line-height:1.6;margin:0;">
+          Una llamada de 15 minutos es suficiente para contarte cómo funciona y qué puedes esperar. Sin presiones.
+        </p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;position:relative;z-index:1;">
+        <a href="#" class="btn btn-gold">Solicitar valoración gratuita →</a>
+        <a href="https://wa.me/34697223944" class="btn-wa">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          WhatsApp directo
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════ FOOTER -->
+<footer>
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px;">
+
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;margin-bottom:56px;flex-wrap:wrap;">
+
+      <!-- Brand col -->
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px;">
+          <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:18px;color:white;">Tu Asesor</span>
+          <span style="color:#FBBF24;font-size:22px;font-weight:700;">·</span>
+          <span style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:18px;color:white;">Álvaro</span>
+        </div>
+        <p style="color:#64748B;font-size:14px;line-height:1.7;margin:0 0 24px;max-width:320px;">
+          Asesor inmobiliario independiente en Sevilla. Vende por solo un 2%. Sin agencias, sin intermediarios, con el mismo nivel de servicio y más honestidad.
+        </p>
+        <a href="https://wa.me/34697223944" class="btn-wa" style="font-size:13px;padding:10px 18px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          +34 697 223 944
+        </a>
+      </div>
+
+      <!-- Links col -->
+      <div>
+        <h4 style="color:white;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:18px;">Navega</h4>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <a href="#" class="footer-link">Comprar</a>
+          <a href="#" class="footer-link">Vender</a>
+          <a href="#" class="footer-link">Valoración gratuita</a>
+          <a href="#" class="footer-link">Blog</a>
+          <a href="#" class="footer-link">Contacto</a>
+        </div>
+      </div>
+
+      <!-- Contact col -->
+      <div>
+        <h4 style="color:white;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:18px;">Contacto</h4>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <span class="footer-link">📍 Sevilla, España</span>
+          <span class="footer-link">📞 +34 697 223 944</span>
+          <span class="footer-link">✉️ hola@tuasesoralvaro.com</span>
+          <span class="footer-link">🌐 tuasesoralvaro.com</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom bar -->
+    <div style="border-top:1px solid #1E293B;padding-top:28px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
+      <p style="color:#334155;font-size:12px;margin:0;">© 2026 Tu Asesor Álvaro · Todos los derechos reservados</p>
+      <div style="display:flex;gap:24px;">
+        <a href="#" class="footer-link">Aviso legal</a>
+        <a href="#" class="footer-link">Privacidad</a>
+        <a href="#" class="footer-link">Cookies</a>
+      </div>
+    </div>
+
+  </div>
+</footer>
+
+</body>
+</html>
