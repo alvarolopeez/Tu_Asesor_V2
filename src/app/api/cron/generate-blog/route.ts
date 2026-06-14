@@ -55,6 +55,34 @@ async function logResult(payload: Record<string, unknown>, status: number): Prom
   }
 }
 
+/**
+ * Dispara la Background Function que genera la portada (Brief #018). Devuelve
+ * true si quedó encolada (202/2xx). En dev local (sin runtime de funciones
+ * Netlify) el endpoint no existe → devuelve false y el caller cae al fallback
+ * inline. Protegida con el service role como secreto compartido.
+ */
+async function triggerCoverBackground(
+  req: NextRequest,
+  slug: string,
+  title: string,
+  excerpt: string,
+): Promise<boolean> {
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!secret) return false;
+  try {
+    const origin = process.env.URL || process.env.DEPLOY_PRIME_URL || new URL(req.url).origin;
+    const res = await fetch(`${origin}/.netlify/functions/blog-cover-background`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': secret },
+      body: JSON.stringify({ slug, title, excerpt }),
+    });
+    return res.status === 202 || res.ok;
+  } catch (err) {
+    console.warn('[cron blog] trigger background de portada falló, fallback inline:', String(err));
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   // ── Auth ──
   const cronSecret = process.env.CRON_SECRET || '';
@@ -67,6 +95,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const tStart = Date.now(); // medición de latencia total (riesgo timeout Netlify)
     // ── Paso 1: idempotencia + títulos recientes (anti-repetición) ──
     // "Hoy" en UTC: a las 08:00 Madrid (06:00/07:00 UTC) el día UTC y el día
     // Madrid coinciden, y los reintentos de n8n caen en el mismo día UTC.
@@ -158,7 +187,29 @@ export async function POST(request: NextRequest) {
       }).catch((e) => console.warn('[cron blog] aviso a Álvaro falló:', e));
     }
 
-    return NextResponse.json({ published: true, slug, title: draft.title });
+    // ── Paso 7: portada IA (Brief #018) — GRACEFUL y FUERA del camino crítico.
+    //    El post YA está publicado (Paso 5), así que la imagen nunca bloquea la
+    //    publicación. La generación de imagen (~6s) sumada al texto (~21s ya
+    //    medidos) + insert + WhatsApp superaría el límite de 26s de Netlify Pro,
+    //    así que la portada se delega a una Background Function (15 min, sin
+    //    timeout) que rellena cover_image con un UPDATE. En dev local (sin
+    //    runtime de funciones Netlify) cae a un fallback inline para poder
+    //    probar end-to-end.
+    const coverQueued = await triggerCoverBackground(request, slug, draft.title, draft.excerpt);
+    if (!coverQueued) {
+      try {
+        const { storeCoverImage } = await import('@/lib/blog/storeCoverImage');
+        const ok = await storeCoverImage(slug, draft.title, draft.excerpt);
+        console.log(`[cron blog] portada inline (fallback dev): ${ok ? 'OK' : 'sin imagen'}`);
+      } catch (e) {
+        console.warn('[cron blog] fallback inline de portada falló:', e);
+      }
+    }
+
+    const totalMs = Date.now() - tStart;
+    console.log(`[cron blog] publicado "${slug}" · portada encolada=${coverQueued} · total cron ${totalMs}ms`);
+
+    return NextResponse.json({ published: true, slug, title: draft.title, coverQueued, totalMs });
   } catch (err) {
     console.error('[cron blog] error inesperado:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
