@@ -5,6 +5,19 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-14 — Fix CRM: el perfil de vendedor no reflejaba todos los datos de la web de valoración
+
+**Problema (reportado por Álvaro)**: tras el Brief #017 la web guarda TODO el inmueble en `leads.preferences`, pero el perfil de vendedor (`SellerProfileClient.tsx`, `/admin/sellers/[id]` → Ficha Inmueble) y el drawer antiguo (`WarmLeadsManager`) no leían varios campos: se perdían **planta, ascensor, estado, terraza, garaje** y la **valoración del formulario** (el CRM leía `prefs.estimated_value` pero la web guarda `rango_estimado_web` → mostraba "Sin calcular"). La etiqueta decía "M² Útiles" cuando el dato es **superficie construida**.
+
+**Solución (fix localizado, sin brief)**:
+- `SellerProfileClient.tsx`: Ficha Inmueble ahora muestra/edita en caliente **Planta, Estado de conservación y extras (Ascensor/Terraza/Garaje como toggles)**, muestra la **referencia catastral**; "Valoración Algoritmo Web" lee `rango_estimado_web` (low–high) con fallback a `estimated_value`; etiqueta → **"M² Construidos"**.
+- `src/app/api/valuation/lead/route.ts`: además de `rango_estimado_web`, guarda `estimated_value` = **centro del rango** → alimenta el drawer y los KPIs del dashboard (que leen un número) sin tocar su lógica legacy.
+- `WarmLeadsManager.tsx`: etiqueta "M² Útiles" → "M² Construidos".
+
+**Verificación**: build verde. Cambios de presentación en componentes hoja (riesgo bajo).
+
+---
+
 ### 2026-06-14 — Brief #017: página pública `/valoracion` (Catastro + rango instantáneo + captación)
 
 Subida de nivel de `src/app/valoracion/page.tsx`. Cuatro commits (`42f3915..4d86e4f`):

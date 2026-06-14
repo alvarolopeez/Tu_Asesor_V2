@@ -44,6 +44,16 @@ interface SellerPreferences {
   agent_valuation?: number;
   commission_pct?: number;
   additionalNotes?: string;
+  // Datos capturados por la web de valoración (Brief #017) que antes no se
+  // reflejaban en el CRM.
+  floor?: string;
+  elevator?: boolean;
+  condition?: string;
+  hasTerrace?: boolean;
+  hasGarage?: boolean;
+  referencia_catastral?: string;
+  direccion_oficial?: string;
+  rango_estimado_web?: { low: number; high: number };
 }
 
 // Brief #011 F2.1 (R8/D1): funnel del vendedor a 4 estados en la UI.
@@ -409,7 +419,7 @@ function SellerProfileBody({ leadId }: { leadId: string }) {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">M² Útiles</label>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">M² Construidos</label>
                 <input
                   type="number"
                   defaultValue={prefs.sqm || ""}
@@ -451,6 +461,78 @@ function SellerProfileBody({ leadId }: { leadId: string }) {
               </div>
             </div>
 
+            {/* Planta + Estado de conservación (capturados por la web de valoración) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Planta</label>
+                <input
+                  type="text"
+                  defaultValue={prefs.floor ?? ""}
+                  placeholder="Ej. 2 (0 = bajo)"
+                  onBlur={(e) => {
+                    const val = e.target.value.trim() || undefined;
+                    if (val !== prefs.floor) void updateField("floor", val, true);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                  className="w-full bg-[#0F172A]/50 border border-white/5 hover:border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#FBBF24] transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Estado de Conservación</label>
+                <select
+                  value={prefs.condition || ""}
+                  onChange={(e) => void updateField("condition", e.target.value || undefined, true)}
+                  className="w-full bg-[#0F172A]/50 border border-white/5 hover:border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#FBBF24] transition-all cursor-pointer"
+                >
+                  <option value="">Sin especificar</option>
+                  <option value="reformar">A reformar</option>
+                  <option value="bueno">Buen estado</option>
+                  <option value="reformado">Reformado</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Extras (ascensor/terraza/garaje) — toggles editables en caliente */}
+            <div>
+              <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Características</label>
+              <div className="grid grid-cols-3 gap-3">
+                {([
+                  { key: "elevator", label: "Ascensor" },
+                  { key: "hasTerrace", label: "Terraza" },
+                  { key: "hasGarage", label: "Garaje" },
+                ] as const).map(({ key, label }) => {
+                  const active = Boolean(prefs[key]);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => void updateField(key, !active, true)}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+                        active
+                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300"
+                          : "bg-[#0F172A]/50 border-white/5 text-slate-500 hover:border-white/10"
+                      }`}
+                    >
+                      {active ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <span className="w-3.5 h-3.5 rounded-full border border-current inline-block" />
+                      )}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Referencia catastral (dato oficial capturado en la web — alimenta la valoración IA) */}
+            {prefs.referencia_catastral && (
+              <div className="text-[11px] text-slate-500">
+                <span className="font-bold text-slate-400">Ref. catastral:</span> {prefs.referencia_catastral}
+              </div>
+            )}
+
             {/* Consola de tasación y negociación (réplica del drawer) */}
             <div className="p-5 rounded-2xl bg-amber-500/[0.02] border border-[#FBBF24]/30 space-y-4">
               <div className="flex items-center gap-2 text-[#FBBF24] font-bold text-xs uppercase tracking-widest">
@@ -461,8 +543,12 @@ function SellerProfileBody({ leadId }: { leadId: string }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block mb-1">Valoración Algoritmo Web</span>
-                  <span className="text-lg font-black text-slate-300 block bg-[#0F172A]/40 px-3 py-2.5 rounded-xl border border-white/5">
-                    {prefs.estimated_value ? formatCurrency(Number(prefs.estimated_value)) : "Sin calcular"}
+                  <span className="text-base font-black text-slate-300 block bg-[#0F172A]/40 px-3 py-2.5 rounded-xl border border-white/5 leading-tight">
+                    {prefs.rango_estimado_web?.low && prefs.rango_estimado_web?.high
+                      ? `${formatCurrency(prefs.rango_estimado_web.low)} – ${formatCurrency(prefs.rango_estimado_web.high)}`
+                      : prefs.estimated_value
+                      ? formatCurrency(Number(prefs.estimated_value))
+                      : "Sin calcular"}
                   </span>
                 </div>
 

@@ -139,6 +139,10 @@ export async function POST(req: NextRequest) {
     // Estimación que vio el cliente en la web (trazabilidad para Álvaro).
     rango_estimado_web:
       body.rangeLow && body.rangeHigh ? { low: body.rangeLow, high: body.rangeHigh } : undefined,
+    // Punto central del rango → alimenta el drawer (WarmLeadsManager) y los KPIs
+    // del dashboard que leen un `estimated_value` numérico (no rompe lo legacy).
+    estimated_value:
+      body.rangeLow && body.rangeHigh ? Math.round((body.rangeLow + body.rangeHigh) / 2) : undefined,
   };
 
   // ── Upsert con dedupe por teléfono normalizado (mismo patrón que el webhook) ──

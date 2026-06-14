@@ -1127,7 +1127,7 @@ export default function WarmLeadsManager({ leads, onGoToDocuments }: WarmLeadsMa
 
                     {/* Sqm */}
                     <div>
-                      <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">M² Útiles</label>
+                      <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">M² Construidos</label>
                       <input 
                         type="number"
                         defaultValue={getPreferences(selectedLead).sqm || ""}
