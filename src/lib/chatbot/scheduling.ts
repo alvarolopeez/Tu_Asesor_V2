@@ -950,7 +950,7 @@ async function finalizeScheduling(
         `financiación ${answers.funding ?? '?'}`,
         answers.tipo_compra ?? '?',
       ].join(' · ');
-      void sendWhatsAppTemplate(
+      await sendWhatsAppTemplate(
         ADVISOR_PHONE,
         'aviso_alvaro',
         ['Perfil de comprador completado por Paula', summary],
@@ -1047,7 +1047,7 @@ async function finalizeScheduling(
           `"${state.target.propertyTitle}"`,
           when,
         ].join(' · ');
-    void sendWhatsAppTemplate(
+    await sendWhatsAppTemplate(
       ADVISOR_PHONE,
       'aviso_alvaro',
       [

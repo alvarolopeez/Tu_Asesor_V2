@@ -13,7 +13,7 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 **Problema 1**: el cron `generate-blog` publicaba el post pero NUNCA avisaba (el aviso no existía). **Fix**: tras el insert, `await sendWhatsAppTemplate(ADVISOR_PHONE, 'aviso_alvaro', ['Nuevo post publicado en el blog', "titulo" + url])`. El primer aviso llegará en la próxima generación diaria (08:00 Madrid) o si se dispara el cron a mano.
 
-**⚠️ Riesgo latente (NO tocado — pendiente decisión de Álvaro)**: el MISMO patrón `void sendWhatsApp*` existe en `appointmentService.ts` (reserva web, 5 envíos: líneas 305/318/329/337/358) y `scheduling.ts` (chatbot Paula, líneas 953/1050). El chatbot se salva por trabajo síncrono posterior; la reserva web puede perder avisos igual que valoración. Candidato a fix de consistencia.
+**✅ Riesgo latente RESUELTO (Álvaro pidió arreglar ambos)**: el MISMO patrón `void sendWhatsApp*` en `appointmentService.ts` (reserva web, 5 envíos) y `scheduling.ts` (chatbot Paula, 2 envíos) se ha convertido a `await`. Las funciones de envío capturan sus errores internamente (devuelven false, no lanzan), así que el await secuencial es seguro y no corta envíos. `grep "void sendWhatsApp"` → 0 resultados en todo src. Notificaciones fiables en todo el sistema.
 
 **⚠️ Dependencia Meta**: la bienvenida al cliente (`valoracion_recibida`) sigue requiriendo que la plantilla esté APROBADA en Meta. Si no lo está, el envío devuelve false (no rompe) pero el cliente no recibe el WhatsApp.
 

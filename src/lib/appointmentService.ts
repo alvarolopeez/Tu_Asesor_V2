@@ -302,7 +302,7 @@ export async function bookPublicAppointment(
       // 3.a Mensaje al cliente.
       if (!hasActiveConvo) {
         // Sin conversación previa → plantilla HSM clásica.
-        void sendWhatsAppTemplate(
+        await sendWhatsAppTemplate(
           cleanPhone,
           TPL_CONFIRM_VISITA,
           [cleanName, data.propertyTitle, formattedDate],
@@ -315,7 +315,7 @@ export async function bookPublicAppointment(
         //  que llegue al móvil del cliente.)
         switch (bookingOutcome.kind) {
           case 'started':
-            void sendWhatsAppMessage(
+            await sendWhatsAppMessage(
               cleanPhone,
               `¡Hola ${cleanName}! Soy Paula 👋, la asesora virtual de Álvaro. ` +
               `Acabas de reservar tu visita a "${propLabel}" para ${formattedDate} 🎉. ` +
@@ -326,7 +326,7 @@ export async function bookPublicAppointment(
             )
             break
           case 'already_has_demand':
-            void sendWhatsAppMessage(
+            await sendWhatsAppMessage(
               cleanPhone,
               `🎉 ¡${cleanName}! Tu visita a "${propLabel}" está reservada para ${formattedDate}. ` +
               `Álvaro te confirmará por aquí antes de la cita. ¿Algo más en lo que pueda ayudarte?`,
@@ -334,7 +334,7 @@ export async function bookPublicAppointment(
             )
             break
           case 'already_has_interview':
-            void sendWhatsAppMessage(
+            await sendWhatsAppMessage(
               cleanPhone,
               `🎉 ¡${cleanName}! He registrado también tu visita a "${propLabel}" para ${formattedDate}. ` +
               `Sigamos con las preguntas que teníamos pendientes para terminar tu perfil.`,
@@ -355,7 +355,7 @@ export async function bookPublicAppointment(
           ? '⚠️ Reserva web sospechosa (tel ya en uso por otro lead)'
           : 'Nueva visita reservada (web)'
         const avisoDetalle = `${cleanName} · ${cleanPhone} · "${propLabel}" · ${formattedDate}`
-        void sendWhatsAppTemplate(
+        await sendWhatsAppTemplate(
           ADVISOR_PHONE,
           TPL_AVISO_ALVARO,
           [avisoTitulo, avisoDetalle],
