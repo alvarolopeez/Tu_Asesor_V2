@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tu Asesor Álvaro — v4 Sevilla Luz (mediterránea)</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --warm-white: #FFFEF9;
+      --sand:       #F2EBE0;
+      --sand-dark:  #E8DDD0;
+      --navy:       #0F172A;
+      --navy-soft:  #1E293B;
+      --gold:       #FBBF24;
+      --gold-pale:  #FEF3C7;
+      --text:       #2C2015;
+      --muted:      #7C6F63;
+      --border:     #E8DDD0;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: 'Jost', sans-serif;
+      background: var(--warm-white);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes rise {
+      from { opacity:0; transform:translateY(32px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity:0; transform:scale(0.96); }
+      to   { opacity:1; transform:scale(1); }
+    }
+    .au  { animation: rise   0.8s cubic-bezier(0.22,1,0.36,1) both; }
+    .si  { animation: scaleIn 0.7s cubic-bezier(0.22,1,0.36,1) both; }
+    .d1  { animation-delay:.08s; }
+    .d2  { animation-delay:.20s; }
+    .d3  { animation-delay:.34s; }
+    .d4  { animation-delay:.50s; }
+    .d5  { animation-delay:.68s; }
+
+    /* ── NAV ── */
+    nav {
+      position:sticky; top:0; z-index:100;
+      background:rgba(255,254,249,0.93);
+      backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+    }
+    .nav-inner {
+      max-width:1160px; margin:0 auto; padding:0 40px;
+      height:64px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .logo {
+      display:flex; align-items:baseline; gap:5px;
+      font-family:'Playfair Display',serif;
+      font-size:20px; font-weight:700; color:var(--navy); text-decoration:none;
+    }
+    .logo-dot { color:var(--gold); font-size:24px; line-height:1; }
+    .nav-links { display:flex; gap:32px; }
+    .nav-links a {
+      font-size:14px; font-weight:400; letter-spacing:0.01em;
+      color:var(--muted); text-decoration:none; transition:color .15s;
+    }
+    .nav-links a:hover { color:var(--navy); }
+    .nav-cta {
+      font-size:13px; font-weight:600;
+      background:var(--navy); color:white;
+      padding:10px 22px; border-radius:100px; text-decoration:none;
+      transition:all .2s;
+    }
+    .nav-cta:hover { background:var(--navy-soft); transform:translateY(-1px); box-shadow:0 4px 12px rgba(15,23,42,.2); }
+
+    /* ── HERO ── */
+    .hero {
+      max-width:1160px; margin:0 auto; padding:72px 40px 80px;
+      display:grid; grid-template-columns:1fr 1.1fr; gap:56px; align-items:center;
+    }
+    .hero-tag {
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;
+      background:var(--gold-pale); color:#92400E;
+      padding:6px 14px; border-radius:100px; margin-bottom:24px;
+    }
+    .hero h1 {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(44px,5.5vw,76px);
+      font-weight:800; line-height:1.08; letter-spacing:-0.02em;
+      color:var(--navy); margin-bottom:22px;
+    }
+    .hero h1 .highlight {
+      position:relative; display:inline-block;
+    }
+    .hero h1 .highlight::after {
+      content:'';
+      position:absolute; left:0; bottom:-2px; right:0; height:4px;
+      background:var(--gold); border-radius:2px;
+    }
+    .hero-sub {
+      font-size:18px; font-weight:300; line-height:1.72;
+      color:var(--muted); max-width:420px; margin-bottom:40px;
+    }
+    .hero-btns { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:52px; }
+    .btn-pill {
+      display:inline-flex; align-items:center; gap:6px;
+      font-family:'Jost',sans-serif; font-size:15px; font-weight:600;
+      padding:14px 28px; border-radius:100px; text-decoration:none;
+      transition:all .22s;
+    }
+    .btn-pill-navy { background:var(--navy); color:white; }
+    .btn-pill-navy:hover { background:var(--navy-soft); transform:translateY(-1px); box-shadow:0 6px 16px rgba(15,23,42,.2); }
+    .btn-pill-outline { background:transparent; color:var(--navy); border:1.5px solid var(--border); }
+    .btn-pill-outline:hover { border-color:var(--navy); background:var(--navy); color:white; }
+    /* Social proof */
+    .hero-social {
+      display:flex; align-items:center; gap:14px;
+      padding-top:32px; border-top:1px solid var(--border);
+    }
+    .avatars { display:flex; }
+    .avatars img { width:36px; height:36px; border-radius:50%; border:2.5px solid var(--warm-white); margin-right:-8px; }
+    .social-text { font-size:14px; font-weight:500; color:var(--navy); margin-bottom:2px; }
+    .social-stars { color:var(--gold); font-size:13px; letter-spacing:1px; }
+
+    /* ── PHOTO MOSAIC ── */
+    /* The memorable element: 3-photo mosaic that feels like a curated scrapbook */
+    .mosaic {
+      display:grid;
+      grid-template-columns:1.15fr 0.85fr;
+      grid-template-rows:1fr 1fr;
+      gap:10px;
+      height:520px;
+    }
+    .mosaic-main { grid-row:1/3; border-radius:16px; overflow:hidden; }
+    .mosaic-top  { border-radius:16px; overflow:hidden; }
+    .mosaic-bot  { border-radius:16px; overflow:hidden; position:relative; }
+    .mosaic img  { width:100%; height:100%; object-fit:cover; display:block; }
+    /* Small price badge overlaid on bottom-right photo */
+    .mosaic-badge {
+      position:absolute; bottom:14px; left:14px; right:14px;
+      background:rgba(255,254,249,.92); backdrop-filter:blur(6px);
+      border-radius:10px; padding:12px 14px;
+      border:1px solid rgba(255,255,255,.8);
+    }
+    .mosaic-badge-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); margin-bottom:3px; }
+    .mosaic-badge-price { font-family:'Playfair Display',serif; font-size:22px; font-weight:700; color:var(--navy); line-height:1; margin-bottom:2px; }
+    .mosaic-badge-detail { font-size:11px; color:var(--muted); }
+
+    /* ── STATS BAND ── */
+    .stats-band {
+      background:var(--sand); border-top:1px solid var(--sand-dark); border-bottom:1px solid var(--sand-dark);
+      padding:40px 0;
+    }
+    .stats-inner {
+      max-width:1160px; margin:0 auto; padding:0 40px;
+      display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+    }
+    .stat-item {
+      text-align:center; padding:0 20px;
+      border-right:1px solid var(--sand-dark);
+    }
+    .stat-item:last-child { border-right:none; }
+    .stat-num {
+      font-family:'Playfair Display',serif; font-size:44px; font-weight:800;
+      color:var(--navy); line-height:1; margin-bottom:6px;
+    }
+    .stat-num span { color:var(--gold); }
+    .stat-label { font-size:13px; color:var(--muted); font-weight:400; }
+
+    /* ── PROCESS ── */
+    .process-outer {
+      max-width:1160px; margin:0 auto; padding:88px 40px;
+    }
+    .section-label {
+      font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
+      color:var(--gold); display:block; margin-bottom:10px;
+    }
+    .section-h2 {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(30px,4vw,48px); font-weight:800; color:var(--navy);
+      line-height:1.15; letter-spacing:-0.01em;
+    }
+    .process-header { margin-bottom:56px; }
+    .process-steps {
+      display:grid; grid-template-columns:repeat(4,1fr); gap:0;
+      position:relative;
+    }
+    /* connecting line */
+    .process-steps::before {
+      content:''; position:absolute;
+      top:24px; left:calc(12.5%); right:calc(12.5%); height:1px;
+      background:var(--border); z-index:0;
+    }
+    .process-step { padding:0 16px 0 0; position:relative; z-index:1; }
+    .process-step:last-child { padding-right:0; }
+    .step-num {
+      width:48px; height:48px; border-radius:50%; background:var(--warm-white);
+      border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center;
+      font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--navy);
+      margin-bottom:20px; transition:all .2s;
+    }
+    .process-step:hover .step-num {
+      background:var(--gold); border-color:var(--gold); color:var(--navy);
+    }
+    .step-title { font-size:16px; font-weight:600; color:var(--navy); margin-bottom:8px; }
+    .step-text  { font-size:14px; color:var(--muted); line-height:1.65; }
+
+    /* ── 2% STATEMENT — the big typographic impact moment ── */
+    .statement {
+      background:var(--navy); padding:96px 0;
+      overflow:hidden; position:relative;
+    }
+    /* Decorative circle */
+    .statement::before {
+      content:''; position:absolute;
+      right:-160px; top:50%; transform:translateY(-50%);
+      width:500px; height:500px; border-radius:50%;
+      border:1px solid rgba(251,191,36,.12);
+      pointer-events:none;
+    }
+    .statement::after {
+      content:''; position:absolute;
+      right:-80px; top:50%; transform:translateY(-50%);
+      width:340px; height:340px; border-radius:50%;
+      border:1px solid rgba(251,191,36,.08);
+      pointer-events:none;
+    }
+    .statement-inner {
+      max-width:1160px; margin:0 auto; padding:0 40px;
+      display:flex; align-items:center; gap:64px; flex-wrap:wrap;
+    }
+    .statement-num {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(120px,18vw,200px); font-weight:800;
+      color:white; line-height:1; letter-spacing:-0.04em; flex-shrink:0;
+      /* gold fill on the % */
+    }
+    .statement-num span { color:var(--gold); }
+    .statement-text { flex:1; min-width:240px; }
+    .statement-text h2 {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(28px,3.5vw,44px); font-weight:700;
+      color:white; line-height:1.2; margin-bottom:18px;
+    }
+    .statement-text p {
+      font-size:17px; line-height:1.7; color:rgba(255,255,255,.55);
+      max-width:420px; margin-bottom:32px;
+    }
+    .btn-gold-pill {
+      display:inline-flex; align-items:center; gap:6px;
+      background:var(--gold); color:var(--navy);
+      font-size:15px; font-weight:700;
+      padding:14px 28px; border-radius:100px; text-decoration:none;
+      transition:all .2s;
+    }
+    .btn-gold-pill:hover { background:#F59E0B; transform:translateY(-1px); box-shadow:0 6px 20px rgba(251,191,36,.3); }
+
+    /* ── PROPERTIES ── */
+    .props-outer {
+      max-width:1160px; margin:0 auto; padding:88px 40px;
+    }
+    .props-header {
+      display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:40px; flex-wrap:wrap; gap:12px;
+    }
+    .props-header a {
+      font-size:14px; font-weight:500; color:var(--muted); text-decoration:none;
+      border-bottom:1px solid var(--border); padding-bottom:2px; transition:color .15s;
+    }
+    .props-header a:hover { color:var(--navy); }
+    .props-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+    .prop-card {
+      background:white; border-radius:16px; overflow:hidden;
+      border:1px solid var(--border); transition:transform .25s,box-shadow .25s;
+    }
+    .prop-card:hover { transform:translateY(-5px); box-shadow:0 16px 40px rgba(44,32,21,.1); }
+    .prop-img-wrap { position:relative; overflow:hidden; }
+    .prop-img-wrap img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; transition:transform .4s ease; }
+    .prop-card:hover .prop-img-wrap img { transform:scale(1.04); }
+    .prop-badge {
+      position:absolute; top:12px; left:12px;
+      font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+      background:var(--gold-pale); color:#92400E;
+      padding:4px 10px; border-radius:100px;
+    }
+    .prop-body { padding:20px 22px 26px; }
+    .prop-zone { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); margin-bottom:6px; }
+    .prop-title { font-family:'Playfair Display',serif; font-size:19px; font-weight:700; color:var(--navy); margin-bottom:12px; line-height:1.25; }
+    .prop-price { font-family:'Playfair Display',serif; font-size:26px; font-weight:800; color:var(--navy); line-height:1; margin-bottom:14px; }
+    .prop-meta { display:flex; gap:10px; font-size:12px; color:var(--muted); }
+    .prop-dot { color:var(--sand-dark); }
+
+    /* ── VALUATION ── */
+    .val-outer { background:var(--sand); padding:88px 0; border-top:1px solid var(--sand-dark); border-bottom:1px solid var(--sand-dark); }
+    .val-inner {
+      max-width:1160px; margin:0 auto; padding:0 40px;
+      display:grid; grid-template-columns:1fr 1fr; gap:72px; align-items:center;
+    }
+    .val-img img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:16px; display:block; }
+    .val-text h2 {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(32px,4vw,50px); font-weight:800; color:var(--navy); line-height:1.12; margin-bottom:18px;
+    }
+    .val-text p { font-size:16px; line-height:1.72; color:var(--muted); margin-bottom:32px; }
+
+    /* ── TESTIMONIALS ── */
+    .testi-outer { max-width:1160px; margin:0 auto; padding:88px 40px; }
+    .testi-header { text-align:center; margin-bottom:52px; }
+    .testi-header h2 { font-family:'Playfair Display',serif; font-size:clamp(30px,4vw,48px); font-weight:800; color:var(--navy); }
+    .testi-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+    .testi-card {
+      background:var(--sand); border-radius:16px; padding:28px 28px 28px;
+      border:1px solid var(--sand-dark); transition:transform .2s,box-shadow .2s;
+    }
+    .testi-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(44,32,21,.08); }
+    .testi-stars { color:var(--gold); font-size:15px; letter-spacing:1px; margin-bottom:14px; }
+    .testi-text { font-size:15px; line-height:1.7; color:var(--text); margin-bottom:22px; }
+    .testi-author { display:flex; align-items:center; gap:12px; }
+    .testi-avatar { width:42px; height:42px; border-radius:50%; border:2px solid var(--warm-white); }
+    .testi-name { font-size:14px; font-weight:600; color:var(--navy); margin-bottom:2px; }
+    .testi-role { font-size:12px; color:var(--muted); }
+
+    /* ── BLOG ── */
+    .blog-outer { background:var(--warm-white); padding:88px 0; border-top:1px solid var(--border); }
+    .blog-inner { max-width:1160px; margin:0 auto; padding:0 40px; }
+    .blog-header { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:40px; flex-wrap:wrap; gap:12px; }
+    .blog-header h2 { font-family:'Playfair Display',serif; font-size:clamp(30px,4vw,48px); font-weight:800; color:var(--navy); }
+    .blog-header a { font-size:14px; font-weight:500; color:var(--muted); text-decoration:none; border-bottom:1px solid var(--border); padding-bottom:2px; transition:color .15s; }
+    .blog-header a:hover { color:var(--navy); }
+    .blog-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+    .blog-card {
+      background:white; border-radius:16px; overflow:hidden;
+      border:1px solid var(--border); text-decoration:none; display:block;
+      transition:transform .2s,box-shadow .2s;
+    }
+    .blog-card:hover { transform:translateY(-4px); box-shadow:0 10px 28px rgba(44,32,21,.09); }
+    .blog-card img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; transition:transform .4s; }
+    .blog-card:hover img { transform:scale(1.04); }
+    .blog-body { padding:18px 20px 22px; }
+    .blog-cat { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:var(--gold); display:block; margin-bottom:8px; }
+    .blog-title { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:var(--navy); line-height:1.3; margin-bottom:8px; }
+    .blog-exc { font-size:13px; color:var(--muted); line-height:1.6; }
+
+    /* ── CTA ── */
+    .cta-outer { max-width:1160px; margin:0 auto; padding:0 40px 88px; }
+    .cta-inner {
+      background:var(--navy); border-radius:24px; padding:60px 64px;
+      display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:36px;
+      position:relative; overflow:hidden;
+    }
+    /* decorative gold rings */
+    .cta-ring {
+      position:absolute; border-radius:50%; border:1px solid rgba(251,191,36,.12);
+      pointer-events:none;
+    }
+    .cta-ring-1 { width:360px; height:360px; right:-100px; top:50%; transform:translateY(-50%); }
+    .cta-ring-2 { width:240px; height:240px; right:-40px; top:50%; transform:translateY(-50%); }
+    .cta-text h2 {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(28px,3.5vw,42px); font-weight:800; color:white; line-height:1.2; margin-bottom:14px;
+    }
+    .cta-text p { font-size:16px; color:rgba(255,255,255,.5); max-width:420px; line-height:1.65; }
+    .cta-actions { display:flex; flex-direction:column; gap:12px; position:relative; z-index:1; }
+    .btn-wa-pill {
+      display:inline-flex; align-items:center; gap:8px;
+      background:rgba(37,211,102,.15); border:1px solid rgba(37,211,102,.3);
+      color:#4ADE80; font-size:14px; font-weight:600;
+      padding:12px 22px; border-radius:100px; text-decoration:none; transition:background .2s;
+    }
+    .btn-wa-pill:hover { background:rgba(37,211,102,.25); }
+
+    /* ── FOOTER ── */
+    footer { background:var(--navy); padding:68px 0 36px; }
+    .footer-inner { max-width:1160px; margin:0 auto; padding:0 40px; }
+    .footer-top {
+      display:grid; grid-template-columns:1.6fr 1fr 1fr; gap:48px;
+      margin-bottom:48px; padding-bottom:40px; border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .footer-logo {
+      display:flex; align-items:baseline; gap:5px; margin-bottom:16px;
+      font-family:'Playfair Display',serif; font-size:20px; font-weight:700; color:white; text-decoration:none;
+    }
+    .footer-logo-dot { color:var(--gold); font-size:24px; }
+    .footer-desc { font-size:14px; color:rgba(255,255,255,.35); line-height:1.7; max-width:280px; margin-bottom:24px; }
+    .footer-wa {
+      display:inline-flex; align-items:center; gap:8px;
+      background:rgba(37,211,102,.12); border:1px solid rgba(37,211,102,.2);
+      color:#4ADE80; font-size:12px; font-weight:600;
+      padding:9px 16px; border-radius:100px; text-decoration:none;
+    }
+    .footer-col-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:rgba(255,255,255,.25); margin-bottom:18px; }
+    .footer-links { display:flex; flex-direction:column; gap:10px; }
+    .footer-links a { font-size:14px; color:rgba(255,255,255,.4); text-decoration:none; transition:color .15s; }
+    .footer-links a:hover { color:white; }
+    .footer-bottom { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+    .footer-copy { font-size:12px; color:rgba(255,255,255,.2); }
+    .footer-legal { display:flex; gap:20px; }
+    .footer-legal a { font-size:12px; color:rgba(255,255,255,.2); text-decoration:none; transition:color .15s; }
+    .footer-legal a:hover { color:rgba(255,255,255,.4); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width:960px) {
+      .hero { grid-template-columns:1fr; padding-top:56px; padding-bottom:64px; }
+      .mosaic { height:360px; }
+      .stats-inner { grid-template-columns:repeat(2,1fr); }
+      .stat-item:nth-child(2) { border-right:none; }
+      .stat-item:nth-child(3) { border-top:1px solid var(--sand-dark); }
+      .process-steps { grid-template-columns:repeat(2,1fr); gap:32px; }
+      .process-steps::before { display:none; }
+      .statement-num { font-size:clamp(100px,25vw,160px); }
+      .props-grid { grid-template-columns:1fr; }
+      .val-inner { grid-template-columns:1fr; gap:40px; }
+      .testi-grid { grid-template-columns:1fr; }
+      .blog-grid { grid-template-columns:1fr; }
+      .footer-top { grid-template-columns:1fr; }
+      .nav-links { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ NAV ══ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="logo">Tu Asesor <span class="logo-dot">·</span> Álvaro</a>
+    <div class="nav-links">
+      <a href="#">Comprar</a>
+      <a href="#">Vender</a>
+      <a href="#">Valoración</a>
+      <a href="#">Blog</a>
+      <a href="#">Contacto</a>
+    </div>
+    <a href="#" class="nav-cta">Valora tu casa gratis</a>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<section>
+  <div class="hero">
+
+    <!-- Texto -->
+    <div>
+      <span class="hero-tag au">🏠 Asesor independiente · Sevilla</span>
+      <h1 class="au d1">
+        Vende tu casa<br>
+        en Sevilla por<br>
+        <span class="highlight">solo un 2%</span>
+      </h1>
+      <p class="hero-sub au d2">
+        Sin agencias, sin letra pequeña. Asesoramiento personal, honesto y de principio a fin. El comprador no paga comisión.
+      </p>
+      <div class="hero-btns au d3">
+        <a href="#" class="btn-pill btn-pill-navy">Valoración gratuita →</a>
+        <a href="#" class="btn-pill btn-pill-outline">Ver inmuebles</a>
+      </div>
+      <div class="hero-social au d4">
+        <div class="avatars">
+          <img src="https://i.pravatar.cc/36?img=1"  alt="">
+          <img src="https://i.pravatar.cc/36?img=5"  alt="">
+          <img src="https://i.pravatar.cc/36?img=9"  alt="">
+          <img src="https://i.pravatar.cc/36?img=25" alt="">
+        </div>
+        <div>
+          <div class="social-text">+40 familias asesoradas en Sevilla</div>
+          <div class="social-stars">★★★★★ <span style="font-size:12px;color:var(--muted);font-weight:400;">5.0 · Google</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOSAICO de fotos — el momento memorable del hero -->
+    <div class="mosaic si d1">
+      <div class="mosaic-main">
+        <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=85" alt="Interior Sevilla"/>
+      </div>
+      <div class="mosaic-top">
+        <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&q=80" alt="Piso en Triana"/>
+      </div>
+      <div class="mosaic-bot">
+        <img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80" alt="Piso reformado"/>
+        <div class="mosaic-badge">
+          <div class="mosaic-badge-label">En venta · Triana</div>
+          <div class="mosaic-badge-price">287.000 €</div>
+          <div class="mosaic-badge-detail">90 m² · 3 hab.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══ STATS ══ -->
+<div class="stats-band">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <div class="stat-num">2<span>%</span></div>
+      <div class="stat-label">de comisión para el vendedor</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">0<span>%</span></div>
+      <div class="stat-label">siempre para el comprador</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">+40</div>
+      <div class="stat-label">familias asesoradas en Sevilla</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">5<span>★</span></div>
+      <div class="stat-label">valoración media en Google</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROCESS ══ -->
+<div class="process-outer">
+  <div class="process-header">
+    <span class="section-label">Cómo funciona</span>
+    <h2 class="section-h2">Cuatro pasos, sin sorpresas</h2>
+  </div>
+  <div class="process-steps">
+    <div class="process-step">
+      <div class="step-num">01</div>
+      <div class="step-title">Valoramos tu casa</div>
+      <p class="step-text">Calculamos el precio justo con datos reales del mercado sevillano. Gratis, sin compromiso.</p>
+    </div>
+    <div class="process-step">
+      <div class="step-num">02</div>
+      <div class="step-title">Preparamos la venta</div>
+      <p class="step-text">Fotografías, reportaje, publicación en portales y estrategia de difusión diseñada para tu piso.</p>
+    </div>
+    <div class="process-step">
+      <div class="step-num">03</div>
+      <div class="step-title">Negociamos por ti</div>
+      <p class="step-text">Gestionamos visitas y ofertas. Siempre hablas con Álvaro, no con un gestor diferente cada vez.</p>
+    </div>
+    <div class="process-step">
+      <div class="step-num">04</div>
+      <div class="step-title">Firma y entrega</div>
+      <p class="step-text">Te acompañamos ante notaría, coordinamos toda la documentación y cerramos la operación.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 2% STATEMENT — el momento de impacto tipográfico ══ -->
+<div class="statement">
+  <div class="statement-inner">
+    <div class="statement-num">2<span>%</span></div>
+    <div class="statement-text">
+      <h2>Es todo lo que pedimos<br>por cuidar tu casa.</h2>
+      <p>
+        Las agencias cobran entre el 3 y el 5%. Nosotros cobramos la mitad — y el comprador no paga nada. Sin letra pequeña. Sin sorpresas. Solo resultados.
+      </p>
+      <a href="#" class="btn-gold-pill">Valorar mi casa gratis →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROPERTIES ══ -->
+<div class="props-outer">
+  <div class="props-header">
+    <div>
+      <span class="section-label">Inmuebles</span>
+      <h2 class="section-h2">Destacados del mes</h2>
+    </div>
+    <a href="#">Ver todos los inmuebles →</a>
+  </div>
+  <div class="props-grid">
+    <div class="prop-card">
+      <div class="prop-img-wrap">
+        <img src="https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=640&q=80" alt="Piso Triana"/>
+        <span class="prop-badge">En venta</span>
+      </div>
+      <div class="prop-body">
+        <div class="prop-zone">Triana · Sevilla</div>
+        <div class="prop-title">Piso luminoso con terraza</div>
+        <div class="prop-price">287.000 €</div>
+        <div class="prop-meta"><span>90 m²</span><span class="prop-dot">·</span><span>3 hab.</span><span class="prop-dot">·</span><span>1 baño</span></div>
+      </div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-img-wrap">
+        <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=640&q=80" alt="Ático Los Remedios"/>
+        <span class="prop-badge">Precio reducido</span>
+      </div>
+      <div class="prop-body">
+        <div class="prop-zone">Los Remedios · Sevilla</div>
+        <div class="prop-title">Ático con vistas al río</div>
+        <div class="prop-price">415.000 €</div>
+        <div class="prop-meta"><span>110 m²</span><span class="prop-dot">·</span><span>4 hab.</span><span class="prop-dot">·</span><span>2 baños</span></div>
+      </div>
+    </div>
+    <div class="prop-card">
+      <div class="prop-img-wrap">
+        <img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?w=640&q=80" alt="Piso Nervión"/>
+        <span class="prop-badge">En venta</span>
+      </div>
+      <div class="prop-body">
+        <div class="prop-zone">Nervión · Sevilla</div>
+        <div class="prop-title">Piso reformado, llave en mano</div>
+        <div class="prop-price">198.000 €</div>
+        <div class="prop-meta"><span>75 m²</span><span class="prop-dot">·</span><span>2 hab.</span><span class="prop-dot">·</span><span>1 baño</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VALUATION ══ -->
+<div class="val-outer">
+  <div class="val-inner">
+    <div>
+      <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=700&q=85" alt="Valoración IA"/>
+    </div>
+    <div class="val-text">
+      <span class="section-label">Herramienta gratuita</span>
+      <h2>¿Cuánto vale tu casa?</h2>
+      <p>Usa nuestra valoración con inteligencia artificial y obtén en minutos una estimación precisa basada en datos reales del mercado en Sevilla. Gratis, sin compromisos.</p>
+      <a href="#" class="btn-pill btn-pill-navy" style="width:fit-content;">Valorar mi casa →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TESTIMONIALS ══ -->
+<div class="testi-outer">
+  <div class="testi-header">
+    <span class="section-label" style="display:block;text-align:center;margin-bottom:10px;">Lo que dicen</span>
+    <h2>Familias que ya confían</h2>
+  </div>
+  <div class="testi-grid">
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-text">"Vendimos el piso en 3 semanas y ahorramos casi 8.000€ en comisiones. Álvaro estuvo disponible en todo momento y nos explicó cada paso con total claridad."</p>
+      <div class="testi-author">
+        <img src="https://i.pravatar.cc/44?img=12" class="testi-avatar" alt="">
+        <div>
+          <div class="testi-name">Carmen y Javier R.</div>
+          <div class="testi-role">Vendedores · Triana</div>
+        </div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-text">"Como comprador, no pagué nada de comisión. Encontramos el piso que buscábamos y Álvaro negoció por nosotros. Un trato que no esperaba de un asesor inmobiliario."</p>
+      <div class="testi-author">
+        <img src="https://i.pravatar.cc/44?img=33" class="testi-avatar" alt="">
+        <div>
+          <div class="testi-name">Lucía Martínez</div>
+          <div class="testi-role">Compradora · Los Remedios</div>
+        </div>
+      </div>
+    </div>
+    <div class="testi-card">
+      <div class="testi-stars">★★★★★</div>
+      <p class="testi-text">"La valoración online fue exactísima. Pusimos el precio que sugirió y vendimos en dos semanas. Trato directo, sin rodeos y sin sorpresas al final."</p>
+      <div class="testi-author">
+        <img src="https://i.pravatar.cc/44?img=47" class="testi-avatar" alt="">
+        <div>
+          <div class="testi-name">Miguel Ángel Torres</div>
+          <div class="testi-role">Vendedor · Nervión</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BLOG ══ -->
+<div class="blog-outer">
+  <div class="blog-inner">
+    <div class="blog-header">
+      <div>
+        <span class="section-label">Blog</span>
+        <h2>Todo sobre el mercado sevillano</h2>
+      </div>
+      <a href="#">Ver todos →</a>
+    </div>
+    <div class="blog-grid">
+      <a href="#" class="blog-card">
+        <img src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=640&q=80" alt="Blog 1"/>
+        <div class="blog-body">
+          <span class="blog-cat">Mercado</span>
+          <div class="blog-title">¿Cuándo es buen momento para vender en Sevilla?</div>
+          <p class="blog-exc">Analizamos los datos de 2025 y qué esperar para el segundo semestre de 2026.</p>
+        </div>
+      </a>
+      <a href="#" class="blog-card">
+        <img src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=640&q=80" alt="Blog 2"/>
+        <div class="blog-body">
+          <span class="blog-cat">Guías</span>
+          <div class="blog-title">Los gastos reales de vender un piso (sin sorpresas)</div>
+          <p class="blog-exc">Notaría, plusvalía, IRPF… te explicamos qué paga el vendedor y qué puedes ahorrarte.</p>
+        </div>
+      </a>
+      <a href="#" class="blog-card">
+        <img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=640&q=80" alt="Blog 3"/>
+        <div class="blog-body">
+          <span class="blog-cat">Barrios</span>
+          <div class="blog-title">Triana vs. Los Remedios: dónde comprar en 2026</div>
+          <p class="blog-exc">Precio por m², oferta disponible y qué barrio sube más en los últimos 12 meses.</p>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CTA ══ -->
+<div class="cta-outer">
+  <div class="cta-inner">
+    <div class="cta-ring cta-ring-1"></div>
+    <div class="cta-ring cta-ring-2"></div>
+    <div class="cta-text">
+      <h2>¿Tienes una casa<br>que vender? Hablemos.</h2>
+      <p>Una llamada de 15 minutos es suficiente para contarte cómo funciona y qué puedes esperar. Sin presiones.</p>
+    </div>
+    <div class="cta-actions">
+      <a href="#" class="btn-gold-pill">Solicitar valoración gratuita →</a>
+      <a href="https://wa.me/34697223944" class="btn-wa-pill">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        WhatsApp directo
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div>
+        <a href="#" class="footer-logo">Tu Asesor <span class="footer-logo-dot">·</span> Álvaro</a>
+        <p class="footer-desc">Asesor inmobiliario independiente en Sevilla. Vende por solo un 2%. Sin agencias, sin intermediarios, con el mismo nivel de servicio y más honestidad.</p>
+        <a href="https://wa.me/34697223944" class="footer-wa">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          +34 697 223 944
+        </a>
+      </div>
+      <div>
+        <div class="footer-col-title">Navega</div>
+        <div class="footer-links">
+          <a href="#">Comprar</a>
+          <a href="#">Vender</a>
+          <a href="#">Valoración gratuita</a>
+          <a href="#">Blog</a>
+          <a href="#">Contacto</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-title">Contacto</div>
+        <div class="footer-links">
+          <a href="#">📍 Sevilla, España</a>
+          <a href="#">📞 +34 697 223 944</a>
+          <a href="#">✉️ hola@tuasesoralvaro.com</a>
+          <a href="#">🌐 tuasesoralvaro.com</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="footer-copy">© 2026 Tu Asesor Álvaro · Todos los derechos reservados</p>
+      <div class="footer-legal">
+        <a href="#">Aviso legal</a>
+        <a href="#">Privacidad</a>
+        <a href="#">Cookies</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
