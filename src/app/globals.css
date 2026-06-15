@@ -1,12 +1,29 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 @theme {
+  /* ── Sistema legacy (dark) — coexistencia, se limpia en la fase final ── */
   --color-primary: #587C9A;
   --color-secondary: #2C3E50;
   --color-accent: #FBBF24;
   --color-background: #0f172a;
   --font-sans: var(--font-lato), sans-serif;
   --font-heading: var(--font-montserrat), sans-serif;
+
+  /* ── Sistema "Sevilla Luz" (Brief #020, mockup v4) ──
+     Mediterráneo claro. Genera utilidades bg-warm-white, text-navy,
+     text-muted, border-line, font-display, font-body, etc. */
+  --color-warm-white: #FFFEF9;
+  --color-sand:       #F2EBE0;
+  --color-sand-dark:  #E8DDD0;
+  --color-navy:       #0F172A;
+  --color-navy-soft:  #1E293B;
+  --color-gold:       #FBBF24; /* = accent */
+  --color-gold-pale:  #FEF3C7;
+  --color-ink:        #2C2015; /* texto cálido */
+  --color-muted:      #7C6F63;
+  --color-line:       #E8DDD0; /* bordes */
+  --font-display: var(--font-playfair), Georgia, serif;
+  --font-body:    var(--font-jost), system-ui, sans-serif;
 }
 
 /* Custom Base Styles */
