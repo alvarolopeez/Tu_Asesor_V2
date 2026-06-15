@@ -5,6 +5,23 @@ Si el CRM o la Web cambian su estructura de base de datos de manera que afecte a
 
 ---
 
+### 2026-06-15 — Brief #020 (Fase 1): rediseño web "Sevilla Luz" (fundación + Header + Footer + Home)
+
+**Solo capa visual. NO afecta a BD, webhooks ni n8n.** Para el agente de automatización: no cambia nada de tu lado — no hay migraciones, ni columnas nuevas, ni cambios en el shape de `leads`/`properties`/`reviews`/`posts`. Todo lo que sigue es presentación.
+
+Primera fase de la migración de la web al diseño aprobado (mockup `docs/mockups/home-rediseno-v4.html`, mediterráneo claro). Cuatro commits (T1→T4):
+
+- **T1 — Fundación** (`globals.css` `@theme` + `layout.tsx`): se **añaden** tokens claros (`warm-white`, `sand`, `navy`, `gold`, `ink`, `muted`, `line`…) y fuentes **Playfair Display** + **Jost** (`font-display`/`font-body`) **junto a** los tokens dark y Lato/Montserrat existentes. **Coexistencia deliberada**: NO se borra nada del sistema viejo, para no romper las páginas aún no migradas. La limpieza va en la fase final (Brief #023).
+- **T2 — Header** (`Header.tsx`): reescrito al estilo claro del mockup (warm-white translúcido, logo Playfair "Tu Asesor · Álvaro"). **Se mantiene `fixed`** (no sticky) para que las páginas legacy con `pt-24/pt-32` no queden con un hueco enorme. Conserva rutas reales + dropdown Servicios (plusvalía/rentabilidad) + menú móvil. Durante la migración se ve un header claro sobre páginas aún oscuras → verificado: **aceptable y legible, no roto**.
+- **T3 — Footer** (`Footer.tsx` nuevo): el footer inline de `layout.tsx` se extrae a componente. Navy, 3 columnas + barra legal. Datos reales (WhatsApp +34 697 223 944, email `tuasesoralvaro@gmail.com`, rutas y legales existentes).
+- **T4 — Home** (`page.tsx`): reescrita como **server component `force-dynamic`** (mismo patrón que `/blog`) con las 9 secciones del mockup. **Lee en server-side y SOLO LECTURA**: `properties` (status=active, 3 más recientes), `reviews` (is_published=true, 3), y `posts` vía `getPublishedPostsPage(1,3)`. Fallbacks elegantes: si no hay propiedades activas, oculta "Inmuebles destacados" y el mosaico del hero usa imagen de Sevilla; si no hay reseñas, usa 3 testimonios de ejemplo. **`HomeBuyerPopup` se mantiene** (captación a 3s intacta).
+
+**⚠️ Cambio de comportamiento a revisar por Álvaro**: la Home ya **NO incluye `SubscribeSection`** (la banda de suscripción de compradores) — no está en el mockup. La captación de compradores sigue existiendo vía el popup (`HomeBuyerPopup`→`BuyerRegistrationModal`) y el modal de `/comprar`. Si se quiere recuperar esa banda en la nueva home, decirlo. `SuccessStoriesCarousel`, `ReviewsGrid` y `SubscribeSection` quedan huérfanos (sin importar desde la home) pero NO se borran — limpieza en fase final.
+
+**Verificación**: `npm run build` verde en cada tarea. QA visual (Chrome headless, desktop+móvil) → la home clava el mockup. `/comprar`, `/valoracion`, `/blog`, `/plusvalia`, `/contacto` siguen 200 y no rotas. Próximas fases: #021 (`/comprar`+`/blog`), #022 (formularios/calculadoras), #023 (limpieza tokens viejos).
+
+---
+
 ### 2026-06-14 — Brief #018: portada IA en los posts del blog (ilustración editorial + marca de agua + SEO)
 
 Los posts del cron automático (`/api/cron/generate-blog`, Brief #010) salían con `cover_image=null`. Ahora cada post recibe una imagen de portada generada con Gemini, con la marca de la web, que además mejora el SEO (og:image). Tres commits (`87387cd`, `eff0b53`, `8e22483`).
