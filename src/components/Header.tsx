@@ -2,122 +2,139 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 
+/**
+ * Header "Sevilla Luz" (Brief #020 T2).
+ *
+ * Estilo del mockup v4 (claro, warm-white translúcido) PERO conservando la
+ * funcionalidad real: rutas existentes, dropdown de Servicios (plusvalía +
+ * rentabilidad) y menú móvil.
+ *
+ * Se mantiene `fixed` (overlay) — y NO sticky — para no romper las páginas
+ * legacy aún oscuras, que ya añaden su propio padding superior (pt-24/pt-32)
+ * para compensar el header fijo. Header claro sobre páginas oscuras durante la
+ * migración: aceptable y temporal (ver brief).
+ */
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const closeMenu = () => setIsMobileMenuOpen(false);
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50">
-        <div className="m-4 md:m-6">
-          <nav className="glass-effect px-4 sm:px-6 py-4 flex justify-between items-center">
-            <div className="font-bold text-xl sm:text-2xl text-white flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2">
-                <img src="/logo.png" alt="Logo Tu Asesor Álvaro" className="h-12 w-auto object-contain" />
-                <span className="hidden">Tu asesor | Álvaro</span>
-              </Link>
-            </div>
-            
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center space-x-6 text-white font-semibold text-lg">
-              <Link href="/comprar" className="nav-link">
-                Comprar (0€)
-              </Link>
-              <Link href="/#vender" className="nav-link">
-                Vender (2%)
-              </Link>
-              
-              {/* Dropdown de Servicios */}
-              <div className="relative group">
-                <button className="flex items-center gap-1 px-4 py-2 border border-white/30 rounded-lg hover:bg-white/10 transition-all">
-                  Servicios
-                  <svg className="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                
-                <div className="absolute top-full left-0 mt-2 w-64 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 z-50">
-                  <div className="bg-[#0f172a]/95 backdrop-blur-md border border-white/5 rounded-xl shadow-2xl overflow-hidden">
-                    <Link href="/#servicios" className="block px-6 py-4 hover:bg-white/5 hover:text-[#FBBF24] transition-colors border-b border-white/5">
-                      Nuestros Servicios
-                    </Link>
-                    <Link href="/plusvalia" className="block px-6 py-4 hover:bg-white/5 hover:text-[#FBBF24] transition-colors border-b border-white/5">
-                      Calculadora de Plusvalía
-                    </Link>
-                    <Link href="/rentabilidad" className="block px-6 py-4 hover:bg-white/5 hover:text-[#FBBF24] transition-colors">
-                      Calculadora de Rentabilidad
-                    </Link>
-                  </div>
+      <header className="fixed top-0 left-0 right-0 z-50 bg-warm-white/90 backdrop-blur-md border-b border-line">
+        <div className="max-w-[1160px] mx-auto px-5 sm:px-10 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <Link
+            href="/"
+            className="flex items-baseline gap-[5px] font-display text-xl font-bold text-navy"
+          >
+            Tu Asesor
+            <span className="text-gold text-2xl leading-none">·</span>
+            Álvaro
+          </Link>
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-8">
+            <Link href="/comprar" className="text-sm text-muted hover:text-navy transition-colors">
+              Comprar
+            </Link>
+            <Link href="/valoracion" className="text-sm text-muted hover:text-navy transition-colors">
+              Vender
+            </Link>
+
+            {/* Dropdown Servicios */}
+            <div className="relative group">
+              <button className="flex items-center gap-1 text-sm text-muted group-hover:text-navy transition-colors">
+                Servicios
+                <ChevronDown size={15} className="transition-transform group-hover:rotate-180" />
+              </button>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-3 w-60 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                <div className="bg-warm-white border border-line rounded-xl shadow-[0_12px_32px_rgba(44,32,21,0.1)] overflow-hidden">
+                  <Link
+                    href="/plusvalia"
+                    className="block px-5 py-3.5 text-sm text-muted hover:text-navy hover:bg-sand transition-colors border-b border-line"
+                  >
+                    Calculadora de Plusvalía
+                  </Link>
+                  <Link
+                    href="/rentabilidad"
+                    className="block px-5 py-3.5 text-sm text-muted hover:text-navy hover:bg-sand transition-colors"
+                  >
+                    Calculadora de Rentabilidad
+                  </Link>
                 </div>
               </div>
-
-              <Link href="/blog" className="nav-link">
-                Blog
-              </Link>
-
-              <Link href="/contacto" className="nav-link">
-                Contacto
-              </Link>
-            </div>
-            
-            <div className="hidden md:block">
-              <Link href="/valoracion" className="btn btn-primary">
-                Valora tu piso GRATIS
-              </Link>
             </div>
 
-            {/* Mobile Menu Button */}
-            <div className="md:hidden">
-              <button 
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="text-white hover:text-[#FBBF24] transition-colors"
-              >
-                <Menu size={32} />
-              </button>
-            </div>
+            <Link href="/blog" className="text-sm text-muted hover:text-navy transition-colors">
+              Blog
+            </Link>
+            <Link href="/contacto" className="text-sm text-muted hover:text-navy transition-colors">
+              Contacto
+            </Link>
           </nav>
+
+          {/* CTA desktop */}
+          <Link
+            href="/valoracion"
+            className="hidden md:inline-flex items-center text-[13px] font-semibold bg-navy text-white px-[22px] py-2.5 rounded-full hover:bg-navy-soft hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(15,23,42,0.2)] transition-all"
+          >
+            Valora tu casa gratis
+          </Link>
+
+          {/* Botón móvil */}
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="md:hidden text-navy hover:text-gold transition-colors"
+            aria-label="Abrir menú"
+          >
+            <Menu size={28} />
+          </button>
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
+      {/* Overlay menú móvil */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[60] bg-[#0f172a]/95 backdrop-blur-md flex flex-col pt-24 px-6 overflow-y-auto pb-10">
-          <button 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="absolute top-6 right-6 text-white hover:text-[#FBBF24] transition-colors"
+        <div className="fixed inset-0 z-[60] bg-warm-white flex flex-col pt-24 px-8 overflow-y-auto pb-10 md:hidden">
+          <button
+            onClick={closeMenu}
+            className="absolute top-6 right-6 text-navy hover:text-gold transition-colors"
+            aria-label="Cerrar menú"
           >
-            <X size={40} />
+            <X size={32} />
           </button>
-          
-          <div className="flex flex-col space-y-6 text-white font-semibold text-2xl w-full max-w-sm mx-auto">
-            <Link href="/comprar" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
-              Comprar (0€)
+
+          <div className="flex flex-col gap-6 w-full max-w-sm mx-auto font-body">
+            <Link href="/comprar" onClick={closeMenu} className="text-2xl font-medium text-navy hover:text-gold transition-colors border-b border-line pb-4">
+              Comprar
             </Link>
-            <Link href="/#vender" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
-              Vender (2%)
+            <Link href="/valoracion" onClick={closeMenu} className="text-2xl font-medium text-navy hover:text-gold transition-colors border-b border-line pb-4">
+              Vender
             </Link>
-            <div className="flex flex-col space-y-3 border-b border-white/10 pb-4">
-              <Link href="/#servicios" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors">
-                Nuestros Servicios
-              </Link>
-              <div className="flex flex-col space-y-3 pl-4 border-l-2 border-[#FBBF24]/50 mt-2">
-                <Link href="/plusvalia" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-300 hover:text-[#FBBF24] transition-colors">
-                  ↳ Calculadora de Impuestos
+            <div className="border-b border-line pb-4">
+              <span className="block text-xs font-semibold uppercase tracking-[0.1em] text-muted mb-3">Servicios</span>
+              <div className="flex flex-col gap-3 pl-4 border-l-2 border-gold/50">
+                <Link href="/plusvalia" onClick={closeMenu} className="text-lg text-ink hover:text-gold transition-colors">
+                  Calculadora de Plusvalía
                 </Link>
-                <Link href="/rentabilidad" onClick={() => setIsMobileMenuOpen(false)} className="text-lg text-slate-300 hover:text-[#FBBF24] transition-colors">
-                  ↳ Calculadora de Rentabilidad
+                <Link href="/rentabilidad" onClick={closeMenu} className="text-lg text-ink hover:text-gold transition-colors">
+                  Calculadora de Rentabilidad
                 </Link>
               </div>
             </div>
-            <Link href="/blog" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
+            <Link href="/blog" onClick={closeMenu} className="text-2xl font-medium text-navy hover:text-gold transition-colors border-b border-line pb-4">
               Blog
             </Link>
-            <Link href="/contacto" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-[#FBBF24] transition-colors border-b border-white/10 pb-4">
+            <Link href="/contacto" onClick={closeMenu} className="text-2xl font-medium text-navy hover:text-gold transition-colors border-b border-line pb-4">
               Contacto
             </Link>
-            <Link href="/valoracion" onClick={() => setIsMobileMenuOpen(false)} className="btn bg-[#FBBF24] hover:bg-yellow-500 text-[#0f172a] mt-4 text-xl px-8 py-4 rounded-xl text-center w-full shadow-lg">
-              Valora tu piso GRATIS
+            <Link
+              href="/valoracion"
+              onClick={closeMenu}
+              className="mt-4 bg-navy text-white text-center text-lg font-semibold px-8 py-4 rounded-full hover:bg-navy-soft transition-colors shadow-lg"
+            >
+              Valora tu casa gratis
             </Link>
           </div>
         </div>
